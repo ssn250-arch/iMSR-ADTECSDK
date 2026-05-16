@@ -52,7 +52,7 @@ const formatTarikh = (dateString) => {
   return `${date.getDate()} ${months[date.getMonth()]} ${date.getFullYear()} (${days[date.getDay()]})`;
 };
 
-// --- FUNGSI MUAT TURUN PDF UNTUK MOBILE (BLOB CONVERSION) ---
+// --- FUNGSI MUAT TURUN PDF UNTUK MOBILE ---
 const handleDownloadBlob = (base64Url, fileName) => {
   try {
     const parts = base64Url.split(';');
@@ -205,6 +205,10 @@ export default function App() {
   const [isLockedOut, setIsLockedOut] = useState(false);
   const inactivityTimer = useRef(null);
 
+  // States Paparan Dokumen Penuh (In-App Modal)
+  const [viewingMemo, setViewingMemo] = useState(null);
+  const [blobUrl, setBlobUrl] = useState(null);
+
   // Data States
   const [announcement, setAnnouncement] = useState('');
   const [sesiKemasukan, setSesiKemasukan] = useState({ sesi: '2', tahun: '2026' });
@@ -266,6 +270,33 @@ export default function App() {
     window.addEventListener('scroll', handleScroll, { passive: true });
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
+
+  // --- PENUKAR MEMORI BLOB UNTUK PAPARAN MODAL BERPRESTASI TINGGI ---
+  useEffect(() => {
+    if (viewingMemo) {
+      try {
+        const parts = viewingMemo.url.split(';');
+        const mime = parts[0].split(':')[1];
+        const raw = window.atob(parts[1].split(',')[1]);
+        const rawLength = raw.length;
+        const uInt8Array = new Uint8Array(rawLength);
+        for (let i = 0; i < rawLength; ++i) {
+          uInt8Array[i] = raw.charCodeAt(i);
+        }
+        const blob = new Blob([uInt8Array], { type: mime });
+        const url = window.URL.createObjectURL(blob);
+        setBlobUrl(url);
+      } catch (e) {
+        console.error("Gagal menjana paparan ringan:", e);
+        setBlobUrl(viewingMemo.url); // fallback
+      }
+    } else {
+      if (blobUrl) {
+        window.URL.revokeObjectURL(blobUrl);
+        setBlobUrl(null);
+      }
+    }
+  }, [viewingMemo]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const toggleTheme = useCallback(() => {
     setIsDarkMode(prev => {
@@ -579,7 +610,7 @@ export default function App() {
                 </div>
               )}
 
-              {/* VIEW: MEMO (NAMA PENUH & BLOB DOWNLOAD) */}
+              {/* VIEW: MEMO (SENARAI BANYAK MEMO - TANPA LAG) */}
               {currentView === 'memo' && (
                 <div className="p-4 max-w-4xl mx-auto pb-32 space-y-6">
                   <div className="bg-white dark:bg-slate-800 rounded-[2rem] border p-6 md:p-8 shadow-sm">
@@ -609,7 +640,6 @@ export default function App() {
                           <div key={memo.id} className="border border-slate-200 dark:border-slate-700 rounded-2xl p-4 md:p-5 bg-slate-50 dark:bg-slate-900/50 hover:bg-white dark:hover:bg-slate-800 transition-all duration-300 shadow-sm hover:shadow-md">
                             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                               
-                              {/* Nama Fail Responsif Penuh */}
                               <div className="flex items-start gap-3 w-full">
                                 <span className="bg-blue-600 text-white text-sm font-black px-3 py-1 rounded-xl shadow-sm mt-0.5 shrink-0">{index + 1}</span>
                                 <div className="flex-1 min-w-0">
@@ -618,31 +648,14 @@ export default function App() {
                                 </div>
                               </div>
                               
-                              {/* Butang Navigasi */}
                               <div className="flex items-center gap-2 w-full sm:w-auto justify-end flex-wrap sm:flex-nowrap mt-2 sm:mt-0">
                                 <button 
-                                  onClick={() => {
-                                    const windowPenuh = window.open();
-                                    if (windowPenuh) {
-                                      windowPenuh.document.write(
-                                        `<html style="margin:0;padding:0;background:#333;"><head><title>${memo.name}</title></head>` +
-                                        `<body style="margin:0;padding:0;display:flex;justify-content:center;">` +
-                                        (memo.type === 'pdf' 
-                                          ? `<iframe src="${memo.url}" style="width:100%; height:100vh; border:none; margin:0; padding:0; background:#fff;"></iframe>`
-                                          : `<img src="${memo.url}" style="max-width:100%; max-height:100vh; object-fit:contain; background:#fff;" />`) +
-                                        `</body></html>`
-                                      );
-                                      windowPenuh.document.close();
-                                    } else {
-                                      alert("Sila benarkan 'Pop-up' untuk melihat dokumen.");
-                                    }
-                                  }} 
+                                  onClick={() => setViewingMemo(memo)}
                                   className="inline-flex items-center justify-center gap-1.5 text-xs font-bold text-blue-700 bg-blue-100 hover:bg-blue-200 dark:bg-blue-900/40 dark:text-blue-300 dark:hover:bg-blue-800/60 px-4 py-2.5 rounded-xl transition-all flex-1 sm:flex-none whitespace-nowrap active:scale-95"
                                 >
                                   <ExternalLink size={16} /> Lihat
                                 </button>
 
-                                {/* Butang Muat Turun Stabil Mobile */}
                                 <button 
                                   onClick={() => handleDownloadBlob(memo.url, memo.name)}
                                   className="inline-flex items-center justify-center gap-1.5 text-xs font-bold text-emerald-700 bg-emerald-100 hover:bg-emerald-200 dark:bg-emerald-900/40 dark:text-emerald-300 dark:hover:bg-emerald-800/60 px-4 py-2.5 rounded-xl transition-all flex-1 sm:flex-none whitespace-nowrap active:scale-95"
@@ -874,6 +887,48 @@ export default function App() {
             </div>
           )}
         </main>
+
+        {/* --- IN-APP MODAL UNTUK PAPARAN MEMO PENUH --- */}
+        {viewingMemo && (
+          <div className="fixed inset-0 z-[100] bg-slate-900/95 backdrop-blur-md flex flex-col animate-in fade-in zoom-in-[0.98] duration-200">
+            {/* Header Modal */}
+            <div className="flex justify-between items-center p-4 bg-slate-900 border-b border-slate-800 text-white shadow-md z-10">
+              <div className="flex items-center gap-3 overflow-hidden">
+                <FileText size={20} className="text-blue-400 shrink-0" />
+                <h3 className="font-bold text-sm md:text-base truncate">{viewingMemo.name}</h3>
+              </div>
+              <div className="flex items-center gap-3 shrink-0 ml-4">
+                <button 
+                  onClick={() => handleDownloadBlob(viewingMemo.url, viewingMemo.name)} 
+                  className="p-2 bg-emerald-600 hover:bg-emerald-500 rounded-xl transition-colors shadow-lg active:scale-95"
+                  title="Muat Turun"
+                >
+                  <Download size={18} />
+                </button>
+                <button 
+                  onClick={() => setViewingMemo(null)} 
+                  className="p-2 bg-red-600 hover:bg-red-500 rounded-xl transition-colors shadow-lg active:scale-95"
+                  title="Tutup"
+                >
+                  <Plus size={18} className="rotate-45" />
+                </button>
+              </div>
+            </div>
+            
+            {/* Ruangan Paparan Dokumen */}
+            <div className="flex-1 w-full h-full p-2 md:p-6 overflow-hidden flex justify-center items-center">
+              {blobUrl ? (
+                viewingMemo.type === 'pdf' ? (
+                  <iframe src={blobUrl} className="w-full h-full bg-white rounded-xl shadow-2xl" title={viewingMemo.name} />
+                ) : (
+                  <img src={blobUrl} alt={viewingMemo.name} className="max-w-full max-h-full object-contain rounded-xl shadow-2xl" />
+                )
+              ) : (
+                <div className="text-white animate-pulse">Sedang memproses dokumen...</div>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* --- FOOTER --- */}
         <footer className="bg-slate-100 dark:bg-slate-900 text-slate-400 py-6 text-center text-[11px] font-bold mt-auto pb-24 md:pb-6 border-t">
