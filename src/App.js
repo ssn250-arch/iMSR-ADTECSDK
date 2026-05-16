@@ -8,7 +8,7 @@ import {
   Lock, LogOut, UploadCloud, Plus, Trash2, Edit3, Image as ImageIcon,
   Bell, Eye, EyeOff, ShieldCheck, AlertTriangle, Clock,
   Moon, Sun, Zap, Settings, Command, Award,
-  Globe, Monitor, Shield
+  Globe, Monitor, Shield, X
 } from 'lucide-react';
 
 // --- STYLES FOR SCROLLBAR & ANIMATIONS ---
@@ -489,7 +489,7 @@ export default function App() {
             <div className="bg-white dark:bg-slate-900 rounded-[2rem] shadow-2xl p-8 w-full max-w-sm border border-slate-200 dark:border-slate-700 animate-in zoom-in-[0.95] fade-in duration-300 ease-out">
               <div className="flex justify-between items-center mb-8">
                 <h2 className="text-2xl font-extrabold flex items-center gap-2"><Lock size={24} className="text-blue-600" /> Akses Admin</h2>
-                <button onClick={() => setShowLogin(false)} className="text-slate-400 hover:text-slate-600 bg-slate-100 dark:bg-slate-800 rounded-full p-2 transition-all active:scale-90"><Plus className="rotate-45" size={20}/></button>
+                <button onClick={() => setShowLogin(false)} className="text-slate-400 hover:text-slate-600 bg-slate-100 dark:bg-slate-800 rounded-full p-2 transition-all active:scale-90"><X size={20}/></button>
               </div>
               {isLockedOut ? (
                 <div className="bg-red-50 text-red-600 p-4 rounded-2xl flex items-center gap-3"><AlertTriangle size={24} /><p className="text-sm font-bold">Akaun dikunci 30 saat.</p></div>
@@ -618,7 +618,6 @@ export default function App() {
                               </div>
                               
                               <div className="flex items-center gap-2 w-full sm:w-auto justify-end flex-wrap sm:flex-nowrap mt-2 sm:mt-0">
-                                {/* Butang Papar HANYA muncul jika skrin bersaiz besar (SM ke atas) */}
                                 <button 
                                   onClick={() => {
                                     const windowPenuh = window.open();
@@ -641,7 +640,6 @@ export default function App() {
                                   <ExternalLink size={16} /> Lihat
                                 </button>
 
-                                {/* Butang Muat Turun sentiasa muncul */}
                                 <button 
                                   onClick={() => handleDownloadBlob(memo.url, memo.name)}
                                   className="inline-flex items-center justify-center gap-1.5 text-xs font-bold text-emerald-700 bg-emerald-100 hover:bg-emerald-200 dark:bg-emerald-900/40 dark:text-emerald-300 dark:hover:bg-emerald-800/60 px-4 py-2.5 rounded-xl transition-all flex-1 sm:flex-none whitespace-nowrap active:scale-95"
@@ -697,19 +695,63 @@ export default function App() {
                       <button onClick={() => { const newAjk = [...ajkInduk, { peranan: "Peranan Baru", nama: "Nama Baru" }]; setAjkInduk(newAjk); saveToFirebase({ ajkInduk: newAjk }); }} className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl font-bold text-xs transition-colors active:scale-95">+ Tambah</button>
                     )}
                   </div>
+                  
                   <div className="bg-white dark:bg-slate-800 border p-6 rounded-3xl space-y-4 shadow-sm">
                     {ajkInduk.map((ajk, idx) => (
-                      <div key={idx} className="flex flex-col sm:flex-row gap-2 border-b pb-3 last:border-0">
+                      <div key={idx} className="flex flex-col sm:flex-row gap-3 sm:gap-4 border-b border-slate-100 dark:border-slate-700 pb-4 last:border-0 last:pb-0 items-start">
                         {isAdmin ? (
                           <>
-                            <input value={ajk.peranan} onChange={e => { const newAjk = [...ajkInduk]; newAjk[idx].peranan = e.target.value; setAjkInduk(newAjk); }} onBlur={() => saveToFirebase({ ajkInduk })} className="border p-2 rounded-lg text-sm dark:bg-slate-900 transition-colors" />
-                            <input value={ajk.nama} onChange={e => { const newAjk = [...ajkInduk]; newAjk[idx].nama = e.target.value; setAjkInduk(newAjk); }} onBlur={() => saveToFirebase({ ajkInduk })} className="border p-2 rounded-lg text-sm w-full dark:bg-slate-900 transition-colors" />
-                            <button onClick={() => { const newAjk = ajkInduk.filter((_, i) => i !== idx); setAjkInduk(newAjk); saveToFirebase({ ajkInduk: newAjk }); }} className="text-red-500 hover:bg-red-50 p-2 rounded-lg transition-colors"><Trash2 size={18}/></button>
+                            <input 
+                              value={ajk.peranan} 
+                              onChange={e => { const newAjk = [...ajkInduk]; newAjk[idx].peranan = e.target.value; setAjkInduk(newAjk); }} 
+                              onBlur={() => saveToFirebase({ ajkInduk })} 
+                              className="border p-2.5 rounded-lg text-sm w-full sm:w-1/3 dark:bg-slate-900 transition-colors font-bold uppercase" 
+                              placeholder="Jawatan"
+                            />
+                            
+                            <div className="w-full flex flex-col gap-1 relative">
+                              <textarea 
+                                value={ajk.nama} 
+                                onChange={e => { const newAjk = [...ajkInduk]; newAjk[idx].nama = e.target.value; setAjkInduk(newAjk); }} 
+                                onBlur={() => saveToFirebase({ ajkInduk })} 
+                                className="border p-2.5 rounded-lg text-sm w-full dark:bg-slate-900 transition-colors leading-relaxed custom-scrollbar" 
+                                rows={Math.max(1, ajk.nama.split('\n').length)}
+                                placeholder="Nama (Tekan Enter untuk menambah pembantu)"
+                              />
+                              {ajk.nama.includes('\n') && (
+                                <span className="text-[10px] font-bold text-blue-500 absolute -bottom-4 left-1">
+                                  * Baris pertama = Ketua (K)
+                                </span>
+                              )}
+                            </div>
+
+                            <button 
+                              onClick={() => { const newAjk = ajkInduk.filter((_, i) => i !== idx); setAjkInduk(newAjk); saveToFirebase({ ajkInduk: newAjk }); }} 
+                              className="text-red-500 hover:bg-red-50 p-2.5 rounded-lg transition-colors shrink-0 self-start sm:self-auto"
+                            >
+                              <Trash2 size={18}/>
+                            </button>
                           </>
                         ) : (
                           <>
-                            <span className="text-sm font-extrabold text-blue-600 dark:text-blue-400 w-1/3 uppercase">{ajk.peranan}</span>
-                            <span className="text-sm font-bold w-2/3 whitespace-pre-line leading-relaxed">{ajk.nama}</span>
+                            <span className="text-sm font-extrabold text-blue-600 dark:text-blue-400 sm:w-1/3 uppercase pt-0.5">{ajk.peranan}</span>
+                            <div className="w-full sm:w-2/3 flex flex-col gap-1.5">
+                              {ajk.nama.split('\n').map((nama, nIdx, arr) => {
+                                const text = nama.trim();
+                                if (!text) return null;
+                                
+                                const cleanName = text.replace(/\(K\)/gi, '').trim(); 
+                                const validNamesCount = arr.filter(n => n.trim() !== '').length;
+                                const isKetua = validNamesCount > 1 && nIdx === 0;
+                                
+                                return (
+                                  <span key={nIdx} className="text-sm font-bold text-slate-800 dark:text-slate-100 leading-snug flex items-start gap-1.5">
+                                    {isKetua && <span className="bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300 text-[10px] px-1.5 py-0.5 rounded font-black shrink-0 mt-0.5">K</span>}
+                                    {cleanName}
+                                  </span>
+                                );
+                              })}
+                            </div>
                           </>
                         )}
                       </div>
@@ -895,7 +937,7 @@ export default function App() {
           ))}
         </nav>
 
-        {/* --- FAB QUICK ACTION BUTTON (MODERNIZED) --- */}
+        {/* --- FAB QUICK ACTION BUTTON (MODERNIZED & ANIMATED) --- */}
         <div className="fixed bottom-24 md:bottom-6 right-6 z-50 flex flex-col items-end gap-2">
            {showFabMenu && (
              <div className="bg-white/85 dark:bg-slate-800/85 backdrop-blur-2xl border border-slate-200/50 dark:border-slate-700/50 shadow-2xl flex flex-col gap-2 text-xs font-bold w-44 animate-in slide-in-from-bottom-4 zoom-in-95 duration-200 ease-out origin-bottom-right rounded-2xl p-2 mb-2">
@@ -911,9 +953,10 @@ export default function App() {
              </div>
            )}
            <button onClick={() => setShowFabMenu(!showFabMenu)} className="bg-slate-800 dark:bg-blue-600 text-white p-4 rounded-full shadow-[0_12px_32px_rgba(0,0,0,0.3)] hover:scale-105 active:scale-95 transition-all duration-300 focus:outline-none flex items-center justify-center border border-slate-700 dark:border-blue-500">
+             {/* MODERN ICON TRANSITION (ROTATE & FADE) */}
              <div className="relative w-6 h-6 flex items-center justify-center">
-               <Command size={24} className={`absolute transition-all duration-300 ease-in-out ${showFabMenu ? 'rotate-90 opacity-0 scale-50' : 'rotate-0 opacity-100 scale-100'}`} />
-               <Plus size={28} className={`absolute transition-all duration-300 ease-in-out ${showFabMenu ? 'rotate-45 opacity-100 scale-100' : '-rotate-45 opacity-0 scale-50'}`} />
+               <Command size={24} className={`absolute transition-all duration-300 ease-in-out ${showFabMenu ? '-rotate-90 opacity-0 scale-50' : 'rotate-0 opacity-100 scale-100'}`} />
+               <X size={24} className={`absolute transition-all duration-300 ease-in-out ${showFabMenu ? 'rotate-0 opacity-100 scale-100' : 'rotate-90 opacity-0 scale-50'}`} />
              </div>
            </button>
         </div>
