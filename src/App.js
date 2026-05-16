@@ -136,6 +136,7 @@ const senaraiStaf = [
   "Cik Nur Syafiqah binti Arman",
   "Puan Nurulizaty binti Ibrahim",
   "Encik Omrei bin Okong",
+  "Encik Peter Masawa",
   "Encik Richard Joanes",
   "Puan Roha binti Awang Latif",
   "Puan Rohana binti Ahmad",
