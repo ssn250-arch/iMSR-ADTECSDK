@@ -9,7 +9,7 @@ import {
   Lock, LogOut, UploadCloud, Plus, Trash2, Edit3, Image as ImageIcon,
   Bell, Eye, EyeOff, ShieldCheck, AlertTriangle, Clock,
   Moon, Sun, Menu, LayoutGrid, Zap, Settings, Command, Award,
-  Facebook as FacebookIcon, Monitor, Shield
+  Globe, Monitor, Shield
 } from 'lucide-react';
 
 // --- STYLES FOR SCROLLBAR & ANIMATIONS ---
@@ -534,7 +534,7 @@ export default function App() {
                   <Monitor size={20} />
                 </a>
                 <a href="https://www.facebook.com/ilpsdk" target="_blank" rel="noopener noreferrer" className="p-2 rounded-full text-slate-500 dark:text-slate-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-slate-800 transition-colors" title="Facebook ILP Sandakan">
-                  <FacebookIcon size={20} />
+                  <Globe size={20} />
                 </a>
               </div>
 
@@ -1250,7 +1250,7 @@ export default function App() {
                   <div className="bg-indigo-600 text-white p-1.5 rounded-lg"><Monitor size={16}/></div> Sistem JIMS
                 </a>
                 <a href="https://www.facebook.com/ilpsdk" target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 px-4 py-3 hover:bg-slate-100 dark:hover:bg-slate-700/50 rounded-2xl transition-colors text-sm font-bold text-slate-700 dark:text-slate-200">
-                    <div className="bg-blue-600 text-white p-1.5 rounded-lg"><FacebookIcon size={16}/></div> Facebook
+                    <div className="bg-blue-600 text-white p-1.5 rounded-lg"><Globe size={16}/></div> Facebook
                 </a>
                 <button onClick={toggleTheme} className="flex items-center gap-3 px-4 py-3 hover:bg-slate-100 dark:hover:bg-slate-700/50 rounded-2xl transition-colors text-sm font-bold text-slate-700 dark:text-slate-200 w-full text-left">
                   <div className="bg-amber-100 dark:bg-indigo-900/50 text-amber-600 dark:text-indigo-400 p-1.5 rounded-lg">
