@@ -52,7 +52,7 @@ const formatTarikh = (dateString) => {
   return `${date.getDate()} ${months[date.getMonth()]} ${date.getFullYear()} (${days[date.getDay()]})`;
 };
 
-// --- FUNGSI MUAT TURUN PDF UNTUK MOBILE ---
+// --- FUNGSI MUAT TURUN PDF UNTUK MOBILE (BLOB CONVERSION) ---
 const handleDownloadBlob = (base64Url, fileName) => {
   try {
     const parts = base64Url.split(';');
@@ -205,10 +205,6 @@ export default function App() {
   const [isLockedOut, setIsLockedOut] = useState(false);
   const inactivityTimer = useRef(null);
 
-  // States Paparan Dokumen Penuh (In-App Modal)
-  const [viewingMemo, setViewingMemo] = useState(null);
-  const [blobUrl, setBlobUrl] = useState(null);
-
   // Data States
   const [announcement, setAnnouncement] = useState('');
   const [sesiKemasukan, setSesiKemasukan] = useState({ sesi: '2', tahun: '2026' });
@@ -270,33 +266,6 @@ export default function App() {
     window.addEventListener('scroll', handleScroll, { passive: true });
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
-
-  // --- PENUKAR MEMORI BLOB UNTUK PAPARAN MODAL BERPRESTASI TINGGI ---
-  useEffect(() => {
-    if (viewingMemo) {
-      try {
-        const parts = viewingMemo.url.split(';');
-        const mime = parts[0].split(':')[1];
-        const raw = window.atob(parts[1].split(',')[1]);
-        const rawLength = raw.length;
-        const uInt8Array = new Uint8Array(rawLength);
-        for (let i = 0; i < rawLength; ++i) {
-          uInt8Array[i] = raw.charCodeAt(i);
-        }
-        const blob = new Blob([uInt8Array], { type: mime });
-        const url = window.URL.createObjectURL(blob);
-        setBlobUrl(url);
-      } catch (e) {
-        console.error("Gagal menjana paparan ringan:", e);
-        setBlobUrl(viewingMemo.url); // fallback
-      }
-    } else {
-      if (blobUrl) {
-        window.URL.revokeObjectURL(blobUrl);
-        setBlobUrl(null);
-      }
-    }
-  }, [viewingMemo]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const toggleTheme = useCallback(() => {
     setIsDarkMode(prev => {
@@ -610,7 +579,7 @@ export default function App() {
                 </div>
               )}
 
-              {/* VIEW: MEMO (SENARAI BANYAK MEMO - TANPA LAG) */}
+              {/* VIEW: MEMO */}
               {currentView === 'memo' && (
                 <div className="p-4 max-w-4xl mx-auto pb-32 space-y-6">
                   <div className="bg-white dark:bg-slate-800 rounded-[2rem] border p-6 md:p-8 shadow-sm">
@@ -649,13 +618,30 @@ export default function App() {
                               </div>
                               
                               <div className="flex items-center gap-2 w-full sm:w-auto justify-end flex-wrap sm:flex-nowrap mt-2 sm:mt-0">
+                                {/* Butang Papar HANYA muncul jika skrin bersaiz besar (SM ke atas) */}
                                 <button 
-                                  onClick={() => setViewingMemo(memo)}
-                                  className="inline-flex items-center justify-center gap-1.5 text-xs font-bold text-blue-700 bg-blue-100 hover:bg-blue-200 dark:bg-blue-900/40 dark:text-blue-300 dark:hover:bg-blue-800/60 px-4 py-2.5 rounded-xl transition-all flex-1 sm:flex-none whitespace-nowrap active:scale-95"
+                                  onClick={() => {
+                                    const windowPenuh = window.open();
+                                    if (windowPenuh) {
+                                      windowPenuh.document.write(
+                                        `<html style="margin:0;padding:0;background:#333;"><head><title>${memo.name}</title></head>` +
+                                        `<body style="margin:0;padding:0;display:flex;justify-content:center;">` +
+                                        (memo.type === 'pdf' 
+                                          ? `<iframe src="${memo.url}" style="width:100%; height:100vh; border:none; margin:0; padding:0; background:#fff;"></iframe>`
+                                          : `<img src="${memo.url}" style="max-width:100%; max-height:100vh; object-fit:contain; background:#fff;" />`) +
+                                        `</body></html>`
+                                      );
+                                      windowPenuh.document.close();
+                                    } else {
+                                      alert("Sila benarkan 'Pop-up' untuk melihat dokumen.");
+                                    }
+                                  }} 
+                                  className="hidden sm:inline-flex items-center justify-center gap-1.5 text-xs font-bold text-blue-700 bg-blue-100 hover:bg-blue-200 dark:bg-blue-900/40 dark:text-blue-300 dark:hover:bg-blue-800/60 px-4 py-2.5 rounded-xl transition-all flex-1 sm:flex-none whitespace-nowrap active:scale-95"
                                 >
                                   <ExternalLink size={16} /> Lihat
                                 </button>
 
+                                {/* Butang Muat Turun sentiasa muncul */}
                                 <button 
                                   onClick={() => handleDownloadBlob(memo.url, memo.name)}
                                   className="inline-flex items-center justify-center gap-1.5 text-xs font-bold text-emerald-700 bg-emerald-100 hover:bg-emerald-200 dark:bg-emerald-900/40 dark:text-emerald-300 dark:hover:bg-emerald-800/60 px-4 py-2.5 rounded-xl transition-all flex-1 sm:flex-none whitespace-nowrap active:scale-95"
@@ -888,48 +874,6 @@ export default function App() {
           )}
         </main>
 
-        {/* --- IN-APP MODAL UNTUK PAPARAN MEMO PENUH --- */}
-        {viewingMemo && (
-          <div className="fixed inset-0 z-[100] bg-slate-900/95 backdrop-blur-md flex flex-col animate-in fade-in zoom-in-[0.98] duration-200">
-            {/* Header Modal */}
-            <div className="flex justify-between items-center p-4 bg-slate-900 border-b border-slate-800 text-white shadow-md z-10">
-              <div className="flex items-center gap-3 overflow-hidden">
-                <FileText size={20} className="text-blue-400 shrink-0" />
-                <h3 className="font-bold text-sm md:text-base truncate">{viewingMemo.name}</h3>
-              </div>
-              <div className="flex items-center gap-3 shrink-0 ml-4">
-                <button 
-                  onClick={() => handleDownloadBlob(viewingMemo.url, viewingMemo.name)} 
-                  className="p-2 bg-emerald-600 hover:bg-emerald-500 rounded-xl transition-colors shadow-lg active:scale-95"
-                  title="Muat Turun"
-                >
-                  <Download size={18} />
-                </button>
-                <button 
-                  onClick={() => setViewingMemo(null)} 
-                  className="p-2 bg-red-600 hover:bg-red-500 rounded-xl transition-colors shadow-lg active:scale-95"
-                  title="Tutup"
-                >
-                  <Plus size={18} className="rotate-45" />
-                </button>
-              </div>
-            </div>
-            
-            {/* Ruangan Paparan Dokumen */}
-            <div className="flex-1 w-full h-full p-2 md:p-6 overflow-hidden flex justify-center items-center">
-              {blobUrl ? (
-                viewingMemo.type === 'pdf' ? (
-                  <iframe src={blobUrl} className="w-full h-full bg-white rounded-xl shadow-2xl" title={viewingMemo.name} />
-                ) : (
-                  <img src={blobUrl} alt={viewingMemo.name} className="max-w-full max-h-full object-contain rounded-xl shadow-2xl" />
-                )
-              ) : (
-                <div className="text-white animate-pulse">Sedang memproses dokumen...</div>
-              )}
-            </div>
-          </div>
-        )}
-
         {/* --- FOOTER --- */}
         <footer className="bg-slate-100 dark:bg-slate-900 text-slate-400 py-6 text-center text-[11px] font-bold mt-auto pb-24 md:pb-6 border-t">
           <p>Hak Cipta Terpelihara &copy; 2026 Kolej Teknologi Termaju (ADTEC) Kampus Sandakan.</p>
@@ -951,23 +895,26 @@ export default function App() {
           ))}
         </nav>
 
-        {/* --- FAB QUICK ACTION BUTTON --- */}
+        {/* --- FAB QUICK ACTION BUTTON (MODERNIZED) --- */}
         <div className="fixed bottom-24 md:bottom-6 right-6 z-50 flex flex-col items-end gap-2">
            {showFabMenu && (
-             <div className="bg-white dark:bg-slate-800 border p-2 rounded-2xl shadow-2xl flex flex-col gap-1 text-xs font-bold w-40 animate-in slide-in-from-bottom-2 zoom-in-[0.9] duration-200 ease-out origin-bottom-right">
-                <a href="https://www.jtm.gov.my/etatatertib" target="_blank" rel="noopener noreferrer" className="p-2.5 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-xl transition-colors">eTATATERTIB</a>
-                <a href="https://jims.jtm.gov.my/" target="_blank" rel="noopener noreferrer" className="p-2.5 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-xl transition-colors">Sistem JIMS</a>
-                <button onClick={toggleTheme} className="p-2.5 text-left hover:bg-slate-100 dark:hover:bg-slate-700 rounded-xl transition-colors">Tema: {isDarkMode ? 'Cerah' : 'Gelap'}</button>
-                <div className="h-px bg-slate-200 dark:bg-slate-700 my-1 mx-1"></div>
+             <div className="bg-white/85 dark:bg-slate-800/85 backdrop-blur-2xl border border-slate-200/50 dark:border-slate-700/50 shadow-2xl flex flex-col gap-2 text-xs font-bold w-44 animate-in slide-in-from-bottom-4 zoom-in-95 duration-200 ease-out origin-bottom-right rounded-2xl p-2 mb-2">
+                <a href="https://www.jtm.gov.my/etatatertib" target="_blank" rel="noopener noreferrer" className="p-3 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-xl transition-colors">eTATATERTIB</a>
+                <a href="https://jims.jtm.gov.my/" target="_blank" rel="noopener noreferrer" className="p-3 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-xl transition-colors">Sistem JIMS</a>
+                <button onClick={toggleTheme} className="p-3 text-left hover:bg-slate-100 dark:hover:bg-slate-700 rounded-xl transition-colors">Tema: {isDarkMode ? 'Cerah' : 'Gelap'}</button>
+                <div className="h-px bg-slate-200/50 dark:bg-slate-700/50 my-1 mx-1"></div>
                 {isAdmin ? (
-                  <button onClick={() => { setIsAdmin(false); setShowFabMenu(false); }} className="p-2.5 text-left text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-xl transition-colors">Log Keluar</button>
+                  <button onClick={() => { setIsAdmin(false); setShowFabMenu(false); }} className="flex items-center gap-3 p-3 text-left text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-xl transition-colors"><LogOut size={16} /> Log Keluar</button>
                 ) : (
-                  <button onClick={() => { setShowLogin(true); setShowFabMenu(false); }} className="p-2.5 text-left text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded-xl transition-colors">Akses Admin</button>
+                  <button onClick={() => { setShowLogin(true); setShowFabMenu(false); }} className="flex items-center gap-3 p-3 text-left text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded-xl transition-colors"><Lock size={16} /> Akses Admin</button>
                 )}
              </div>
            )}
-           <button onClick={() => setShowFabMenu(!showFabMenu)} className="bg-slate-800 dark:bg-blue-600 text-white p-3.5 rounded-full shadow-[0_8px_20px_rgba(0,0,0,0.2)] hover:scale-105 active:scale-95 transition-all duration-300">
-             {showFabMenu ? <Plus size={24} className="rotate-45" /> : <Command size={24} />}
+           <button onClick={() => setShowFabMenu(!showFabMenu)} className="bg-slate-800 dark:bg-blue-600 text-white p-4 rounded-full shadow-[0_12px_32px_rgba(0,0,0,0.3)] hover:scale-105 active:scale-95 transition-all duration-300 focus:outline-none flex items-center justify-center border border-slate-700 dark:border-blue-500">
+             <div className="relative w-6 h-6 flex items-center justify-center">
+               <Command size={24} className={`absolute transition-all duration-300 ease-in-out ${showFabMenu ? 'rotate-90 opacity-0 scale-50' : 'rotate-0 opacity-100 scale-100'}`} />
+               <Plus size={28} className={`absolute transition-all duration-300 ease-in-out ${showFabMenu ? 'rotate-45 opacity-100 scale-100' : '-rotate-45 opacity-0 scale-50'}`} />
+             </div>
            </button>
         </div>
 
