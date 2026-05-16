@@ -90,6 +90,75 @@ const CustomFacebookIcon = React.memo(({ size = 20 }) => (
   </svg>
 ));
 
+// --- SENARAI STAF (AUTOCOMPLETE) ---
+const senaraiStaf = [
+  "Abdul Hamid bin Sakmud @ Abdullah",
+  "Adiniah Binti Muhamad Radzai",
+  "Ahmad Fadhlullah bin Rusaidi",
+  "Anamary binti Madyusah",
+  "Andrew Bin Arih",
+  "Anzari bin Mohd Daud",
+  "Aslinah binti Aldan",
+  "Asriyani binti Seraila",
+  "Azryzan bin Besri",
+  "Azwie bin Jafri",
+  "Billy Anak Rejap",
+  "Darman bin Daming",
+  "Faten Farhana binti Wong",
+  "Hafizulhaq bin Hatib",
+  "Haslinda binti Bohari",
+  "Hazrudy bin Ahmad Nasaruddin",
+  "Ibrahim bin Lamusa",
+  "Isabella Francis Xavier",
+  "Ismail Bin Muin",
+  "Jaikol bin Udar",
+  "Jamludin bin Assat",
+  "Japri Bin Patomdang",
+  "Juraini binti Sahid",
+  "Lynn Noell Ending",
+  "Mohamad Sali bin Saleh",
+  "Mohammad Nasir bin Awang",
+  "Mohd Hafizul bin Ibrahim Apani",
+  "Mohd Hairi bin Mohd Shah",
+  "Mohd Hakimin Mohd Hussin",
+  "Mohd Nur Fitri bin Jamil",
+  "Mohd Shamin bin Ahmad",
+  "Muhaidi bin Mohamad",
+  "Muhammad Alinafiah bin Sabril",
+  "Muhalis bin Nonchi",
+  "Nadzihah binti Ahmad",
+  "Nasri bin Kipple",
+  "Nazriati binti Nasib",
+  "Nazry bin Yusof",
+  "Noraini binti Sukri",
+  "Norashikin Binti Ariffin",
+  "Norashsikin binti Mohd Arsad",
+  "Norhadzla binti Abd Halim",
+  "Nur Syafiqah binti Arman",
+  "Nurulizaty binti Ibrahim",
+  "Omrei bin Okong",
+  "Richard Joanes",
+  "Roha binti Awang Latif",
+  "Rohana binti Ahmad",
+  "Roshayati binti Mohammad",
+  "Rusyieni @ Wendy Binti Payah",
+  "Sakinah binti Pitungut",
+  "Satria binti Murtala",
+  "Shaharul bin Abu Talib",
+  "Tc. Johannes Belili",
+  "Tc. Mohd Radznan bin Malek",
+  "Tc. Mohd Sabri bin Mohd Sarif",
+  "Tc. Ng Vui Chien",
+  "Tc. Silvester bin Lawai",
+  "Ts. Joey Eriksen Teo",
+  "Ts. Muhammad Haziq bin Hamzah",
+  "Ts. Muhammad Hifzan bin Salimun",
+  "Ts. Nurzharfan bin Rafei Bui",
+  "Ts. Suhaidi bin Mustar",
+  "Ts. Syed Mohd Yusri bin Syed Yusoff",
+  "Zuliza binti Roslan"
+];
+
 // --- NETWORK ANIMATION COMPONENT ---
 const NetworkAnimation = React.memo(() => {
   const canvasRef = useRef(null);
@@ -214,7 +283,7 @@ export default function App() {
   const [biroList, setBiroList] = useState([]);
   const [jadualData, setJadualData] = useState([]);
   const [penutupData, setPenutupData] = useState([]);
-  const [layoutImage, setLayoutImage] = useState(null); // Boleh terima base64 PDF atau Imej
+  const [layoutImage, setLayoutImage] = useState(null);
 
   const [activeJadualTab, setActiveJadualTab] = useState('');
   const [isScrolled, setIsScrolled] = useState(false);
@@ -349,10 +418,9 @@ export default function App() {
     }
   };
 
-  // --- KEMAS KINI FUNGSI MUAT NAIK PELAN (SOKONGAN PDF & IMEJ) ---
   const handleLayoutUpload = (e) => {
     const file = e.target.files[0];
-    if (file) {
+    if (file && file.type.startsWith('image/')) {
       const reader = new FileReader();
       reader.onload = (ev) => {
         setLayoutImage(ev.target.result);
@@ -448,6 +516,13 @@ export default function App() {
 
   return (
     <div className={isDarkMode ? 'dark' : ''}>
+      {/* DATALIST UNTUK AUTOCOMPLETE NAMA STAF */}
+      <datalist id="senarai-staf">
+        {senaraiStaf.map((staf, i) => (
+          <option key={i} value={staf} />
+        ))}
+      </datalist>
+
       <div className="min-h-screen bg-slate-100 dark:bg-slate-900 font-sans text-slate-900 dark:text-slate-100 flex flex-col relative selection:bg-blue-200 dark:selection:bg-blue-900 overflow-x-hidden">
         <GlobalStyles />
 
@@ -618,7 +693,6 @@ export default function App() {
                               </div>
                               
                               <div className="flex items-center gap-2 w-full sm:w-auto justify-end flex-wrap sm:flex-nowrap mt-2 sm:mt-0">
-                                {/* Butang Papar HANYA muncul jika skrin bersaiz besar (SM ke atas) */}
                                 <button 
                                   onClick={() => {
                                     const windowPenuh = window.open();
@@ -641,7 +715,6 @@ export default function App() {
                                   <ExternalLink size={16} /> Lihat
                                 </button>
 
-                                {/* Butang Muat Turun sentiasa muncul */}
                                 <button 
                                   onClick={() => handleDownloadBlob(memo.url, memo.name)}
                                   className="inline-flex items-center justify-center gap-1.5 text-xs font-bold text-emerald-700 bg-emerald-100 hover:bg-emerald-200 dark:bg-emerald-900/40 dark:text-emerald-300 dark:hover:bg-emerald-800/60 px-4 py-2.5 rounded-xl transition-all flex-1 sm:flex-none whitespace-nowrap active:scale-95"
@@ -711,25 +784,55 @@ export default function App() {
                               placeholder="Jawatan"
                             />
                             
-                            <div className="w-full flex flex-col gap-1 relative">
-                              <textarea 
-                                value={ajk.nama} 
-                                onChange={e => { const newAjk = [...ajkInduk]; newAjk[idx].nama = e.target.value; setAjkInduk(newAjk); }} 
-                                onBlur={() => saveToFirebase({ ajkInduk })} 
-                                className="border p-2.5 rounded-lg text-sm w-full dark:bg-slate-900 transition-colors leading-relaxed custom-scrollbar" 
-                                rows={Math.max(1, ajk.nama.split('\n').length)}
-                                placeholder="Nama (Tekan Enter untuk menambah pembantu)"
-                              />
-                              {ajk.nama.includes('\n') && (
-                                <span className="text-[10px] font-bold text-blue-500 absolute -bottom-4 left-1">
-                                  * Baris pertama = Ketua (K)
-                                </span>
-                              )}
+                            <div className="w-full flex flex-col gap-2 relative">
+                              {ajk.nama.split('\n').map((n, nIdx, arr) => (
+                                <div key={nIdx} className="flex items-center gap-2">
+                                  {arr.length > 1 && nIdx === 0 && (
+                                    <span className="bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300 text-[10px] px-1.5 py-1 rounded font-black shrink-0">K</span>
+                                  )}
+                                  <input 
+                                    list="senarai-staf"
+                                    value={n} 
+                                    onChange={e => { 
+                                      const names = ajk.nama.split('\n');
+                                      names[nIdx] = e.target.value;
+                                      const newAjk = [...ajkInduk]; 
+                                      newAjk[idx].nama = names.join('\n'); 
+                                      setAjkInduk(newAjk); 
+                                    }} 
+                                    onBlur={() => saveToFirebase({ ajkInduk })} 
+                                    className="border p-2.5 rounded-lg text-sm w-full dark:bg-slate-900 transition-colors" 
+                                    placeholder={arr.length > 1 && nIdx === 0 ? "Cari Nama Ketua" : "Cari Nama Pembantu"}
+                                  />
+                                  {arr.length > 1 && (
+                                     <button onClick={() => {
+                                         const names = ajk.nama.split('\n');
+                                         names.splice(nIdx, 1);
+                                         const newAjk = [...ajkInduk];
+                                         newAjk[idx].nama = names.join('\n');
+                                         setAjkInduk(newAjk);
+                                         saveToFirebase({ ajkInduk: newAjk });
+                                     }} className="text-red-400 hover:text-red-500 p-1">
+                                         <X size={16}/>
+                                     </button>
+                                  )}
+                                </div>
+                              ))}
+                              <button 
+                                onClick={() => {
+                                   const newAjk = [...ajkInduk];
+                                   newAjk[idx].nama += '\n';
+                                   setAjkInduk(newAjk);
+                                }}
+                                className="text-xs text-blue-600 dark:text-blue-400 font-bold self-start mt-1 hover:underline flex items-center gap-1"
+                              >
+                                <Plus size={12}/> Tambah Pembantu
+                              </button>
                             </div>
 
                             <button 
                               onClick={() => { const newAjk = ajkInduk.filter((_, i) => i !== idx); setAjkInduk(newAjk); saveToFirebase({ ajkInduk: newAjk }); }} 
-                              className="text-red-500 hover:bg-red-50 p-2.5 rounded-lg transition-colors shrink-0 self-start sm:self-auto"
+                              className="text-red-500 bg-red-50 hover:bg-red-100 p-2.5 rounded-lg transition-colors shrink-0 self-start sm:self-auto"
                             >
                               <Trash2 size={18}/>
                             </button>
@@ -763,7 +866,7 @@ export default function App() {
                   <div className="flex justify-between items-center pt-4">
                     <h3 className="font-extrabold text-2xl">Biro Pelaksana</h3>
                     {isAdmin && (
-                      <button onClick={() => { const newBiro = [...biroList, { nama: "Biro Baru", ketua: "Ketua Biro", ahli: [] }]; setBiroList(newBiro); saveToFirebase({ biroList: newBiro }); }} className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl font-bold text-xs transition-colors active:scale-95">+ Tambah Biro</button>
+                      <button onClick={() => { const newBiro = [...biroList, { nama: "Biro Baru", ketua: "", ahli: [] }]; setBiroList(newBiro); saveToFirebase({ biroList: newBiro }); }} className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl font-bold text-xs transition-colors active:scale-95">+ Tambah Biro</button>
                     )}
                   </div>
                   <div className="space-y-3">
@@ -771,13 +874,15 @@ export default function App() {
                       isAdmin ? (
                         <div key={idx} className="bg-white dark:bg-slate-800 border p-4 rounded-2xl relative space-y-2 shadow-sm animate-in fade-in">
                           <button onClick={() => { const newBiro = biroList.filter((_, i) => i !== idx); setBiroList(newBiro); saveToFirebase({ biroList: newBiro }); }} className="absolute top-4 right-4 text-red-500 hover:bg-red-50 p-1 rounded transition-colors"><Trash2 size={18}/></button>
-                          <input value={biro.nama} onChange={e => { const newBiro = [...biroList]; newBiro[idx].nama = e.target.value; setBiroList(newBiro); }} onBlur={() => saveToFirebase({ biroList })} className="border p-2 rounded-xl text-sm w-4/5 font-bold dark:bg-slate-900 transition-colors" />
-                          <input value={biro.ketua} onChange={e => { const newBiro = [...biroList]; newBiro[idx].ketua = e.target.value; setBiroList(newBiro); }} onBlur={() => saveToFirebase({ biroList })} className="border p-2 rounded-xl text-sm w-full dark:bg-slate-900 transition-colors" placeholder="Ketua Biro" />
+                          
+                          <input value={biro.nama} onChange={e => { const newBiro = [...biroList]; newBiro[idx].nama = e.target.value; setBiroList(newBiro); }} onBlur={() => saveToFirebase({ biroList })} className="border p-2 rounded-xl text-sm w-4/5 font-bold dark:bg-slate-900 transition-colors" placeholder="Nama Biro" />
+                          <input list="senarai-staf" value={biro.ketua} onChange={e => { const newBiro = [...biroList]; newBiro[idx].ketua = e.target.value; setBiroList(newBiro); }} onBlur={() => saveToFirebase({ biroList })} className="border p-2 rounded-xl text-sm w-full dark:bg-slate-900 transition-colors" placeholder="Cari Nama Ketua Biro" />
+                          
                           <div className="bg-slate-50 dark:bg-slate-900 p-3 rounded-xl mt-3">
-                            <div className="flex justify-between items-center text-xs font-bold mb-2"><span>Ahli:</span><button onClick={() => { const newBiro = [...biroList]; if(!newBiro[idx].ahli) newBiro[idx].ahli=[]; newBiro[idx].ahli.push("Ahli Baru"); setBiroList(newBiro); }} className="text-blue-600 hover:text-blue-700 bg-blue-50 px-2 py-1 rounded transition-colors">+ Tambah Ahli</button></div>
+                            <div className="flex justify-between items-center text-xs font-bold mb-2"><span>Ahli:</span><button onClick={() => { const newBiro = [...biroList]; if(!newBiro[idx].ahli) newBiro[idx].ahli=[]; newBiro[idx].ahli.push(""); setBiroList(newBiro); }} className="text-blue-600 hover:text-blue-700 bg-blue-50 px-2 py-1 rounded transition-colors">+ Tambah Ahli</button></div>
                             {biro.ahli && biro.ahli.map((ahli, aIdx) => (
                               <div key={aIdx} className="flex gap-2 mt-1">
-                                <input value={ahli} onChange={e => { const newBiro = [...biroList]; newBiro[idx].ahli[aIdx] = e.target.value; setBiroList(newBiro); }} onBlur={() => saveToFirebase({ biroList })} className="border p-1.5 rounded-lg text-xs w-full bg-white dark:bg-slate-800 transition-colors" />
+                                <input list="senarai-staf" value={ahli} onChange={e => { const newBiro = [...biroList]; newBiro[idx].ahli[aIdx] = e.target.value; setBiroList(newBiro); }} onBlur={() => saveToFirebase({ biroList })} className="border p-1.5 rounded-lg text-xs w-full bg-white dark:bg-slate-800 transition-colors" placeholder="Cari Nama Ahli" />
                                 <button onClick={() => { const newBiro = [...biroList]; newBiro[idx].ahli = newBiro[idx].ahli.filter((_, i) => i !== aIdx); setBiroList(newBiro); saveToFirebase({ biroList: newBiro }); }} className="text-red-500 hover:bg-red-50 px-2 rounded-lg text-xs transition-colors">Buang</button>
                               </div>
                             ))}
@@ -893,7 +998,6 @@ export default function App() {
                     <div className={`relative ${layoutImage ? '' : 'border-2 border-dashed bg-slate-50 dark:bg-slate-900 rounded-2xl min-h-[300px] flex items-center justify-center p-4'}`}>
                       {layoutImage ? (
                         <div className="w-full flex flex-col gap-4">
-                          {/* MOBILE VIEW: HANYA BUTANG MUAT TURUN */}
                           <div className="block sm:hidden w-full bg-slate-50 dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm flex flex-col items-center gap-4">
                              {layoutImage.includes('application/pdf') ? <FileText size={48} className="text-purple-500" /> : <ImageIcon size={48} className="text-purple-500" />}
                              <p className="text-sm font-bold text-slate-700 dark:text-slate-300">Dokumen Pelan Pendaftaran</p>
@@ -913,7 +1017,6 @@ export default function App() {
                              )}
                           </div>
 
-                          {/* DESKTOP/TABLET VIEW: PREVIEW + BUTANG */}
                           <div className="hidden sm:flex flex-col gap-4">
                             <div className="border border-slate-200 dark:border-slate-700 rounded-2xl overflow-hidden bg-white dark:bg-slate-900 shadow-sm">
                               {layoutImage.includes('application/pdf') ? (
@@ -1011,7 +1114,6 @@ export default function App() {
              </div>
            )}
            <button onClick={() => setShowFabMenu(!showFabMenu)} className="bg-slate-800 dark:bg-blue-600 text-white p-4 rounded-full shadow-[0_12px_32px_rgba(0,0,0,0.3)] hover:scale-105 active:scale-95 transition-all duration-300 focus:outline-none flex items-center justify-center border border-slate-700 dark:border-blue-500">
-             {/* MODERN ICON TRANSITION (ROTATE & FADE) */}
              <div className="relative w-6 h-6 flex items-center justify-center">
                <Command size={24} className={`absolute transition-all duration-300 ease-in-out ${showFabMenu ? '-rotate-90 opacity-0 scale-50' : 'rotate-0 opacity-100 scale-100'}`} />
                <X size={24} className={`absolute transition-all duration-300 ease-in-out ${showFabMenu ? 'rotate-0 opacity-100 scale-100' : 'rotate-90 opacity-0 scale-50'}`} />
