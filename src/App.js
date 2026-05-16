@@ -624,7 +624,7 @@ export default function App() {
                           Minggu Silaturahim
                         </h2>
                         <p className="text-blue-100 dark:text-blue-200/80 text-lg md:text-xl font-medium opacity-90 max-w-md">
-                          Kolej Teknologi Termaju (ADTEC) Kampus Sandakan, JTM.
+                          Kolej Teknologi Termaju (ADTEC) Jabatan Tenaga Manusia Kampus Sandakan
                         </p>
                       </div>
                       
@@ -1061,8 +1061,8 @@ export default function App() {
 
         {/* --- FOOTER --- */}
         <footer className="bg-slate-100 dark:bg-slate-900 text-slate-400 dark:text-slate-600 py-8 text-center text-[10px] md:text-xs font-bold mt-auto relative z-30 pb-24 md:pb-8 transition-colors">
-          <p>Hak Cipta Terpelihara &copy; 2026 Kolej Teknologi Termaju (ADTEC) Kampus Sandakan.</p>
-          <p className="mt-1.5">Jabatan Tenaga Manusia, Kementerian Sumber Manusia.</p>
+          <p>Hak Cipta Terpelihara &copy; 2026 Kolej Teknologi Termaju (ADTEC) Jabatan Tenaga Manusia Kampus Sandakan.</p>
+          <p className="mt-1.5">Kementerian Sumber Manusia.</p>
         </footer>
 
         {/* --- BOTTOM NAVIGATION (MOBILE ONLY) - Glassmorphism --- */}
