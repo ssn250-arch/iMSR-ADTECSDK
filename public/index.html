@@ -6,36 +6,41 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" />
     <meta name="theme-color" content="#1e40af" />
     
-    <title>iMSR-ADTECSDK</title>
+    <title>Portal iMSR - ADTEC Sandakan</title>
     <meta name="description" content="Portal Rasmi Minggu Silaturahim (MSR) ADTEC JTM Kampus Sandakan." />
 
     <meta property="og:title" content="Portal iMSR - ADTEC Sandakan" />
     <meta property="og:description" content="Akses maklumat jadual, memo lantikan, dan pelan pendaftaran secara real-time di sini." />
-    <meta property="og:image" content="%PUBLIC_URL%/logo.png" />
-    <meta property="og:url" content="https://ssn250-arch.github.io/MSR-ADTECSDK/" />
+    <meta property="og:image" content="%PUBLIC_URL%/logo-imsr.png" />
+    <meta property="og:url" content="https://ssn250-arch.github.io/iMSR-ADTECSDK/" />
     <meta property="og:type" content="website" />
 
-    <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="Portal iMSR - ADTEC Sandakan" />
-    <meta name="twitter:description" content="Akses maklumat jadual, memo lantikan, dan pelan pendaftaran secara real-time di sini." />
-    <meta name="twitter:image" content="%PUBLIC_URL%/logo.png" />
-    <link rel="preconnect" href="https://firestore.googleapis.com" />
-    
+    <link rel="apple-touch-icon" href="%PUBLIC_URL%/logo192.png" />
     <link rel="manifest" href="%PUBLIC_URL%/manifest.json" />
 
+    <link rel="preconnect" href="https://firestore.googleapis.com" />
+    
     <style>
       body {
         margin: 0;
         background-color: #f1f5f9;
         font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
       }
-      .dark body {
-        background-color: #0f172a;
-      }
+      .dark body { background-color: #0f172a; }
     </style>
   </head>
   <body>
-    <noscript>Anda perlu mengaktifkan JavaScript untuk menjalankan aplikasi Portal MSR ini.</noscript>
+    <noscript>Anda perlu mengaktifkan JavaScript.</noscript>
     <div id="root"></div>
+
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('%PUBLIC_URL%/sw.js')
+            .then(reg => console.log('PWA Service Worker didaftarkan berjaya.', reg))
+            .catch(err => console.log('PWA Service Worker gagal didaftarkan:', err));
+        });
+      }
+    </script>
   </body>
 </html>
