@@ -1,0 +1,15 @@
+{
+  "files": {
+    "main.css": "/imsr-adtec/static/css/main.1ce894eb.css",
+    "main.js": "/imsr-adtec/static/js/main.97466f76.js",
+    "static/js/453.45d5fb71.chunk.js": "/imsr-adtec/static/js/453.45d5fb71.chunk.js",
+    "index.html": "/imsr-adtec/index.html",
+    "main.1ce894eb.css.map": "/imsr-adtec/static/css/main.1ce894eb.css.map",
+    "main.97466f76.js.map": "/imsr-adtec/static/js/main.97466f76.js.map",
+    "453.45d5fb71.chunk.js.map": "/imsr-adtec/static/js/453.45d5fb71.chunk.js.map"
+  },
+  "entrypoints": [
+    "static/css/main.1ce894eb.css",
+    "static/js/main.97466f76.js"
+  ]
+}
