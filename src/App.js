@@ -116,6 +116,7 @@ const senaraiStaf = [
   "Encik Lynn Noell Ending",
   "Encik Mohamad Sali bin Saleh",
   "Encik Mohammad Nasir bin Awang",
+  "Encik Mohd Faiz Fathullah bin Ali Hassan",
   "Encik Mohd Hafizul bin Ibrahim Apani",
   "Encik Mohd Hairi bin Mohd Shah",
   "Encik Mohd Hakimin Mohd Hussin",
