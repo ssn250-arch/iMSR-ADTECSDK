@@ -306,16 +306,16 @@ export default function App() {
     localStorage.theme = !isDarkMode ? 'dark' : 'light';
   };
 
-  const navigateTo = (view) => {
-    if (view === currentView) return;
-    setShowFabMenu(false);
-    setIsLoading(true);
-    setCurrentView(view);
-    setTimeout(() => {
-      setIsLoading(false);
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    }, 400);
-  };
+  const navigateTo = useCallback((view) => {
+    // 1. Tutup menu FAB jika terbuka 
+    setShowFabMenu(false); 
+    
+    // 2. Tukar skrin serta-merta tanpa paksa loading skeleton
+    setCurrentView(view); 
+    
+    // 3. Lompat ke atas halaman dengan lancar
+    window.scrollTo({ top: 0, behavior: 'auto' }); 
+  }, []);
 
   // --- SECURITY LOGIC ---
   const resetInactivityTimer = () => {
@@ -729,7 +729,7 @@ export default function App() {
               )}
 
               {/* VIEW: MEMO */}
-              {{memoFileType === 'pdf' ? (
+              {memoFileType === 'pdf' ? (
   <div className="flex flex-col">
      <iframe src={memoFileUrl} title="Memo PDF" className="w-full h-[600px] md:h-[800px] bg-white dark:bg-slate-800" />
      <div className="p-4 bg-slate-50 dark:bg-slate-800/80 border-t border-slate-200 dark:border-slate-700 text-center flex flex-wrap justify-center gap-3">
