@@ -466,7 +466,7 @@ export default function App() {
                   <h1 className={`font-extrabold tracking-tight leading-tight bg-clip-text text-transparent bg-gradient-to-r from-blue-700 to-indigo-600 dark:from-blue-400 dark:to-indigo-300 transition-all duration-300 ${
                     isScrolled ? 'text-base md:text-lg' : 'text-lg md:text-xl'
                   }`}>
-                    iMSR ADTEC JTM
+                    iMSR ADTEC
                   </h1>
                   <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest hidden sm:block mt-0.5">Kampus Sandakan</span>
                 </div>
