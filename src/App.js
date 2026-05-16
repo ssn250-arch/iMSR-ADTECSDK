@@ -762,9 +762,28 @@ export default function App() {
                             <div className="flex flex-col">
                                <iframe src={memoFileUrl} title="Memo PDF" className="w-full h-[600px] md:h-[800px] bg-white dark:bg-slate-800" />
                               <div className="p-4 bg-slate-50 dark:bg-slate-800/80 border-t border-slate-200 dark:border-slate-700 text-center">
-                                 <a href={memoFileUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 px-5 py-2.5 rounded-xl shadow-md transition-all active:scale-95">
-                                  <ExternalLink size={18} /> Buka Paparan Penuh
-                                </a>
+                                <button 
+                                  onClick={() => {
+                                    // 1. Buka tab baharu yang kosong
+                                  const newWindow = window.open();
+    
+                                    // 2. Cipta elemen iframe di dalam tab baharu itu untuk paparan PDF
+                                    if (newWindow) {
+                                      newWindow.document.write(
+                                      `<html style="margin:0;padding:0;"><head><title>Paparan Penuh Memo MSR</title></head>` +
+                                      `<body style="margin:0;padding:0;">` +
+                                      `<iframe src="${memoFileUrl}" style="width:100%; height:100vh; border:none; margin:0; padding:0;"></iframe>` +
+                                      `</body></html>`
+                                    );
+                                    newWindow.document.close();
+                                  } else {
+                                    alert("Sila benarkan 'Pop-up' pada pelayar web anda untuk melihat dokumen.");
+                                  }
+                                }} 
+                                className="inline-flex items-center gap-2 text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 px-5 py-2.5 rounded-xl shadow-md transition-all active:scale-95"
+                              >
+                                <ExternalLink size={18} /> Buka Paparan Penuh
+                              </button>
                               </div>
                             </div>
                           ) : (
