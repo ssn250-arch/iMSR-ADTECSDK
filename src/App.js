@@ -456,7 +456,7 @@ export default function App() {
               
               <div className="flex items-center gap-2 md:gap-3">
                 <img 
-                  src="Logo ADTEC JTM 2025 Kampus Sandakan.jpg" 
+                  src="Logo ADTEC JTM 2025 Kampus Sandakan.png" 
                   alt="Logo ADTEC" 
                   className={`w-auto object-contain drop-shadow-sm bg-white/80 dark:bg-slate-800 rounded-lg transition-all duration-300 ${
                     isScrolled ? 'h-8 md:h-10 p-1' : 'h-10 md:h-12 p-1.5'
