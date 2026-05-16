@@ -489,7 +489,7 @@ export default function App() {
 
               {isAdmin && (
                 <span className="hidden md:flex items-center gap-1 text-xs font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/30 px-3 py-1.5 rounded-full border border-emerald-200 dark:border-emerald-800/50 shadow-sm">
-                  <ShieldCheck size={14}/> Sesi Admin
+                  <ShieldCheck size={14}/> Mod Admin
                 </span>
               )}
               <button 
@@ -525,7 +525,7 @@ export default function App() {
                 <form onSubmit={handleLogin} className="space-y-5">
                   <div>
                     <label className="block text-[11px] font-extrabold text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Nama Pengguna</label>
-                    <input type="text" required value={loginForm.username} onChange={(e) => setLoginForm({...loginForm, username: e.target.value})} className="w-full bg-slate-50 dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 px-4 py-3 rounded-xl focus:ring-0 focus:border-blue-500 outline-none transition-all font-semibold text-slate-800 dark:text-white" placeholder="admin" />
+                    <input type="text" required value={loginForm.username} onChange={(e) => setLoginForm({...loginForm, username: e.target.value})} className="w-full bg-slate-50 dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 px-4 py-3 rounded-xl focus:ring-0 focus:border-blue-500 outline-none transition-all font-semibold text-slate-800 dark:text-white" placeholder="Masukkan Username" />
                   </div>
                   <div>
                     <label className="block text-[11px] font-extrabold text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Kata Laluan</label>
