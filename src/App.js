@@ -359,20 +359,28 @@ export default function App() {
     }
   };
 
-  const handleDocumentUpload = (e) => {
+ const handleDocumentUpload = (e) => {
     const file = e.target.files[0];
     if (file) {
+      const reader = new FileReader();
+      
       if (file.type === 'application/pdf') {
-        const url = URL.createObjectURL(file); // Nota: Untuk kegunaan pengeluaran berskala besar, disyorkan menggunakan Firebase Storage
-        setMemoFileUrl(url);
-        setMemoFileType('pdf');
-        saveToFirebase({ memoFileUrl: url, memoFileType: 'pdf' });
-      } else if (file.type.startsWith('image/')) {
-        const reader = new FileReader();
+        // Tukar PDF kepada Base64 String supaya serasi dengan GitHub Pages
         reader.onload = (ev) => {
-          setMemoFileUrl(ev.target.result);
+          const base64Data = ev.target.result;
+          setMemoFileUrl(base64Data);
+          setMemoFileType('pdf');
+          saveToFirebase({ memoFileUrl: base64Data, memoFileType: 'pdf' });
+        };
+        reader.readAsDataURL(file);
+        
+      } else if (file.type.startsWith('image/')) {
+        // Kekalkan logik imej sedia ada (Base64)
+        reader.onload = (ev) => {
+          const base64Data = ev.target.result;
+          setMemoFileUrl(base64Data);
           setMemoFileType('image');
-          saveToFirebase({ memoFileUrl: ev.target.result, memoFileType: 'image' });
+          saveToFirebase({ memoFileUrl: base64Data, memoFileType: 'image' });
         };
         reader.readAsDataURL(file);
       }
@@ -677,7 +685,7 @@ export default function App() {
                            Minggu Silaturahim
                         </h2>
                         <p className="text-blue-100 dark:text-blue-200/80 text-lg md:text-xl font-medium opacity-90 max-w-md">
-                           Kolej Teknologi Termaju (ADTEC) Kampus Sandakan, JTM.
+                           Kolej Teknologi Termaju (ADTEC) Jabatan Tenaga Manusia Kampus Sandakan
                         </p>
                       </div>
                       
