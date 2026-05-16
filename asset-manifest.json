@@ -1,15 +1,15 @@
 {
   "files": {
     "main.css": "/iMSR-ADTECSDK/static/css/main.1ce894eb.css",
-    "main.js": "/iMSR-ADTECSDK/static/js/main.681ac1ed.js",
+    "main.js": "/iMSR-ADTECSDK/static/js/main.9fd3fd11.js",
     "static/js/453.45d5fb71.chunk.js": "/iMSR-ADTECSDK/static/js/453.45d5fb71.chunk.js",
     "index.html": "/iMSR-ADTECSDK/index.html",
     "main.1ce894eb.css.map": "/iMSR-ADTECSDK/static/css/main.1ce894eb.css.map",
-    "main.681ac1ed.js.map": "/iMSR-ADTECSDK/static/js/main.681ac1ed.js.map",
+    "main.9fd3fd11.js.map": "/iMSR-ADTECSDK/static/js/main.9fd3fd11.js.map",
     "453.45d5fb71.chunk.js.map": "/iMSR-ADTECSDK/static/js/453.45d5fb71.chunk.js.map"
   },
   "entrypoints": [
     "static/css/main.1ce894eb.css",
-    "static/js/main.681ac1ed.js"
+    "static/js/main.9fd3fd11.js"
   ]
 }
