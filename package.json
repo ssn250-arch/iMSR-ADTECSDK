@@ -1,6 +1,6 @@
 {
   "name": "imsr-adtec",
-  "homepage": "https://ssn250-arch.github.io/iMSR-ADTEC",
+  "homepage": "https://ssn250-arch.github.io/iMSR-ADTECSDK",
   "version": "0.1.0",
   "private": true,
   "dependencies": {
