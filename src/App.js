@@ -508,7 +508,7 @@ export default function App() {
               
               <div className="flex items-center gap-2 md:gap-3">
                 <img 
-                  src="Logo ADTEC JTM 2025 Kampus Sandakan.jpg" 
+                  src="Logo ADTEC JTM 2025 Kampus Sandakan.png" 
                   alt="Logo ADTEC" 
                   className={`w-auto object-contain drop-shadow-sm bg-white/80 dark:bg-slate-800 rounded-lg transition-all duration-300 ${
                     isScrolled ? 'h-8 md:h-10 p-1' : 'h-10 md:h-12 p-1.5'
@@ -518,9 +518,9 @@ export default function App() {
                   <h1 className={`font-extrabold tracking-tight leading-tight bg-clip-text text-transparent bg-gradient-to-r from-blue-700 to-indigo-600 dark:from-blue-400 dark:to-indigo-300 transition-all duration-300 ${
                     isScrolled ? 'text-base md:text-lg' : 'text-lg md:text-xl'
                   }`}>
-                    Portal MSR
+                    iMSR ADTEC JTM
                   </h1>
-                  <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest hidden sm:block mt-0.5">ADTEC Sandakan</span>
+                  <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest hidden sm:block mt-0.5">KAMPUS Sandakan</span>
                 </div>
               </div>
             </div>
@@ -573,7 +573,7 @@ export default function App() {
                 <form onSubmit={handleLogin} className="space-y-5">
                   <div>
                     <label className="block text-[11px] font-extrabold text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Nama Pengguna</label>
-                    <input type="text" required value={loginForm.username} onChange={(e) => setLoginForm({...loginForm, username: e.target.value})} className="w-full bg-slate-50 dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 px-4 py-3 rounded-xl focus:ring-0 focus:border-blue-500 outline-none transition-all font-semibold text-slate-800 dark:text-white" placeholder="admin" />
+                    <input type="text" required value={loginForm.username} onChange={(e) => setLoginForm({...loginForm, username: e.target.value})} className="w-full bg-slate-50 dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 px-4 py-3 rounded-xl focus:ring-0 focus:border-blue-500 outline-none transition-all font-semibold text-slate-800 dark:text-white" placeholder="Username" />
                   </div>
                   <div>
                     <label className="block text-[11px] font-extrabold text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Kata Laluan</label>
@@ -1212,8 +1212,7 @@ export default function App() {
 
         {/* --- FOOTER --- */}
         <footer className="bg-slate-100 dark:bg-slate-900 text-slate-400 dark:text-slate-600 py-8 text-center text-[10px] md:text-xs font-bold mt-auto relative z-30 pb-24 md:pb-8 transition-colors">
-          <p>Hak Cipta Terpelihara &copy; 2026 Kolej Teknologi Termaju (ADTEC) Kampus Sandakan.</p>
-          <p className="mt-1.5">Jabatan Tenaga Manusia, Kementerian Sumber Manusia.</p>
+          <p>Hak Cipta Terpelihara &copy; 2026 Kolej Teknologi Termaju (ADTEC) Jabatan Tenaga Manusia Kampus Sandakan.</p>
         </footer>
 
         {/* --- BOTTOM NAVIGATION (MOBILE ONLY) --- */}
