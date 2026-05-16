@@ -214,7 +214,7 @@ export default function App() {
   const [biroList, setBiroList] = useState([]);
   const [jadualData, setJadualData] = useState([]);
   const [penutupData, setPenutupData] = useState([]);
-  const [layoutImage, setLayoutImage] = useState(null);
+  const [layoutImage, setLayoutImage] = useState(null); // Boleh terima base64 PDF atau Imej
 
   const [activeJadualTab, setActiveJadualTab] = useState('');
   const [isScrolled, setIsScrolled] = useState(false);
@@ -329,7 +329,6 @@ export default function App() {
       reader.onload = (ev) => {
         const base64Data = ev.target.result;
         const fileType = file.type === 'application/pdf' ? 'pdf' : 'image';
-        
         let ext = file.name.split('.').pop() || (fileType === 'pdf' ? 'pdf' : 'jpg');
         let defaultName = `Dokumen_MSR.${ext}`;
 
@@ -350,9 +349,10 @@ export default function App() {
     }
   };
 
+  // --- KEMAS KINI FUNGSI MUAT NAIK PELAN (SOKONGAN PDF & IMEJ) ---
   const handleLayoutUpload = (e) => {
     const file = e.target.files[0];
-    if (file && file.type.startsWith('image/')) {
+    if (file) {
       const reader = new FileReader();
       reader.onload = (ev) => {
         setLayoutImage(ev.target.result);
@@ -618,6 +618,7 @@ export default function App() {
                               </div>
                               
                               <div className="flex items-center gap-2 w-full sm:w-auto justify-end flex-wrap sm:flex-nowrap mt-2 sm:mt-0">
+                                {/* Butang Papar HANYA muncul jika skrin bersaiz besar (SM ke atas) */}
                                 <button 
                                   onClick={() => {
                                     const windowPenuh = window.open();
@@ -640,6 +641,7 @@ export default function App() {
                                   <ExternalLink size={16} /> Lihat
                                 </button>
 
+                                {/* Butang Muat Turun sentiasa muncul */}
                                 <button 
                                   onClick={() => handleDownloadBlob(memo.url, memo.name)}
                                   className="inline-flex items-center justify-center gap-1.5 text-xs font-bold text-emerald-700 bg-emerald-100 hover:bg-emerald-200 dark:bg-emerald-900/40 dark:text-emerald-300 dark:hover:bg-emerald-800/60 px-4 py-2.5 rounded-xl transition-all flex-1 sm:flex-none whitespace-nowrap active:scale-95"
@@ -876,17 +878,73 @@ export default function App() {
                   <div className="bg-white dark:bg-slate-800 rounded-[2rem] border p-8 shadow-sm">
                     <h3 className="text-2xl font-extrabold mb-2">Pelan Pendaftaran</h3>
                     <p className="text-slate-500 text-sm mb-6">Sila rujuk pelan susun atur dewan pendaftaran.</p>
-                    <div className="relative border-2 border-dashed bg-slate-50 dark:bg-slate-900 rounded-2xl min-h-[300px] flex items-center justify-center overflow-hidden group p-4 transition-all hover:border-purple-300">
-                      {layoutImage ? (
-                        <img src={layoutImage} alt="Pelan" className="w-full h-auto max-h-[600px] object-contain rounded-xl" />
-                      ) : (
-                        <div className="text-slate-400 flex flex-col items-center gap-2"><ImageIcon size={48} /><p className="text-sm font-bold">Tiada pelan dimuat naik</p></div>
-                      )}
-                      {isAdmin && (
-                        <label className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center cursor-pointer transition-opacity backdrop-blur-sm duration-300">
-                          <span className="bg-white text-xs font-bold px-5 py-3 rounded-xl shadow-xl hover:scale-105 transition-transform">Muat Naik Imej Pelan Baru</span>
-                          <input type="file" accept="image/*" className="hidden" onChange={handleLayoutUpload} />
+                    
+                    {isAdmin && !layoutImage && (
+                      <div className="mb-6 p-6 border-2 border-dashed rounded-3xl text-center hover:bg-slate-50 dark:hover:bg-slate-900/50 transition-colors">
+                        <label className="cursor-pointer flex flex-col items-center">
+                          <UploadCloud size={32} className="text-purple-500 animate-pulse" />
+                          <span className="text-sm font-bold mt-2">Muat Naik Fail Pelan Baharu</span>
+                          <span className="text-xs text-slate-400 mt-1">Sokongan: PDF / Imej</span>
+                          <input type="file" accept="application/pdf, image/*" className="hidden" onChange={handleLayoutUpload} />
                         </label>
+                      </div>
+                    )}
+
+                    <div className={`relative ${layoutImage ? '' : 'border-2 border-dashed bg-slate-50 dark:bg-slate-900 rounded-2xl min-h-[300px] flex items-center justify-center p-4'}`}>
+                      {layoutImage ? (
+                        <div className="w-full flex flex-col gap-4">
+                          {/* MOBILE VIEW: HANYA BUTANG MUAT TURUN */}
+                          <div className="block sm:hidden w-full bg-slate-50 dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm flex flex-col items-center gap-4">
+                             {layoutImage.includes('application/pdf') ? <FileText size={48} className="text-purple-500" /> : <ImageIcon size={48} className="text-purple-500" />}
+                             <p className="text-sm font-bold text-slate-700 dark:text-slate-300">Dokumen Pelan Pendaftaran</p>
+                             <button 
+                               onClick={() => handleDownloadBlob(layoutImage, layoutImage.includes('application/pdf') ? 'Pelan_Pendaftaran.pdf' : 'Pelan_Pendaftaran.jpg')}
+                               className="w-full inline-flex items-center justify-center gap-2 text-sm font-bold text-emerald-700 bg-emerald-100 hover:bg-emerald-200 dark:bg-emerald-900/40 dark:text-emerald-300 px-4 py-3 rounded-xl transition-all active:scale-95"
+                             >
+                               <Download size={18} /> Muat Turun Pelan
+                             </button>
+                             {isAdmin && (
+                               <button 
+                                 onClick={() => { if(window.confirm("Padam pelan ini?")){ setLayoutImage(null); saveToFirebase({ layoutImage: null }); } }}
+                                 className="w-full inline-flex items-center justify-center gap-2 text-sm font-bold text-red-600 bg-red-50 hover:bg-red-100 dark:bg-red-900/20 px-4 py-3 rounded-xl transition-all active:scale-95"
+                               >
+                                 <Trash2 size={18} /> Padam Pelan
+                               </button>
+                             )}
+                          </div>
+
+                          {/* DESKTOP/TABLET VIEW: PREVIEW + BUTANG */}
+                          <div className="hidden sm:flex flex-col gap-4">
+                            <div className="border border-slate-200 dark:border-slate-700 rounded-2xl overflow-hidden bg-white dark:bg-slate-900 shadow-sm">
+                              {layoutImage.includes('application/pdf') ? (
+                                <iframe src={layoutImage} className="w-full h-[600px]" title="Pelan Pendaftaran" />
+                              ) : (
+                                <img src={layoutImage} alt="Pelan Pendaftaran" className="w-full h-auto max-h-[600px] object-contain" />
+                              )}
+                            </div>
+                            <div className="flex justify-end gap-3">
+                              <button 
+                                onClick={() => handleDownloadBlob(layoutImage, layoutImage.includes('application/pdf') ? 'Pelan_Pendaftaran.pdf' : 'Pelan_Pendaftaran.jpg')}
+                                className="inline-flex items-center gap-2 text-sm font-bold text-emerald-700 bg-emerald-100 hover:bg-emerald-200 dark:bg-emerald-900/40 dark:text-emerald-300 px-5 py-2.5 rounded-xl transition-all active:scale-95"
+                              >
+                                <Download size={18} /> Muat Turun
+                              </button>
+                              {isAdmin && (
+                                <button 
+                                  onClick={() => { if(window.confirm("Padam pelan ini?")){ setLayoutImage(null); saveToFirebase({ layoutImage: null }); } }}
+                                  className="inline-flex items-center gap-2 text-sm font-bold text-red-600 bg-red-50 hover:bg-red-100 dark:bg-red-900/20 px-5 py-2.5 rounded-xl transition-all active:scale-95"
+                                >
+                                  <Trash2 size={18} /> Padam
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="text-slate-400 flex flex-col items-center gap-2">
+                          <ImageIcon size={48} />
+                          <p className="text-sm font-bold">Tiada pelan dimuat naik</p>
+                        </div>
                       )}
                     </div>
                   </div>
