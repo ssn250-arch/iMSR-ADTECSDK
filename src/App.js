@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 // Import Firebase Firestore
 import { doc, onSnapshot, setDoc } from 'firebase/firestore';
 import { db } from './firebase'; // Pastikan laluan (path) ke fail firebase.js anda adalah betul
