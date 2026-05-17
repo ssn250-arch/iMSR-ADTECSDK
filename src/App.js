@@ -33,6 +33,11 @@ const GlobalStyles = React.memo(() => (
         100% { transform: translateX(200%); }
       }
       .animate-slide { animation: slide 1.5s ease-in-out infinite; }
+      @keyframes progress {
+        0% { width: 100%; }
+        100% { width: 0%; }
+      }
+      .animate-progress { animation: progress 15s linear forwards; }
     `}
   </style>
 ));
@@ -351,7 +356,7 @@ export default function App() {
       const lastVisit = localStorage.getItem('imsr_last_visit');
       if (!lastVisit || new Date(lastUpdated) > new Date(lastVisit)) {
         setTimeout(() => setShowToast(true), 1500); // Tunjuk lepas 1.5 saat 
-        setTimeout(() => setShowToast(false), 7000); // Tutup automatik selepas 7 saat
+        setTimeout(() => setShowToast(false), 16500); // Tutup automatik selepas 15 saat
       }
       localStorage.setItem('imsr_last_visit', new Date().toISOString());
       hasCheckedUpdates.current = true;
@@ -512,7 +517,7 @@ export default function App() {
           saveToFirebase({ lastUpdated: new Date().toISOString() });
         } catch (error) {
           console.error(error);
-          alert("RALAT: Gagal memuat naik pelan. Sila pastikan fail kurang dari 1MB.");
+          alert("RALAT: Gagal memuat naik pelan. Saiz melebihi had (1MB). Sila kompres fail tersebut.");
         }
       };
       reader.readAsDataURL(file);
@@ -606,18 +611,19 @@ export default function App() {
       {/* --- NOTIFIKASI TOAST (KEMAS KINI BAHARU) --- */}
       {showToast && (
         <div className="fixed top-4 left-4 right-4 md:left-auto md:right-8 md:top-8 md:w-96 z-[150] animate-in slide-in-from-top-10 fade-in duration-500">
-          <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white p-4 rounded-2xl shadow-[0_10px_40px_rgba(0,0,0,0.3)] flex items-start gap-3 border border-blue-400/50 relative overflow-hidden">
-            <div className="absolute top-0 left-0 w-full h-1 bg-white/20">
-               <div className="h-full bg-yellow-400 w-full animate-[slide_7s_linear]"></div>
+          <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white p-5 rounded-2xl shadow-[0_10px_40px_rgba(0,0,0,0.3)] flex items-start gap-4 border border-blue-400/50 relative overflow-hidden">
+            {/* Bar Progres yang menyusut dalam masa 15 Saat */}
+            <div className="absolute bottom-0 left-0 w-full h-1 bg-white/20">
+               <div className="h-full bg-yellow-400 animate-progress"></div>
             </div>
-            <div className="bg-white/20 p-2 rounded-xl shrink-0 mt-1">
-              <Info className="animate-pulse" size={20} />
+            <div className="bg-white/20 p-2.5 rounded-xl shrink-0 mt-1">
+              <Info className="animate-pulse" size={24} />
             </div>
             <div className="pr-6 mt-0.5">
-              <h4 className="font-extrabold text-sm md:text-base tracking-tight mb-0.5">Kemas Kini Baharu!</h4>
-              <p className="text-xs text-blue-100 leading-relaxed font-medium">Sistem mempunyai dokumen atau pengumuman yang terkini sejak lawatan terakhir anda.</p>
+              <h4 className="font-extrabold text-sm md:text-base tracking-tight mb-1">Kemas Kini Baharu!</h4>
+              <p className="text-xs text-blue-100 leading-relaxed font-medium">Terdapat maklumat jadual, fail dokumen, atau pengumuman yang terkini. Sila semak paparan portal.</p>
             </div>
-            <button onClick={() => setShowToast(false)} className="absolute top-3 right-3 text-blue-200 hover:text-white transition-colors bg-black/10 hover:bg-black/30 p-1.5 rounded-full"><X size={14}/></button>
+            <button onClick={() => setShowToast(false)} className="absolute top-4 right-4 text-blue-200 hover:text-white transition-colors bg-black/10 hover:bg-black/30 p-1.5 rounded-full active:scale-90"><X size={16}/></button>
           </div>
         </div>
       )}
@@ -833,7 +839,6 @@ export default function App() {
                                 <p className="text-sm md:text-base font-bold text-slate-800 dark:text-slate-200 break-words leading-tight">{memo.name}</p>
                                 <div className="flex flex-wrap items-center gap-2 mt-1.5">
                                   <span className="text-[9px] font-black text-blue-600 bg-blue-100 dark:text-blue-300 dark:bg-blue-900/40 px-1.5 py-0.5 rounded uppercase tracking-wider">{memo.type === 'pdf' ? 'Dokumen PDF' : 'Fail Imej'}</span>
-                                  {/* --- PAPARAN TARIKH DOKUMEN --- */}
                                   {memo.uploadDate && (
                                     <span className="text-[9px] font-bold text-slate-500 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 px-1.5 py-0.5 rounded flex items-center gap-1 shadow-sm">
                                       <Clock size={10}/> {formatDateTime(memo.uploadDate)}
@@ -1397,12 +1402,15 @@ export default function App() {
         )}
 
         {/* --- FOOTER --- */}
-        <footer className="bg-[#f8fafc] dark:bg-[#0b1121] text-slate-400 py-6 text-center text-[10px] font-bold mt-auto pb-24 md:pb-6 border-t border-slate-200 dark:border-slate-800/50 relative z-30">
-          <p>Hak Cipta Terpelihara &copy; 2026 Kolej Teknologi Termaju (ADTEC) Kampus Sandakan.</p>
+        <footer className="bg-[#f8fafc] dark:bg-[#0b1121] text-slate-400 py-6 text-center mt-auto pb-24 md:pb-6 border-t border-slate-200 dark:border-slate-800/50 relative z-30">
           {/* INFO KEMAS KINI TERAKHIR */}
-          {lastUpdated && (
-            <p className="mt-1.5 text-[9px] text-slate-400/80 font-medium tracking-wider uppercase">
+          {lastUpdated ? (
+            <p className="text-[10px] md:text-xs text-slate-500 font-medium tracking-wider uppercase">
               Kemas Kini Terakhir: {formatDateTime(lastUpdated)}
+            </p>
+          ) : (
+            <p className="text-[10px] md:text-xs text-slate-500 font-medium tracking-wider uppercase">
+              Sistem iMSR ADTEC Sandakan
             </p>
           )}
         </footer>
@@ -1426,7 +1434,7 @@ export default function App() {
         </nav>
 
         {/* --- FAB QUICK ACTION BUTTON (MODERNIZED & ANIMATED) --- */}
-        <div className="fixed bottom-24 md:bottom-6 right-4 md:right-6 z-50 flex flex-col items-end gap-2">
+        <div className="fixed bottom-28 md:bottom-8 right-4 md:right-6 z-50 flex flex-col items-end gap-2">
            {showFabMenu && (
              <div className="bg-white/85 dark:bg-slate-800/85 backdrop-blur-2xl border border-slate-200/50 dark:border-slate-700/50 shadow-2xl flex flex-col gap-1.5 text-xs font-bold w-44 animate-in slide-in-from-bottom-4 zoom-in-90 duration-200 ease-out origin-bottom-right rounded-2xl p-2 mb-2">
                 <a href="https://www.jtm.gov.my/etatatertib" target="_blank" rel="noopener noreferrer" className="p-3 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-xl transition-colors flex items-center gap-2">
