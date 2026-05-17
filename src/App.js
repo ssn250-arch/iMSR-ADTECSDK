@@ -8,7 +8,7 @@ import {
   Lock, LogOut, UploadCloud, Plus, Trash2, Edit3, Image as ImageIcon,
   Bell, Eye, EyeOff, ShieldCheck, AlertTriangle, Clock,
   Moon, Sun, Zap, Settings, Command, Award,
-  Globe, Monitor, Shield, X
+  Globe, Monitor, Shield, X, Info
 } from 'lucide-react';
 
 // --- STYLES FOR SCROLLBAR & ANIMATIONS ---
@@ -55,6 +55,18 @@ const formatTarikh = (dateString) => {
   const days = ['Ahad', 'Isnin', 'Selasa', 'Rabu', 'Khamis', 'Jumaat', 'Sabtu'];
   const months = ['Jan', 'Feb', 'Mac', 'Apr', 'Mei', 'Jun', 'Jul', 'Ogo', 'Sep', 'Okt', 'Nov', 'Dis'];
   return `${date.getDate()} ${months[date.getMonth()]} ${date.getFullYear()} (${days[date.getDay()]})`;
+};
+
+const formatDateTime = (isoString) => {
+  if (!isoString) return "";
+  const date = new Date(isoString);
+  const days = ['Ahad', 'Isnin', 'Selasa', 'Rabu', 'Khamis', 'Jumaat', 'Sabtu'];
+  const months = ['Jan', 'Feb', 'Mac', 'Apr', 'Mei', 'Jun', 'Jul', 'Ogo', 'Sep', 'Okt', 'Nov', 'Dis'];
+  const h = date.getHours();
+  const m = date.getMinutes().toString().padStart(2, '0');
+  const ampm = h >= 12 ? 'PM' : 'AM';
+  const hr12 = h % 12 || 12;
+  return `${date.getDate()} ${months[date.getMonth()]} ${date.getFullYear()} (${hr12}:${m} ${ampm})`;
 };
 
 // --- FUNGSI MUAT TURUN PDF UNTUK MOBILE (BLOB CONVERSION) ---
@@ -248,7 +260,12 @@ export default function App() {
   const [viewingMemo, setViewingMemo] = useState(null);
   const [blobUrl, setBlobUrl] = useState(null);
 
+  // Notifications (Toast)
+  const [showToast, setShowToast] = useState(false);
+  const hasCheckedUpdates = useRef(false);
+
   // Data States
+  const [lastUpdated, setLastUpdated] = useState(null);
   const [announcement, setAnnouncement] = useState('');
   const [sesiKemasukan, setSesiKemasukan] = useState({ sesi: '2', tahun: '2026' });
   const [memoText, setMemoText] = useState('');
@@ -257,7 +274,9 @@ export default function App() {
   const [biroList, setBiroList] = useState([]);
   const [jadualData, setJadualData] = useState([]);
   const [penutupData, setPenutupData] = useState([]);
+  
   const [layoutImage, setLayoutImage] = useState(null);
+  const [layoutDate, setLayoutDate] = useState(null);
 
   const [activeJadualTab, setActiveJadualTab] = useState('');
   const [isScrolled, setIsScrolled] = useState(false);
@@ -270,13 +289,14 @@ export default function App() {
     }
   }, [isAppReady]);
 
-  // --- FIREBASE FETCH DATA (STRUKTUR BAHARU: PECAHAN LIMIT 1MB) ---
+  // --- FIREBASE FETCH DATA (DENGAN PEMANTAUAN UPDATE) ---
   useEffect(() => {
-    // 1. Fetch Main Data (Kecuali Imej & Fail PDF)
+    // 1. Fetch Main Data 
     const docRef = doc(db, "msr", "data_utama");
     const unsubscribeUtama = onSnapshot(docRef, (docSnap) => {
       if (docSnap.exists()) {
         const data = docSnap.data();
+        if (data.lastUpdated) setLastUpdated(data.lastUpdated);
         if (data.announcement !== undefined) setAnnouncement(data.announcement);
         if (data.sesiKemasukan) setSesiKemasukan(data.sesiKemasukan);
         if (data.memoText !== undefined) setMemoText(data.memoText);
@@ -290,24 +310,26 @@ export default function App() {
       }
     }, (error) => console.error("Firebase fetch error:", error));
 
-    // 2. Fetch Memos (Setiap memo kini diasingkan dalam failnya sendiri)
+    // 2. Fetch Memos 
     const memosRef = collection(db, "msr_memos");
     const unsubscribeMemos = onSnapshot(memosRef, (snapshot) => {
       const memosArray = [];
       snapshot.forEach((doc) => memosArray.push(doc.data()));
-      // Susun ikut id (id berasaskan Date.now())
       memosArray.sort((a, b) => a.id.localeCompare(b.id));
       setMemoList(memosArray);
     }, (error) => console.error("Ralat memo:", error));
 
-    // 3. Fetch Layout Image (Diasingkan bagi menjimatkan had 1MB fail utama)
+    // 3. Fetch Layout Image
     const layoutRef = doc(db, "msr", "data_layout");
     const unsubscribeLayout = onSnapshot(layoutRef, (docSnap) => {
       if (docSnap.exists() && docSnap.data().layoutImage) {
         setLayoutImage(docSnap.data().layoutImage);
+        setLayoutDate(docSnap.data().uploadDate || null);
       } else {
         setLayoutImage(null);
+        setLayoutDate(null);
       }
+      // Trigger Splash Screen OFF
       setTimeout(() => { setIsAppReady(true); }, 1500); 
     }, (error) => {
       console.error("Ralat layout:", error);
@@ -321,10 +343,27 @@ export default function App() {
     };
   }, []);
 
+  // --- LOGIK NOTIFIKASI KEMAS KINI (TOAST) ---
+  useEffect(() => {
+    // Apabila Splash Screen ditutup dan lastUpdated telah diterima,
+    // kita akan periksa jika ini lawatan pertama atau jika ada maklumat baharu.
+    if (isAppReady && lastUpdated && !hasCheckedUpdates.current) {
+      const lastVisit = localStorage.getItem('imsr_last_visit');
+      if (!lastVisit || new Date(lastUpdated) > new Date(lastVisit)) {
+        setTimeout(() => setShowToast(true), 1500); // Tunjuk lepas 1.5 saat 
+        setTimeout(() => setShowToast(false), 7000); // Tutup automatik selepas 7 saat
+      }
+      localStorage.setItem('imsr_last_visit', new Date().toISOString());
+      hasCheckedUpdates.current = true;
+    }
+  }, [isAppReady, lastUpdated]);
+
   const saveToFirebase = useCallback(async (fieldsToUpdate) => {
     try {
       const docRef = doc(db, "msr", "data_utama");
-      await setDoc(docRef, fieldsToUpdate, { merge: true });
+      // Selitkan cap masa secara automatik pada setiap perubahan
+      const payload = { ...fieldsToUpdate, lastUpdated: new Date().toISOString() };
+      await setDoc(docRef, payload, { merge: true });
     } catch (error) {
       console.error("Gagal mengemaskini pangkalan data:", error);
     }
@@ -422,12 +461,11 @@ export default function App() {
     }
   };
 
-  // --- MUAT NAIK FAIL MEMO BERASINGAN (PECAHAN LIMIT) ---
   const handleDocumentUpload = (e) => {
     const file = e.target.files[0];
     if (file) {
       if (file.size > 800 * 1024) {
-         alert("PERHATIAN: Saiz fail ini agak besar. Jika ia gagal dimuat naik, sila gunakan aplikasi pemampat PDF (compress PDF) terlebih dahulu.");
+         alert("PERHATIAN: Saiz fail ini agak besar. Jika gagal, sila gunakan aplikasi pemampat PDF/Imej.");
       }
       
       const reader = new FileReader();
@@ -441,34 +479,40 @@ export default function App() {
           id: 'memo_' + Date.now(),
           name: file.name || defaultName,
           url: base64Data,
-          type: fileType
+          type: fileType,
+          uploadDate: new Date().toISOString() // Simpan Tarikh Muat Naik
         };
 
         try {
           await setDoc(doc(db, "msr_memos", newMemo.id), newMemo);
+          // Maklumkan pangkalan data utama untuk kemas kini timestamp global
+          saveToFirebase({ lastUpdated: new Date().toISOString() });
         } catch (error) {
           console.error(error);
-          alert("RALAT: Gagal memuat naik fail. Saiz fail anda melebihi had pangkalan data (1MB). Sila kompres / kecilkan fail anda terlebih dahulu.");
+          alert("RALAT: Gagal memuat naik fail. Sila pastikan fail kurang daripada 1MB.");
         }
       };
       reader.readAsDataURL(file);
     }
   };
 
-  // --- MUAT NAIK PELAN BERASINGAN (PECAHAN LIMIT) ---
   const handleLayoutUpload = (e) => {
     const file = e.target.files[0];
     if (file && (file.type.startsWith('image/') || file.type === 'application/pdf')) {
       if (file.size > 800 * 1024) {
-         alert("PERHATIAN: Saiz pelan ini agak besar. Jika gagal, sila kompres imej/PDF tersebut.");
+         alert("PERHATIAN: Saiz pelan agak besar. Jika gagal, kompres imej/PDF tersebut.");
       }
       const reader = new FileReader();
       reader.onload = async (ev) => {
         try {
-          await setDoc(doc(db, "msr", "data_layout"), { layoutImage: ev.target.result });
+          await setDoc(doc(db, "msr", "data_layout"), { 
+            layoutImage: ev.target.result,
+            uploadDate: new Date().toISOString() // Simpan Tarikh Muat Naik
+          });
+          saveToFirebase({ lastUpdated: new Date().toISOString() });
         } catch (error) {
           console.error(error);
-          alert("RALAT: Gagal memuat naik pelan. Saiz melebihi had (1MB). Sila kompres fail tersebut.");
+          alert("RALAT: Gagal memuat naik pelan. Sila pastikan fail kurang dari 1MB.");
         }
       };
       reader.readAsDataURL(file);
@@ -559,6 +603,25 @@ export default function App() {
         ))}
       </datalist>
 
+      {/* --- NOTIFIKASI TOAST (KEMAS KINI BAHARU) --- */}
+      {showToast && (
+        <div className="fixed top-4 left-4 right-4 md:left-auto md:right-8 md:top-8 md:w-96 z-[150] animate-in slide-in-from-top-10 fade-in duration-500">
+          <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white p-4 rounded-2xl shadow-[0_10px_40px_rgba(0,0,0,0.3)] flex items-start gap-3 border border-blue-400/50 relative overflow-hidden">
+            <div className="absolute top-0 left-0 w-full h-1 bg-white/20">
+               <div className="h-full bg-yellow-400 w-full animate-[slide_7s_linear]"></div>
+            </div>
+            <div className="bg-white/20 p-2 rounded-xl shrink-0 mt-1">
+              <Info className="animate-pulse" size={20} />
+            </div>
+            <div className="pr-6 mt-0.5">
+              <h4 className="font-extrabold text-sm md:text-base tracking-tight mb-0.5">Kemas Kini Baharu!</h4>
+              <p className="text-xs text-blue-100 leading-relaxed font-medium">Sistem mempunyai dokumen atau pengumuman yang terkini sejak lawatan terakhir anda.</p>
+            </div>
+            <button onClick={() => setShowToast(false)} className="absolute top-3 right-3 text-blue-200 hover:text-white transition-colors bg-black/10 hover:bg-black/30 p-1.5 rounded-full"><X size={14}/></button>
+          </div>
+        </div>
+      )}
+
       {/* --- SPLASH SCREEN LOADING (DIKECILKAN SAIZ) --- */}
       <div className={`fixed inset-0 z-[999] bg-[#0f172a] flex flex-col items-center justify-center transition-all duration-700 ease-in-out ${isAppReady ? 'opacity-0 pointer-events-none scale-105 blur-sm' : 'opacity-100 scale-100 blur-none'}`}>
         <div className="relative flex flex-col items-center">
@@ -643,7 +706,6 @@ export default function App() {
             {currentView === 'home' && (
               <div className="px-4 lg:px-8 max-w-6xl mx-auto pb-32 pt-4">
                 
-                {/* HERO SECTION - Teks diubah sedikit kecil agar lebih kemas */}
                 <div className="relative rounded-[2.5rem] bg-gradient-to-br from-[#0f172a] via-blue-950 to-indigo-950 overflow-hidden shadow-xl border border-slate-800/60 mb-8">
                   <NetworkAnimation />
                   <div className="absolute top-[-20%] left-[-10%] w-[50%] h-[50%] bg-blue-500/30 rounded-full blur-[120px] animate-float pointer-events-none"></div>
@@ -769,8 +831,14 @@ export default function App() {
                               <span className="bg-gradient-to-br from-blue-500 to-indigo-600 text-white text-xs font-black px-3 py-1.5 rounded-xl shadow-md mt-0.5 shrink-0">{index + 1}</span>
                               <div className="flex-1 min-w-0">
                                 <p className="text-sm md:text-base font-bold text-slate-800 dark:text-slate-200 break-words leading-tight">{memo.name}</p>
-                                <div className="flex items-center gap-2 mt-1.5">
-                                  <span className="text-[9px] font-black text-slate-500 bg-slate-200 dark:bg-slate-700 px-1.5 py-0.5 rounded uppercase tracking-wider">{memo.type === 'pdf' ? 'Dokumen PDF' : 'Fail Imej'}</span>
+                                <div className="flex flex-wrap items-center gap-2 mt-1.5">
+                                  <span className="text-[9px] font-black text-blue-600 bg-blue-100 dark:text-blue-300 dark:bg-blue-900/40 px-1.5 py-0.5 rounded uppercase tracking-wider">{memo.type === 'pdf' ? 'Dokumen PDF' : 'Fail Imej'}</span>
+                                  {/* --- PAPARAN TARIKH DOKUMEN --- */}
+                                  {memo.uploadDate && (
+                                    <span className="text-[9px] font-bold text-slate-500 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 px-1.5 py-0.5 rounded flex items-center gap-1 shadow-sm">
+                                      <Clock size={10}/> {formatDateTime(memo.uploadDate)}
+                                    </span>
+                                  )}
                                 </div>
                               </div>
                             </div>
@@ -796,6 +864,7 @@ export default function App() {
                                     if(window.confirm("Adakah anda pasti mahu memadam dokumen ini?")) {
                                       try {
                                         await deleteDoc(doc(db, "msr_memos", memo.id));
+                                        saveToFirebase({ lastUpdated: new Date().toISOString() });
                                       } catch(err) {
                                         console.error(err);
                                         alert("Gagal memadam dokumen.");
@@ -1154,7 +1223,10 @@ export default function App() {
                            {layoutImage.includes('application/pdf') ? <FileText size={48} className="text-purple-500" /> : <ImageIcon size={48} className="text-purple-500" />}
                            <div className="space-y-1">
                              <p className="text-sm font-black text-slate-800 dark:text-slate-200">Dokumen Pelan Pendaftaran</p>
-                             <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">{layoutImage.includes('application/pdf') ? 'Format PDF' : 'Format Imej'}</p>
+                             <div className="flex flex-col items-center gap-1.5">
+                               <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">{layoutImage.includes('application/pdf') ? 'Format PDF' : 'Format Imej'}</p>
+                               {layoutDate && <p className="text-[9px] font-bold text-slate-400"><Clock size={10} className="inline mr-1"/>{formatDateTime(layoutDate)}</p>}
+                             </div>
                            </div>
                            <button 
                              onClick={() => handleDownloadBlob(layoutImage, layoutImage.includes('application/pdf') ? 'Pelan_Pendaftaran.pdf' : 'Pelan_Pendaftaran.jpg')}
@@ -1168,7 +1240,8 @@ export default function App() {
                                  if(window.confirm("Padam pelan ini?")){ 
                                     setLayoutImage(null); 
                                     try {
-                                      await setDoc(doc(db, "msr", "data_layout"), { layoutImage: null }); 
+                                      await setDoc(doc(db, "msr", "data_layout"), { layoutImage: null, uploadDate: null }); 
+                                      saveToFirebase({ lastUpdated: new Date().toISOString() });
                                     } catch(err){}
                                  } 
                                }}
@@ -1199,28 +1272,34 @@ export default function App() {
                             )}
                           </div>
 
-                          <div className="flex justify-end gap-2 bg-slate-50 dark:bg-slate-900/50 p-3 rounded-2xl border border-slate-200 dark:border-slate-700">
-                            <button 
-                              onClick={() => handleDownloadBlob(layoutImage, layoutImage.includes('application/pdf') ? 'Pelan_Pendaftaran.pdf' : 'Pelan_Pendaftaran.jpg')}
-                              className="inline-flex items-center gap-1.5 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 px-5 py-2.5 rounded-lg shadow-sm transition-all active:scale-95"
-                            >
-                              <Download size={16} /> Muat Turun Fail
-                            </button>
-                            {isAdmin && (
+                          <div className="flex justify-between items-center gap-2 bg-slate-50 dark:bg-slate-900/50 p-3 rounded-2xl border border-slate-200 dark:border-slate-700">
+                            <span className="text-[10px] font-bold text-slate-500 ml-2">
+                              {layoutDate ? `Dimuat naik pada: ${formatDateTime(layoutDate)}` : ''}
+                            </span>
+                            <div className="flex gap-2">
                               <button 
-                                onClick={async () => { 
-                                 if(window.confirm("Padam pelan ini?")){ 
-                                    setLayoutImage(null); 
-                                    try {
-                                      await setDoc(doc(db, "msr", "data_layout"), { layoutImage: null }); 
-                                    } catch(err){}
-                                 } 
-                                }}
-                                className="inline-flex items-center gap-1.5 text-xs font-bold text-red-600 bg-red-50 hover:bg-red-100 dark:bg-red-900/20 px-5 py-2.5 rounded-lg transition-all active:scale-95"
+                                onClick={() => handleDownloadBlob(layoutImage, layoutImage.includes('application/pdf') ? 'Pelan_Pendaftaran.pdf' : 'Pelan_Pendaftaran.jpg')}
+                                className="inline-flex items-center gap-1.5 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 px-5 py-2.5 rounded-lg shadow-sm transition-all active:scale-95"
                               >
-                                <Trash2 size={16} /> Padam
+                                <Download size={16} /> Muat Turun Fail
                               </button>
-                            )}
+                              {isAdmin && (
+                                <button 
+                                  onClick={async () => { 
+                                   if(window.confirm("Padam pelan ini?")){ 
+                                      setLayoutImage(null); 
+                                      try {
+                                        await setDoc(doc(db, "msr", "data_layout"), { layoutImage: null, uploadDate: null }); 
+                                        saveToFirebase({ lastUpdated: new Date().toISOString() });
+                                      } catch(err){}
+                                   } 
+                                  }}
+                                  className="inline-flex items-center gap-1.5 text-xs font-bold text-red-600 bg-red-50 hover:bg-red-100 dark:bg-red-900/20 px-5 py-2.5 rounded-lg transition-all active:scale-95"
+                                >
+                                  <Trash2 size={16} /> Padam
+                                </button>
+                              )}
+                            </div>
                           </div>
                         </div>
                       </div>
@@ -1276,7 +1355,10 @@ export default function App() {
                 </div>
                 <div>
                   <h3 className="font-bold text-sm md:text-base truncate max-w-xl">{viewingMemo.name}</h3>
-                  <span className="text-[9px] font-black tracking-widest text-slate-400 uppercase">{viewingMemo.type === 'pdf' ? 'Dokumen PDF' : 'Fail Imej'}</span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[9px] font-black tracking-widest text-slate-400 uppercase">{viewingMemo.type === 'pdf' ? 'Dokumen PDF' : 'Fail Imej'}</span>
+                    {viewingMemo.uploadDate && <span className="text-[9px] font-bold text-slate-500">| {formatDateTime(viewingMemo.uploadDate)}</span>}
+                  </div>
                 </div>
               </div>
               <div className="flex items-center gap-2 shrink-0 ml-4">
@@ -1317,6 +1399,12 @@ export default function App() {
         {/* --- FOOTER --- */}
         <footer className="bg-[#f8fafc] dark:bg-[#0b1121] text-slate-400 py-6 text-center text-[10px] font-bold mt-auto pb-24 md:pb-6 border-t border-slate-200 dark:border-slate-800/50 relative z-30">
           <p>Hak Cipta Terpelihara &copy; 2026 Kolej Teknologi Termaju (ADTEC) Kampus Sandakan.</p>
+          {/* INFO KEMAS KINI TERAKHIR */}
+          {lastUpdated && (
+            <p className="mt-1.5 text-[9px] text-slate-400/80 font-medium tracking-wider uppercase">
+              Kemas Kini Terakhir: {formatDateTime(lastUpdated)}
+            </p>
+          )}
         </footer>
 
         {/* --- BOTTOM NAV (MOBILE) --- */}
