@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { doc, onSnapshot, setDoc } from 'firebase/firestore';
+import { doc, onSnapshot, setDoc, collection, deleteDoc } from 'firebase/firestore';
 import { db } from './firebase';
 
 import { 
@@ -97,71 +97,25 @@ const CustomFacebookIcon = React.memo(({ size = 20 }) => (
 
 // --- SENARAI STAF (AUTOCOMPLETE) ---
 const senaraiStaf = [
-  "Encik Abdul Hamid bin Sakmud @ Abdullah",
-  "Puan Adiniah Binti Muhamad Radzai",
-  "Puan Anamary binti Madyusah",
-  "Encik Andrew Bin Arih",
-  "Encik Anzari bin Mohd Daud",
-  "Puan Aslinah binti Aldan",
-  "Puan Asriyani binti Seraila",
-  "Encik Azryzan bin Besri",
-  "Encik Azwie bin Jafri",
-  "Encik Billy Anak Rejap",
-  "Encik Darman bin Daming",
-  "Puan Enceng binti Saleng Jaga",
-  "Cik Faten Farhana binti Wong",
-  "Puan Haslinda binti Bohari",
-  "Encik Hazrudy bin Ahmad Nasaruddin",
-  "Encik Ibrahim bin Lamusa",
-  "Cik Isabella Francis Xavier",
-  "Encik Ismail Bin Muin",
-  "Encik Jaikol bin Udar",
-  "Encik Jamludin bin Assat",
-  "Encik Japri Bin Patomdang",
-  "Puan Juraini binti Sahid",
-  "Encik Lynn Noell Ending",
-  "Encik Mohamad Sali bin Saleh",
-  "Encik Mohammad Nasir bin Awang",
-  "Encik Mohd Faiz Fathullah bin Ali Hassan",
-  "Encik Mohd Hafizul bin Ibrahim Apani",
-  "Encik Mohd Hairi bin Mohd Shah",
-  "Encik Mohd Hakimin Mohd Hussin",
-  "Encik Mohd Nur Fitri bin Jamil",
-  "Encik Mohd Shamin bin Ahmad",
-  "Encik Muhaidi bin Mohamad",
-  "Encik Muhammad Alinafiah bin Sabril",
-  "Encik Muhalis bin Nonchi",
-  "Cik Nadzihah binti Ahmad",
-  "Encik Nasri bin Kipple",
-  "Puan Nazriati binti Nasib",
-  "Encik Nazry bin Yusof",
-  "Cik Norashikin Binti Ariffin",
-  "Cik Norashsikin binti Mohd Arsad",
-  "Puan Norhadzla binti Abd Halim",
-  "Cik Nur Syafiqah binti Arman",
-  "Puan Nurulizaty binti Ibrahim",
-  "Encik Omrei bin Okong",
-  "Encik Peter Masawa",
-  "Encik Richard Joanes",
-  "Puan Roha binti Awang Latif",
-  "Puan Rohana binti Ahmad",
-  "Puan Roshayati binti Mohammad",
-  "Puan Rusyieni @ Wendy Binti Payah",
-  "Cik Sakinah binti Pitungut",
-  "Puan Satria binti Murtala",
-  "Encik Shaharul bin Abu Talib",
-  "Tc. Johannes Belili",
-  "Tc. Mohd Radznan bin Malek",
-  "Tc. Mohd Sabri bin Mohd Sarif",
-  "Tc. Ng Vui Chien",
-  "Tc. Silvester bin Lawai",
-  "Ts. Joey Eriksen Teo",
-  "Ts. Muhammad Haziq bin Hamzah",
-  "Ts. Muhammad Hifzan bin Salimun",
-  "Ts. Nurzharfan bin Rafei Bui",
-  "Ts. Suhaidi bin Mustar",
-  "Ts. Syed Mohd Yusri bin Syed Yusoff",
-  "Puan Zuliza binti Roslan"
+  "Encik Abdul Hamid bin Sakmud @ Abdullah", "Puan Adiniah Binti Muhamad Radzai", "Puan Anamary binti Madyusah",
+  "Encik Andrew Bin Arih", "Encik Anzari bin Mohd Daud", "Puan Aslinah binti Aldan", "Puan Asriyani binti Seraila",
+  "Encik Azryzan bin Besri", "Encik Azwie bin Jafri", "Encik Billy Anak Rejap", "Encik Darman bin Daming",
+  "Puan Enceng binti Saleng Jaga", "Cik Faten Farhana binti Wong", "Puan Haslinda binti Bohari", 
+  "Encik Hazrudy bin Ahmad Nasaruddin", "Encik Ibrahim bin Lamusa", "Cik Isabella Francis Xavier", 
+  "Encik Ismail Bin Muin", "Encik Jaikol bin Udar", "Encik Jamludin bin Assat", "Encik Japri Bin Patomdang",
+  "Puan Juraini binti Sahid", "Encik Lynn Noell Ending", "Encik Mohamad Sali bin Saleh", "Encik Mohammad Nasir bin Awang",
+  "Encik Mohd Faiz Fathullah bin Ali Hassan", "Encik Mohd Hafizul bin Ibrahim Apani", "Encik Mohd Hairi bin Mohd Shah",
+  "Encik Mohd Hakimin Mohd Hussin", "Encik Mohd Nur Fitri bin Jamil", "Encik Mohd Shamin bin Ahmad",
+  "Encik Muhaidi bin Mohamad", "Encik Muhammad Alinafiah bin Sabril", "Encik Muhalis bin Nonchi", 
+  "Cik Nadzihah binti Ahmad", "Encik Nasri bin Kipple", "Puan Nazriati binti Nasib", "Encik Nazry bin Yusof",
+  "Cik Norashikin Binti Ariffin", "Cik Norashsikin binti Mohd Arsad", "Puan Norhadzla binti Abd Halim", 
+  "Cik Nur Syafiqah binti Arman", "Puan Nurulizaty binti Ibrahim", "Encik Omrei bin Okong", "Encik Peter Masawa",
+  "Encik Richard Joanes", "Puan Roha binti Awang Latif", "Puan Rohana binti Ahmad", "Puan Roshayati binti Mohammad",
+  "Puan Rusyieni @ Wendy Binti Payah", "Cik Sakinah binti Pitungut", "Puan Satria binti Murtala", 
+  "Encik Shaharul bin Abu Talib", "Tc. Johannes Belili", "Tc. Mohd Radznan bin Malek", "Tc. Mohd Sabri bin Mohd Sarif",
+  "Tc. Ng Vui Chien", "Tc. Silvester bin Lawai", "Ts. Joey Eriksen Teo", "Ts. Muhammad Haziq bin Hamzah",
+  "Ts. Muhammad Hifzan bin Salimun", "Ts. Nurzharfan bin Rafei Bui", "Ts. Suhaidi bin Mustar", 
+  "Ts. Syed Mohd Yusri bin Syed Yusoff", "Puan Zuliza binti Roslan"
 ];
 
 // --- WARNA KAD MODEN ---
@@ -260,7 +214,6 @@ const LiveClock = React.memo(() => {
 
   return (
     <div className="flex flex-col items-center justify-center my-2">
-      {/* Saiz jam digital dikecilkan sedikit di sini */}
       <div className="flex items-baseline gap-1 font-mono font-black tracking-tighter text-3xl md:text-4xl text-white drop-shadow-[0_0_15px_rgba(255,255,255,0.3)]">
         {timeNums}
         <span className="text-sm md:text-base font-extrabold text-blue-300 tracking-widest drop-shadow-none ml-1">
@@ -317,32 +270,55 @@ export default function App() {
     }
   }, [isAppReady]);
 
-  // --- FIREBASE FETCH DATA ---
+  // --- FIREBASE FETCH DATA (STRUKTUR BAHARU: PECAHAN LIMIT 1MB) ---
   useEffect(() => {
+    // 1. Fetch Main Data (Kecuali Imej & Fail PDF)
     const docRef = doc(db, "msr", "data_utama");
-    const unsubscribe = onSnapshot(docRef, (docSnap) => {
+    const unsubscribeUtama = onSnapshot(docRef, (docSnap) => {
       if (docSnap.exists()) {
         const data = docSnap.data();
         if (data.announcement !== undefined) setAnnouncement(data.announcement);
         if (data.sesiKemasukan) setSesiKemasukan(data.sesiKemasukan);
         if (data.memoText !== undefined) setMemoText(data.memoText);
-        if (data.memoList !== undefined) setMemoList(data.memoList);
         if (data.ajkInduk) setAjkInduk(data.ajkInduk);
         if (data.biroList) setBiroList(data.biroList);
         if (data.penutupData) setPenutupData(data.penutupData);
-        if (data.layoutImage !== undefined) setLayoutImage(data.layoutImage);
         if (data.jadualData) {
           setJadualData(data.jadualData);
           setActiveJadualTab(prev => prev || (data.jadualData.length > 0 ? data.jadualData[0].id : ''));
         }
       }
+    }, (error) => console.error("Firebase fetch error:", error));
+
+    // 2. Fetch Memos (Setiap memo kini diasingkan dalam failnya sendiri)
+    const memosRef = collection(db, "msr_memos");
+    const unsubscribeMemos = onSnapshot(memosRef, (snapshot) => {
+      const memosArray = [];
+      snapshot.forEach((doc) => memosArray.push(doc.data()));
+      // Susun ikut id (id berasaskan Date.now())
+      memosArray.sort((a, b) => a.id.localeCompare(b.id));
+      setMemoList(memosArray);
+    }, (error) => console.error("Ralat memo:", error));
+
+    // 3. Fetch Layout Image (Diasingkan bagi menjimatkan had 1MB fail utama)
+    const layoutRef = doc(db, "msr", "data_layout");
+    const unsubscribeLayout = onSnapshot(layoutRef, (docSnap) => {
+      if (docSnap.exists() && docSnap.data().layoutImage) {
+        setLayoutImage(docSnap.data().layoutImage);
+      } else {
+        setLayoutImage(null);
+      }
       setTimeout(() => { setIsAppReady(true); }, 1500); 
     }, (error) => {
-      console.error("Firebase fetch error:", error);
+      console.error("Ralat layout:", error);
       setTimeout(() => { setIsAppReady(true); }, 1500);
     });
 
-    return () => unsubscribe();
+    return () => {
+      unsubscribeUtama();
+      unsubscribeMemos();
+      unsubscribeLayout();
+    };
   }, []);
 
   const saveToFirebase = useCallback(async (fieldsToUpdate) => {
@@ -446,40 +422,58 @@ export default function App() {
     }
   };
 
+  // --- MUAT NAIK FAIL MEMO BERASINGAN (PECAHAN LIMIT) ---
   const handleDocumentUpload = (e) => {
     const file = e.target.files[0];
     if (file) {
+      if (file.size > 800 * 1024) {
+         alert("PERHATIAN: Saiz fail ini agak besar. Jika ia gagal dimuat naik, sila gunakan aplikasi pemampat PDF (compress PDF) terlebih dahulu.");
+      }
+      
       const reader = new FileReader();
-      reader.onload = (ev) => {
+      reader.onload = async (ev) => {
         const base64Data = ev.target.result;
         const fileType = file.type === 'application/pdf' ? 'pdf' : 'image';
         let ext = file.name.split('.').pop() || (fileType === 'pdf' ? 'pdf' : 'jpg');
         let defaultName = `Dokumen_MSR.${ext}`;
+        
         const newMemo = {
           id: 'memo_' + Date.now(),
           name: file.name || defaultName,
           url: base64Data,
           type: fileType
         };
-        setMemoList(prev => {
-          const updatedList = [...prev, newMemo];
-          saveToFirebase({ memoList: updatedList });
-          return updatedList;
-        });
+
+        try {
+          await setDoc(doc(db, "msr_memos", newMemo.id), newMemo);
+        } catch (error) {
+          console.error(error);
+          alert("RALAT: Gagal memuat naik fail. Saiz fail anda melebihi had pangkalan data (1MB). Sila kompres / kecilkan fail anda terlebih dahulu.");
+        }
       };
       reader.readAsDataURL(file);
     }
   };
 
+  // --- MUAT NAIK PELAN BERASINGAN (PECAHAN LIMIT) ---
   const handleLayoutUpload = (e) => {
     const file = e.target.files[0];
-    if (file && file.type.startsWith('image/')) {
+    if (file && (file.type.startsWith('image/') || file.type === 'application/pdf')) {
+      if (file.size > 800 * 1024) {
+         alert("PERHATIAN: Saiz pelan ini agak besar. Jika gagal, sila kompres imej/PDF tersebut.");
+      }
       const reader = new FileReader();
-      reader.onload = (ev) => {
-        setLayoutImage(ev.target.result);
-        saveToFirebase({ layoutImage: ev.target.result });
+      reader.onload = async (ev) => {
+        try {
+          await setDoc(doc(db, "msr", "data_layout"), { layoutImage: ev.target.result });
+        } catch (error) {
+          console.error(error);
+          alert("RALAT: Gagal memuat naik pelan. Saiz melebihi had (1MB). Sila kompres fail tersebut.");
+        }
       };
       reader.readAsDataURL(file);
+    } else {
+      alert("Sila muat naik fail berformat Imej atau PDF sahaja.");
     }
   };
 
@@ -568,11 +562,8 @@ export default function App() {
       {/* --- SPLASH SCREEN LOADING (DIKECILKAN SAIZ) --- */}
       <div className={`fixed inset-0 z-[999] bg-[#0f172a] flex flex-col items-center justify-center transition-all duration-700 ease-in-out ${isAppReady ? 'opacity-0 pointer-events-none scale-105 blur-sm' : 'opacity-100 scale-100 blur-none'}`}>
         <div className="relative flex flex-col items-center">
-           {/* Saiz bulatan cahaya diturunkan dari w-32->24 */}
            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-24 h-24 md:w-40 md:h-40 bg-blue-600/40 blur-[50px] rounded-full animate-pulse"></div>
-           {/* Saiz logo diturunkan dari w-24->20 */}
            <img src="Logo ADTEC JTM 2025 Kampus Sandakan.png" alt="Logo ADTEC" className="w-20 md:w-28 relative z-10 drop-shadow-2xl animate-float" />
-           {/* Teks dikecilkan sedikit */}
            <h1 className="mt-6 text-xl md:text-2xl font-black tracking-tight text-white relative z-10 drop-shadow-lg">
              iMSR <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-indigo-400">ADTEC JTM</span>
            </h1>
@@ -686,7 +677,6 @@ export default function App() {
                           )}
                         </div>
 
-                        {/* Font saiz dikurangkan sedikit */}
                         <h1 className="text-4xl md:text-5xl lg:text-[4rem] font-black text-transparent bg-clip-text bg-gradient-to-br from-white via-blue-50 to-blue-400 tracking-tight leading-[1.1] drop-shadow-sm">
                           Minggu<br/>Silaturahim
                         </h1>
@@ -730,7 +720,6 @@ export default function App() {
                         <item.icon size={26} strokeWidth={2} />
                       </div>
                       <div className="relative z-10 mt-6">
-                        {/* Font saiz dikecilkan sedikit di menu */}
                         <h3 className="text-lg md:text-xl font-black text-slate-800 dark:text-white mb-1 tracking-tight group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors duration-300">{item.title}</h3>
                         <p className="text-xs text-slate-500 dark:text-slate-400 font-medium flex items-center">
                           {item.desc}
@@ -803,11 +792,14 @@ export default function App() {
 
                               {isAdmin && (
                                 <button 
-                                  onClick={() => {
+                                  onClick={async () => {
                                     if(window.confirm("Adakah anda pasti mahu memadam dokumen ini?")) {
-                                      const updated = memoList.filter(m => m.id !== memo.id);
-                                      setMemoList(updated);
-                                      saveToFirebase({ memoList: updated });
+                                      try {
+                                        await deleteDoc(doc(db, "msr_memos", memo.id));
+                                      } catch(err) {
+                                        console.error(err);
+                                        alert("Gagal memadam dokumen.");
+                                      }
                                     }
                                   }} 
                                   className="text-red-500 bg-red-50 hover:bg-red-100 dark:bg-red-900/20 dark:hover:bg-red-900/40 p-2 rounded-xl transition-colors shrink-0 active:scale-90"
@@ -1105,7 +1097,7 @@ export default function App() {
                     <div className="relative border-l-[3px] border-rose-200 dark:border-rose-800/50 ml-3 md:ml-6 space-y-5 mt-6">
                       {penutupData.map((slot) => (
                         <div key={slot.id} className="relative pl-6 md:pl-8 group">
-                          <div className="absolute -left-[11px] top-4 h-5 w-5 rounded-full border-[4px] border-white dark:border-slate-800 bg-rose-500 shadow-sm z-10 group-hover:scale-125 transition-transform duration-300"></div>
+                          <div className="absolute -left-[11px] top-4 h-5 w-5 rounded-full border-[4px] border-white dark:border-slate-800 bg-rose-500 shadow-md z-10 group-hover:scale-125 transition-transform duration-300"></div>
                           
                           {isAdmin ? (
                             <div className="bg-slate-50 dark:bg-slate-900/50 p-4 rounded-2xl border border-slate-200 dark:border-slate-700 relative shadow-sm transition-shadow">
@@ -1172,7 +1164,14 @@ export default function App() {
                            </button>
                            {isAdmin && (
                              <button 
-                               onClick={() => { if(window.confirm("Padam pelan ini?")){ setLayoutImage(null); saveToFirebase({ layoutImage: null }); } }}
+                               onClick={async () => { 
+                                 if(window.confirm("Padam pelan ini?")){ 
+                                    setLayoutImage(null); 
+                                    try {
+                                      await setDoc(doc(db, "msr", "data_layout"), { layoutImage: null }); 
+                                    } catch(err){}
+                                 } 
+                               }}
                                className="w-full inline-flex items-center justify-center gap-2 text-xs font-bold text-red-600 bg-red-50 hover:bg-red-100 dark:bg-red-900/20 px-4 py-3 rounded-xl transition-all active:scale-95"
                              >
                                <Trash2 size={16} /> Padam Rekod Pelan
@@ -1209,7 +1208,14 @@ export default function App() {
                             </button>
                             {isAdmin && (
                               <button 
-                                onClick={() => { if(window.confirm("Padam pelan ini?")){ setLayoutImage(null); saveToFirebase({ layoutImage: null }); } }}
+                                onClick={async () => { 
+                                 if(window.confirm("Padam pelan ini?")){ 
+                                    setLayoutImage(null); 
+                                    try {
+                                      await setDoc(doc(db, "msr", "data_layout"), { layoutImage: null }); 
+                                    } catch(err){}
+                                 } 
+                                }}
                                 className="inline-flex items-center gap-1.5 text-xs font-bold text-red-600 bg-red-50 hover:bg-red-100 dark:bg-red-900/20 px-5 py-2.5 rounded-lg transition-all active:scale-95"
                               >
                                 <Trash2 size={16} /> Padam
