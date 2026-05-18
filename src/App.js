@@ -302,10 +302,7 @@ export default function App() {
       if (docSnap.exists()) {
         const data = docSnap.data();
         if (data.lastUpdated) setLastUpdated(data.lastUpdated);
-        
-        // Simpan maklumat kemas kini terbaharu untuk fungsi Toast Boleh Klik
         if (data.latestUpdate) setLatestUpdateInfo(data.latestUpdate);
-        
         if (data.announcement !== undefined) setAnnouncement(data.announcement);
         if (data.sesiKemasukan) setSesiKemasukan(data.sesiKemasukan);
         if (data.memoText !== undefined) setMemoText(data.memoText);
@@ -362,7 +359,6 @@ export default function App() {
     }
   }, [isAppReady, lastUpdated]);
 
-  // Fungsi simpanan ke firebase diselitkan dengan parameter `latestUpdate`
   const saveToFirebase = useCallback(async (fieldsToUpdate) => {
     try {
       const docRef = doc(db, "msr", "data_utama");
@@ -489,7 +485,6 @@ export default function App() {
 
         try {
           await setDoc(doc(db, "msr_memos", newMemo.id), newMemo);
-          // Update Notifikasi
           saveToFirebase({ latestUpdate: { view: 'memo', text: `Dokumen baharu bertajuk '${newMemo.name}' telah dimuat naik.` } });
         } catch (error) {
           console.error(error);
@@ -513,7 +508,6 @@ export default function App() {
             layoutImage: ev.target.result,
             uploadDate: new Date().toISOString()
           });
-          // Update Notifikasi
           saveToFirebase({ latestUpdate: { view: 'layout', text: 'Satu fail pelan pendaftaran dewan baharu telah dimuat naik.' } });
         } catch (error) {
           console.error(error);
@@ -669,19 +663,20 @@ export default function App() {
           isScrolled ? 'bg-white/80 dark:bg-slate-900/80 shadow-[0_4px_30px_rgba(0,0,0,0.05)] dark:shadow-[0_4px_30px_rgba(0,0,0,0.3)] border-b border-slate-200 dark:border-slate-800' : 'bg-transparent border-b border-transparent py-2'
         }`}>
           <div className={`max-w-6xl mx-auto px-4 lg:px-8 flex items-center justify-between transition-all duration-300 ease-out ${isScrolled ? 'h-14 md:h-16' : 'h-16 md:h-20'}`}>
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-4">
               {currentView !== 'home' && (
                 <button onClick={() => navigateTo('home')} className="p-2 -ml-2 rounded-full bg-white/50 dark:bg-slate-800/50 hover:bg-slate-200 dark:hover:bg-slate-700 active:scale-90 transition-all duration-200 shadow-sm border border-slate-200/50 dark:border-slate-700/50">
                   <ChevronLeft size={20} />
                 </button>
               )}
-              <div className="flex items-center gap-2.5 md:gap-3">
+              {/* JADIKAN LOGO SEBAGAI BUTANG KE HOME */}
+              <button onClick={() => navigateTo('home')} className="flex items-center gap-2.5 md:gap-3 text-left focus:outline-none hover:opacity-80 transition-opacity active:scale-95">
                 <img src="Logo ADTEC JTM 2025 Kampus Sandakan.png" alt="Logo" className={`w-auto object-contain bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-slate-100 dark:border-slate-700 transition-all duration-300 ${isScrolled ? 'h-8 md:h-10 p-1' : 'h-10 md:h-12 p-1.5'}`} />
                 <div>
                   <h1 className="font-extrabold tracking-tight text-base md:text-xl bg-clip-text text-transparent bg-gradient-to-r from-blue-700 to-indigo-600 dark:from-blue-400 dark:to-indigo-300">iMSR ADTEC JTM</h1>
                   <span className="text-[9px] md:text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-[0.2em] hidden sm:block transition-all">KAMPUS Sandakan</span>
                 </div>
-              </div>
+              </button>
             </div>
             
             <div className="flex items-center gap-2 md:gap-4">
@@ -736,14 +731,14 @@ export default function App() {
                   <div className="relative z-20 px-6 py-10 md:px-12 md:py-20 flex flex-col lg:flex-row items-center justify-between gap-10">
                     <div className="w-full lg:w-3/5 space-y-6 text-center lg:text-left">
                       
-                      <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/5 border border-white/10 backdrop-blur-xl text-amber-300 text-xs font-medium w-full lg:w-auto text-left shadow-sm hover:bg-white/10 transition-colors duration-300">
-                        <Bell className="animate-bounce shrink-0" size={16}/>
+                      <div className="flex flex-col md:flex-row items-start md:items-center gap-3 px-5 py-3 md:py-2.5 rounded-2xl md:rounded-full bg-white/5 border border-white/10 backdrop-blur-xl text-amber-300 text-sm font-medium w-full text-left shadow-sm hover:bg-white/10 transition-colors duration-300">
+                        <Bell className="animate-bounce shrink-0 mt-0.5 md:mt-0" size={18}/>
                         {isAdmin ? (
-                          <div className="flex-1 flex items-center gap-2">
-                            <input value={announcement} onChange={e => setAnnouncement(e.target.value)} onBlur={() => saveToFirebase({ announcement, latestUpdate: { view: 'home', text: 'Teks pengumuman baharu telah dikemas kini.' } })} className="w-full bg-transparent border-b border-amber-500/50 outline-none text-white focus:border-amber-400 px-1 py-0.5" placeholder="Tulis pengumuman..." />
+                          <div className="flex-1 flex items-center gap-2 w-full">
+                            <input value={announcement} onChange={e => setAnnouncement(e.target.value)} onBlur={() => saveToFirebase({ announcement, latestUpdate: { view: 'home', text: 'Teks pengumuman portal telah dikemas kini.' } })} className="w-full bg-transparent border-b border-amber-500/50 outline-none text-white focus:border-amber-400 px-1 py-0.5" placeholder="Tulis pengumuman..." />
                           </div>
                         ) : (
-                          <span className="truncate max-w-sm xl:max-w-md">{announcement || "Selamat Datang ke iMSR ADTEC Sandakan"}</span>
+                          <span className="flex-1 whitespace-normal break-words leading-relaxed">{announcement || "Selamat Datang ke iMSR ADTEC Sandakan"}</span>
                         )}
                       </div>
 
@@ -1419,9 +1414,8 @@ export default function App() {
 
         {/* --- FOOTER --- */}
         <footer className="bg-[#f8fafc] dark:bg-[#0b1121] text-slate-400 py-6 text-center mt-auto pb-24 md:pb-6 border-t border-slate-200 dark:border-slate-800/50 relative z-30">
-          {/* INFO HAK CIPTA ASAL DIKEMBALIKAN */}
           <p className="text-[10px] md:text-xs text-slate-500 font-bold tracking-wide">
-            Hak Cipta Terpelihara &copy; 2026 Kolej Teknologi Termaju (ADTEC) Kampus Sandakan.
+            Hak Cipta Terpelihara &copy; 2026 Kolej Teknologi Termaju (ADTEC) Jabatan Tenaga Manusia Kampus Sandakan.
           </p>
         </footer>
 
