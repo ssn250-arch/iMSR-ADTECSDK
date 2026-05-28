@@ -651,7 +651,7 @@ export default function App() {
            <div className="mt-8 w-40 h-1 bg-slate-800 rounded-full overflow-hidden relative z-10 shadow-inner">
              <div className="absolute top-0 left-0 h-full bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500 w-1/2 animate-slide rounded-full"></div>
            </div>
-           <p className="mt-3 text-[11px] font-semibold text-slate-500 animate-pulse tracking-wider">Memuatkan Data...</p>
+           <p className="mt-3 text-[11px] font-semibold text-slate-500 animate-pulse tracking-wider">Please wait...</p>
         </div>
       </div>
 
@@ -760,7 +760,7 @@ export default function App() {
                           Minggu<br/>Silaturahim
                         </h1>
                         <p className="text-sm md:text-base text-slate-300/90 font-medium max-w-lg mx-auto lg:mx-0 leading-relaxed">
-                          Portal rasmi pusat sehenti pendaftaran dan orientasi pelajar baharu Kolej Teknologi Termaju (ADTEC) Sandakan.
+                          Portal rasmi Pendaftaran dan Minggu Silaturahim Pelajar (MSR) baharu ADTEC JTM Kampus Sandakan.
                         </p>
                       </div>
                     </div>
