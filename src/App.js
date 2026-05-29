@@ -1419,7 +1419,7 @@ export default function App() {
           </p>
         </footer>
 
-        {/* --- BOTTOM NAV (MOBILE) --- */}
+        {/* --- BOTTOM NAV (MOBILE) WITH GLASSMORPHISM ICONS --- */}
         <nav className="md:hidden fixed bottom-0 w-full bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border-t border-slate-200 dark:border-slate-800 flex justify-around items-center pt-1.5 pb-safe-bottom pb-3 z-40 shadow-[0_-10px_40px_rgba(0,0,0,0.05)] dark:shadow-[0_-10px_40px_rgba(0,0,0,0.5)]">
           {[
             { id: 'home', icon: Home, label: 'Utama' },
@@ -1428,8 +1428,20 @@ export default function App() {
             { id: 'jadual', icon: Calendar, label: 'Jadual' },
             { id: 'penutup', icon: Award, label: 'Penutup' }
           ].map((item) => (
-            <button key={item.id} onClick={() => navigateTo(item.id)} className={`flex flex-col items-center gap-1 p-1.5 w-[20%] text-[9px] font-black transition-all active:scale-90 ${currentView === item.id ? 'text-blue-600 dark:text-blue-400 -translate-y-1.5' : 'text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300'}`}>
-              <div className={`${currentView === item.id ? 'bg-blue-100 dark:bg-blue-900/40 p-2 rounded-xl shadow-sm border border-blue-200 dark:border-blue-800/50 mb-0.5' : 'p-1'}`}>
+            <button 
+              key={item.id} 
+              onClick={() => navigateTo(item.id)} 
+              className={`flex flex-col items-center gap-1 p-1.5 w-[20%] text-[9px] font-black transition-all active:scale-90 ${
+                currentView === item.id 
+                  ? 'text-blue-600 dark:text-blue-400 -translate-y-1.5' 
+                  : 'text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300'
+              }`}
+            >
+              <div className={`transition-all duration-300 ${
+                currentView === item.id 
+                  ? 'backdrop-blur-md bg-blue-500/80 dark:bg-blue-600/80 shadow-lg rounded-xl p-2 border border-white/30 text-white' 
+                  : 'backdrop-blur-md bg-white/30 dark:bg-white/10 shadow-sm rounded-xl p-2 border border-white/20'
+              }`}>
                 <item.icon size={20} strokeWidth={currentView === item.id ? 2.5 : 2} />
               </div>
               <span className={`tracking-wide ${currentView === item.id ? 'opacity-100' : 'opacity-80'}`}>{item.label}</span>
