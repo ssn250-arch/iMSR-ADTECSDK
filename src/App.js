@@ -287,6 +287,10 @@ export default function App() {
   const [activeJadualTab, setActiveJadualTab] = useState('');
   const [isScrolled, setIsScrolled] = useState(false);
 
+  // --- OFFLINE DETECTION & CACHE ---
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const [showOfflineBanner, setShowOfflineBanner] = useState(false);
+
   useEffect(() => {
     if (!isAppReady) {
       document.body.style.overflow = 'hidden';
@@ -295,12 +299,33 @@ export default function App() {
     }
   }, [isAppReady]);
 
-  // --- FIREBASE FETCH DATA ---
+  // --- FIREBASE FETCH DATA (dengan cache offline) ---
   useEffect(() => {
+    // Load cached data first
+    const cachedData = localStorage.getItem('imsr_cached_data');
+    if (cachedData) {
+      try {
+        const data = JSON.parse(cachedData);
+        if (data.lastUpdated) setLastUpdated(data.lastUpdated);
+        if (data.announcement !== undefined) setAnnouncement(data.announcement);
+        if (data.sesiKemasukan) setSesiKemasukan(data.sesiKemasukan);
+        if (data.memoText !== undefined) setMemoText(data.memoText);
+        if (data.ajkInduk) setAjkInduk(data.ajkInduk);
+        if (data.biroList) setBiroList(data.biroList);
+        if (data.penutupData) setPenutupData(data.penutupData);
+        if (data.jadualData) {
+          setJadualData(data.jadualData);
+          setActiveJadualTab(prev => prev || (data.jadualData.length > 0 ? data.jadualData[0].id : ''));
+        }
+      } catch(e) { console.warn("Cache error", e); }
+    }
+
     const docRef = doc(db, "msr", "data_utama");
     const unsubscribeUtama = onSnapshot(docRef, (docSnap) => {
       if (docSnap.exists()) {
         const data = docSnap.data();
+        // Save to cache
+        localStorage.setItem('imsr_cached_data', JSON.stringify(data));
         if (data.lastUpdated) setLastUpdated(data.lastUpdated);
         if (data.latestUpdate) setLatestUpdateInfo(data.latestUpdate);
         if (data.announcement !== undefined) setAnnouncement(data.announcement);
@@ -322,6 +347,7 @@ export default function App() {
       snapshot.forEach((doc) => memosArray.push(doc.data()));
       memosArray.sort((a, b) => a.id.localeCompare(b.id));
       setMemoList(memosArray);
+      localStorage.setItem('imsr_cached_memos', JSON.stringify(memosArray));
     }, (error) => console.error("Ralat memo:", error));
 
     const layoutRef = doc(db, "msr", "data_layout");
@@ -329,6 +355,7 @@ export default function App() {
       if (docSnap.exists() && docSnap.data().layoutImage) {
         setLayoutImage(docSnap.data().layoutImage);
         setLayoutDate(docSnap.data().uploadDate || null);
+        localStorage.setItem('imsr_cached_layout', JSON.stringify({ layoutImage: docSnap.data().layoutImage, uploadDate: docSnap.data().uploadDate }));
       } else {
         setLayoutImage(null);
         setLayoutDate(null);
@@ -336,6 +363,14 @@ export default function App() {
       setTimeout(() => { setIsAppReady(true); }, 1500); 
     }, (error) => {
       console.error("Ralat layout:", error);
+      const cachedLayout = localStorage.getItem('imsr_cached_layout');
+      if (cachedLayout) {
+        try {
+          const layout = JSON.parse(cachedLayout);
+          setLayoutImage(layout.layoutImage);
+          setLayoutDate(layout.uploadDate);
+        } catch(e) {}
+      }
       setTimeout(() => { setIsAppReady(true); }, 1500);
     });
 
@@ -346,28 +381,84 @@ export default function App() {
     };
   }, []);
 
+  // --- OFFLINE EVENT HANDLERS ---
+  useEffect(() => {
+    const handleOnline = () => {
+      setIsOnline(true);
+      setShowOfflineBanner(false);
+      retryFailedUpdates();
+    };
+    const handleOffline = () => {
+      setIsOnline(false);
+      setShowOfflineBanner(true);
+      setTimeout(() => setShowOfflineBanner(false), 10000);
+    };
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+
+  const retryFailedUpdates = useCallback(async () => {
+    const pending = JSON.parse(localStorage.getItem('imsr_pending_updates') || '[]');
+    if (pending.length === 0) return;
+    for (const update of pending) {
+      try {
+        const docRef = doc(db, "msr", "data_utama");
+        await setDoc(docRef, update.payload, { merge: true });
+      } catch (err) {
+        console.warn("Gagal sync semula:", err);
+      }
+    }
+    localStorage.removeItem('imsr_pending_updates');
+  }, []);
+
+  const saveToFirebaseWithOffline = useCallback(async (fieldsToUpdate) => {
+    const payload = { ...fieldsToUpdate, lastUpdated: new Date().toISOString() };
+    if (!navigator.onLine) {
+      const pending = JSON.parse(localStorage.getItem('imsr_pending_updates') || '[]');
+      pending.push({ timestamp: Date.now(), payload });
+      localStorage.setItem('imsr_pending_updates', JSON.stringify(pending));
+      setShowOfflineBanner(true);
+      setTimeout(() => setShowOfflineBanner(false), 6000);
+      // Also update local cache
+      const cached = localStorage.getItem('imsr_cached_data');
+      if (cached) {
+        try {
+          const data = JSON.parse(cached);
+          const updatedData = { ...data, ...fieldsToUpdate, lastUpdated: payload.lastUpdated };
+          localStorage.setItem('imsr_cached_data', JSON.stringify(updatedData));
+        } catch(e) {}
+      }
+      return;
+    }
+    try {
+      const docRef = doc(db, "msr", "data_utama");
+      await setDoc(docRef, payload, { merge: true });
+    } catch (error) {
+      console.error("Gagal mengemaskini:", error);
+      const pending = JSON.parse(localStorage.getItem('imsr_pending_updates') || '[]');
+      pending.push({ timestamp: Date.now(), payload });
+      localStorage.setItem('imsr_pending_updates', JSON.stringify(pending));
+      setShowOfflineBanner(true);
+      setTimeout(() => setShowOfflineBanner(false), 6000);
+    }
+  }, []);
+
   // --- LOGIK NOTIFIKASI KEMAS KINI (TOAST PINTAR) ---
   useEffect(() => {
     if (isAppReady && lastUpdated && !hasCheckedUpdates.current) {
       const lastVisit = localStorage.getItem('imsr_last_visit');
       if (!lastVisit || new Date(lastUpdated) > new Date(lastVisit)) {
         setTimeout(() => setShowToast(true), 1500); 
-        setTimeout(() => setShowToast(false), 16500); // 15 Saat dipaparkan
+        setTimeout(() => setShowToast(false), 16500);
       }
       localStorage.setItem('imsr_last_visit', new Date().toISOString());
       hasCheckedUpdates.current = true;
     }
   }, [isAppReady, lastUpdated]);
-
-  const saveToFirebase = useCallback(async (fieldsToUpdate) => {
-    try {
-      const docRef = doc(db, "msr", "data_utama");
-      const payload = { ...fieldsToUpdate, lastUpdated: new Date().toISOString() };
-      await setDoc(docRef, payload, { merge: true });
-    } catch (error) {
-      console.error("Gagal mengemaskini pangkalan data:", error);
-    }
-  }, []);
 
   useEffect(() => {
     if (localStorage.theme === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
@@ -401,7 +492,7 @@ export default function App() {
         setBlobUrl(null);
       }
     }
-  }, [viewingMemo]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [viewingMemo]);
 
   const toggleTheme = useCallback(() => {
     setIsDarkMode(prev => {
@@ -485,7 +576,7 @@ export default function App() {
 
         try {
           await setDoc(doc(db, "msr_memos", newMemo.id), newMemo);
-          saveToFirebase({ latestUpdate: { view: 'memo', text: `Dokumen baharu bertajuk '${newMemo.name}' telah dimuat naik.` } });
+          saveToFirebaseWithOffline({ latestUpdate: { view: 'memo', text: `Dokumen baharu bertajuk '${newMemo.name}' telah dimuat naik.` } });
         } catch (error) {
           console.error(error);
           alert("RALAT: Gagal memuat naik fail. Sila pastikan fail kurang daripada 1MB.");
@@ -508,7 +599,7 @@ export default function App() {
             layoutImage: ev.target.result,
             uploadDate: new Date().toISOString()
           });
-          saveToFirebase({ latestUpdate: { view: 'layout', text: 'Satu fail pelan pendaftaran dewan baharu telah dimuat naik.' } });
+          saveToFirebaseWithOffline({ latestUpdate: { view: 'layout', text: 'Satu fail pelan pendaftaran dewan baharu telah dimuat naik.' } });
         } catch (error) {
           console.error(error);
           alert("RALAT: Gagal memuat naik pelan. Saiz melebihi had (1MB). Sila kompres fail tersebut.");
@@ -540,6 +631,7 @@ export default function App() {
           type="button"
           onClick={() => setIsOpen(!isOpen)}
           className="flex items-center gap-1 bg-white/10 hover:bg-white/20 px-3 py-1.5 rounded-lg text-[11px] font-extrabold text-white transition-all backdrop-blur-md shadow-sm border border-white/20 outline-none"
+          aria-label="Pilih nilai dropdown"
         >
           {options.find(o => o.value === value)?.label || value}
           <ChevronDown size={14} className={`transition-transform duration-300 ${isOpen ? 'rotate-180' : ''}`} />
@@ -553,6 +645,7 @@ export default function App() {
                 type="button"
                 onClick={() => { onChange(opt.value); setIsOpen(false); }}
                 className={`w-full text-left px-4 py-2.5 text-xs font-bold transition-colors ${value === opt.value ? 'text-blue-600 dark:text-blue-400 bg-blue-50/80 dark:bg-blue-900/30' : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700/80'}`}
+                aria-label={`Pilih ${opt.label}`}
               >
                 {opt.label}
               </button>
@@ -569,6 +662,7 @@ export default function App() {
         <button 
           className="w-full px-4 py-3 text-left flex justify-between items-center bg-slate-50 hover:bg-slate-100 dark:bg-slate-800 dark:hover:bg-slate-700 transition-colors"
           onClick={onToggle}
+          aria-label={`Kembangkan biro ${biro.nama}`}
         >
           <span className="font-bold text-slate-800 dark:text-slate-100 text-sm">{biro.nama}</span>
           <ChevronDown className={`text-slate-500 transition-transform duration-300 ${isOpen ? 'rotate-180 text-blue-500' : ''}`} size={18} />
@@ -595,7 +689,6 @@ export default function App() {
 
   return (
     <div className={isDarkMode ? 'dark' : ''}>
-      {/* DATALIST UNTUK AUTOCOMPLETE NAMA STAF */}
       <datalist id="senarai-staf">
         {senaraiStaf.map((staf, i) => (
           <option key={i} value={staf} />
@@ -606,7 +699,6 @@ export default function App() {
       {showToast && (
         <div className="fixed top-4 left-4 right-4 md:left-auto md:right-8 md:top-8 md:w-[26rem] z-[150] animate-in slide-in-from-top-10 fade-in duration-500">
           <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white p-5 rounded-2xl shadow-[0_10px_40px_rgba(0,0,0,0.3)] flex flex-col gap-3 border border-blue-400/50 relative overflow-hidden">
-            {/* Bar Progres yang menyusut dalam masa 15 Saat */}
             <div className="absolute bottom-0 left-0 w-full h-1.5 bg-black/20">
                <div className="h-full bg-yellow-400 animate-progress"></div>
             </div>
@@ -623,22 +715,35 @@ export default function App() {
               </div>
             </div>
 
-            {/* Butang Navigasi Pintar */}
             {latestUpdateInfo?.view && (
               <button 
                 onClick={() => { navigateTo(latestUpdateInfo.view); setShowToast(false); }}
                 className="w-full mt-2 bg-white/10 hover:bg-white/20 border border-white/20 text-white text-xs font-bold py-2.5 rounded-xl transition-colors flex items-center justify-center gap-2 active:scale-95"
+                aria-label="Lihat bahagian kemas kini"
               >
                 Lihat Bahagian {latestUpdateInfo.view.charAt(0).toUpperCase() + latestUpdateInfo.view.slice(1)} <ChevronRight size={14} />
               </button>
             )}
 
-            <button onClick={() => setShowToast(false)} className="absolute top-4 right-4 text-blue-200 hover:text-white transition-colors bg-black/10 hover:bg-black/30 p-1.5 rounded-full active:scale-90"><X size={16}/></button>
+            <button onClick={() => setShowToast(false)} className="absolute top-4 right-4 text-blue-200 hover:text-white transition-colors bg-black/10 hover:bg-black/30 p-1.5 rounded-full active:scale-90" aria-label="Tutup notifikasi"><X size={16}/></button>
           </div>
         </div>
       )}
 
-      {/* --- SPLASH SCREEN LOADING (DIKECILKAN SAIZ) --- */}
+      {/* Banner Offline */}
+      {showOfflineBanner && (
+        <div className="fixed bottom-20 left-4 right-4 md:bottom-8 md:left-auto md:right-8 z-[200] bg-red-600 text-white p-3 rounded-xl shadow-xl flex items-center justify-between gap-3 animate-in slide-in-from-bottom-5 fade-in">
+          <div className="flex items-center gap-2">
+            <AlertTriangle size={18} className="text-yellow-300" />
+            <span className="text-xs font-bold">Tiada sambungan internet. Perubahan akan disimpan dan disegerak apabila sambungan pulih.</span>
+          </div>
+          <button onClick={() => setShowOfflineBanner(false)} className="text-white/70 hover:text-white p-1" aria-label="Tutup amaran offline">
+            <X size={16} />
+          </button>
+        </div>
+      )}
+
+      {/* --- SPLASH SCREEN LOADING --- */}
       <div className={`fixed inset-0 z-[999] bg-[#0f172a] flex flex-col items-center justify-center transition-all duration-700 ease-in-out ${isAppReady ? 'opacity-0 pointer-events-none scale-105 blur-sm' : 'opacity-100 scale-100 blur-none'}`}>
         <div className="relative flex flex-col items-center">
            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-24 h-24 md:w-40 md:h-40 bg-blue-600/40 blur-[50px] rounded-full animate-pulse"></div>
@@ -665,13 +770,12 @@ export default function App() {
           <div className={`max-w-6xl mx-auto px-4 lg:px-8 flex items-center justify-between transition-all duration-300 ease-out ${isScrolled ? 'h-14 md:h-16' : 'h-16 md:h-20'}`}>
             <div className="flex items-center gap-4">
               {currentView !== 'home' && (
-                <button onClick={() => navigateTo('home')} className="p-2 -ml-2 rounded-full bg-white/50 dark:bg-slate-800/50 hover:bg-slate-200 dark:hover:bg-slate-700 active:scale-90 transition-all duration-200 shadow-sm border border-slate-200/50 dark:border-slate-700/50">
+                <button onClick={() => navigateTo('home')} className="p-2 -ml-2 rounded-full bg-white/50 dark:bg-slate-800/50 hover:bg-slate-200 dark:hover:bg-slate-700 active:scale-90 transition-all duration-200 shadow-sm border border-slate-200/50 dark:border-slate-700/50" aria-label="Kembali ke laman utama">
                   <ChevronLeft size={20} />
                 </button>
               )}
-              {/* JADIKAN LOGO SEBAGAI BUTANG KE HOME */}
-              <button onClick={() => navigateTo('home')} className="flex items-center gap-2.5 md:gap-3 text-left focus:outline-none hover:opacity-80 transition-opacity active:scale-95">
-                <img src="Logo ADTEC JTM 2025 Kampus Sandakan.png" alt="Logo" className={`w-auto object-contain bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-slate-100 dark:border-slate-700 transition-all duration-300 ${isScrolled ? 'h-8 md:h-10 p-1' : 'h-10 md:h-12 p-1.5'}`} />
+              <button onClick={() => navigateTo('home')} className="flex items-center gap-2.5 md:gap-3 text-left focus:outline-none hover:opacity-80 transition-opacity active:scale-95" aria-label="Laman utama">
+                <img src="Logo ADTEC JTM 2025 Kampus Sandakan.png" alt="Logo ADTEC" className={`w-auto object-contain bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-slate-100 dark:border-slate-700 transition-all duration-300 ${isScrolled ? 'h-8 md:h-10 p-1' : 'h-10 md:h-12 p-1.5'}`} />
                 <div>
                   <h1 className="font-extrabold tracking-tight text-base md:text-xl bg-clip-text text-transparent bg-gradient-to-r from-blue-700 to-indigo-600 dark:from-blue-400 dark:to-indigo-300">iMSR ADTEC JTM</h1>
                   <span className="text-[9px] md:text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-[0.2em] hidden sm:block transition-all">KAMPUS Sandakan</span>
@@ -681,12 +785,12 @@ export default function App() {
             
             <div className="flex items-center gap-2 md:gap-4">
               <div className="hidden sm:flex items-center gap-2 border-r border-slate-200 dark:border-slate-700 pr-4 mr-2">
-                <a href="https://www.jtm.gov.my/etatatertib/" target="_blank" rel="noopener noreferrer" className="p-2 rounded-full text-slate-500 dark:text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-slate-800 transition-all" title="eTATATERTIB"><Shield size={18} /></a>
-                <a href="https://jims.jtm.gov.my/" target="_blank" rel="noopener noreferrer" className="p-2 rounded-full text-slate-500 dark:text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-slate-800 transition-all" title="Sistem JIMS"><Monitor size={18} /></a>
-                <a href="https://www.facebook.com/ilpsdk" target="_blank" rel="noopener noreferrer" className="p-2 rounded-full text-slate-500 dark:text-slate-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-slate-800 transition-all" title="Facebook ILP Sandakan"><CustomFacebookIcon size={18} /></a>
+                <a href="https://www.jtm.gov.my/etatatertib/" target="_blank" rel="noopener noreferrer" className="p-2 rounded-full text-slate-500 dark:text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-slate-800 transition-all" title="eTATATERTIB" aria-label="eTATATERTIB"><Shield size={18} /></a>
+                <a href="https://jims.jtm.gov.my/" target="_blank" rel="noopener noreferrer" className="p-2 rounded-full text-slate-500 dark:text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-slate-800 transition-all" title="Sistem JIMS" aria-label="Sistem JIMS"><Monitor size={18} /></a>
+                <a href="https://www.facebook.com/ilpsdk" target="_blank" rel="noopener noreferrer" className="p-2 rounded-full text-slate-500 dark:text-slate-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-slate-800 transition-all" title="Facebook ILP Sandakan" aria-label="Facebook ILP Sandakan"><CustomFacebookIcon size={18} /></a>
               </div>
               {isAdmin && <span className="hidden md:flex items-center gap-1.5 text-[10px] font-bold text-emerald-600 bg-emerald-50 dark:bg-emerald-900/30 px-3 py-1.5 rounded-full border border-emerald-200 dark:border-emerald-800/50 transition-all shadow-sm"><ShieldCheck size={14}/> Mod Admin</span>}
-              <button onClick={toggleTheme} className="p-2.5 rounded-full bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 transition-all active:scale-90 hover:bg-slate-100 dark:hover:bg-slate-700 shadow-sm border border-slate-200 dark:border-slate-700">{isDarkMode ? <Sun size={18} /> : <Moon size={18} />}</button>
+              <button onClick={toggleTheme} className="p-2.5 rounded-full bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 transition-all active:scale-90 hover:bg-slate-100 dark:hover:bg-slate-700 shadow-sm border border-slate-200 dark:border-slate-700" aria-label="Tukar tema gelap/terang">{isDarkMode ? <Sun size={18} /> : <Moon size={18} />}</button>
             </div>
           </div>
         </header>
@@ -697,18 +801,18 @@ export default function App() {
             <div className="bg-white dark:bg-slate-900 rounded-[2rem] shadow-2xl p-6 md:p-8 w-full max-w-sm border border-slate-200 dark:border-slate-700 animate-in zoom-in-[0.95] fade-in duration-300 ease-out">
               <div className="flex justify-between items-center mb-6">
                 <h2 className="text-xl font-extrabold flex items-center gap-2"><Lock size={20} className="text-blue-600" /> Akses Admin</h2>
-                <button onClick={() => setShowLogin(false)} className="text-slate-400 hover:text-slate-600 bg-slate-100 dark:bg-slate-800 rounded-full p-1.5 transition-all active:scale-90"><X size={18}/></button>
+                <button onClick={() => setShowLogin(false)} className="text-slate-400 hover:text-slate-600 bg-slate-100 dark:bg-slate-800 rounded-full p-1.5 transition-all active:scale-90" aria-label="Tutup dialog log masuk"><X size={18}/></button>
               </div>
               {isLockedOut ? (
                 <div className="bg-red-50 text-red-600 p-3 rounded-xl flex items-center gap-2 mb-4"><AlertTriangle size={20} /><p className="text-xs font-bold">Akaun dikunci 30 saat.</p></div>
               ) : (
                 <form onSubmit={handleLogin} className="space-y-4">
-                  <input type="text" required value={loginForm.username} onChange={(e) => setLoginForm({...loginForm, username: e.target.value})} className="w-full bg-slate-50 dark:bg-slate-800 border px-4 py-2.5 rounded-xl text-sm font-semibold text-slate-800 dark:text-white transition-all focus:ring-2 focus:ring-blue-500 outline-none" placeholder="Nama Pengguna" />
+                  <input type="text" required value={loginForm.username} onChange={(e) => setLoginForm({...loginForm, username: e.target.value})} className="w-full bg-slate-50 dark:bg-slate-800 border px-4 py-2.5 rounded-xl text-sm font-semibold text-slate-800 dark:text-white transition-all focus:ring-2 focus:ring-blue-500 outline-none" placeholder="Nama Pengguna" aria-label="Nama pengguna" />
                   <div className="relative">
-                    <input type={showPassword ? "text" : "password"} required value={loginForm.password} onChange={(e) => setLoginForm({...loginForm, password: e.target.value})} className="w-full bg-slate-50 dark:bg-slate-800 border pl-4 pr-10 py-2.5 rounded-xl text-sm font-semibold text-slate-800 dark:text-white transition-all focus:ring-2 focus:ring-blue-500 outline-none" placeholder="Kata Laluan" />
-                    <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">{showPassword ? <EyeOff size={18} /> : <Eye size={18} />}</button>
+                    <input type={showPassword ? "text" : "password"} required value={loginForm.password} onChange={(e) => setLoginForm({...loginForm, password: e.target.value})} className="w-full bg-slate-50 dark:bg-slate-800 border pl-4 pr-10 py-2.5 rounded-xl text-sm font-semibold text-slate-800 dark:text-white transition-all focus:ring-2 focus:ring-blue-500 outline-none" placeholder="Kata Laluan" aria-label="Kata laluan" />
+                    <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600" aria-label={showPassword ? "Sembunyikan kata laluan" : "Papar kata laluan"}>{showPassword ? <EyeOff size={18} /> : <Eye size={18} />}</button>
                   </div>
-                  <button type="submit" className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold py-3 rounded-xl text-sm shadow-lg active:scale-95 transition-transform duration-200">Sahkan Log Masuk</button>
+                  <button type="submit" className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold py-3 rounded-xl text-sm shadow-lg active:scale-95 transition-transform duration-200" aria-label="Log masuk">Sahkan Log Masuk</button>
                 </form>
               )}
             </div>
@@ -735,7 +839,7 @@ export default function App() {
                         <Bell className="animate-bounce shrink-0 mt-0.5 md:mt-0" size={18}/>
                         {isAdmin ? (
                           <div className="flex-1 flex items-center gap-2 w-full">
-                            <input value={announcement} onChange={e => setAnnouncement(e.target.value)} onBlur={() => saveToFirebase({ announcement, latestUpdate: { view: 'home', text: 'Teks pengumuman portal telah dikemas kini.' } })} className="w-full bg-transparent border-b border-amber-500/50 outline-none text-white focus:border-amber-400 px-1 py-0.5" placeholder="Tulis pengumuman..." />
+                            <input value={announcement} onChange={e => setAnnouncement(e.target.value)} onBlur={() => saveToFirebaseWithOffline({ announcement, latestUpdate: { view: 'home', text: 'Teks pengumuman portal telah dikemas kini.' } })} className="w-full bg-transparent border-b border-amber-500/50 outline-none text-white focus:border-amber-400 px-1 py-0.5" placeholder="Tulis pengumuman..." aria-label="Teks pengumuman" />
                           </div>
                         ) : (
                           <span className="flex-1 whitespace-normal break-words leading-relaxed">{announcement || "Selamat Datang ke iMSR ADTEC Sandakan"}</span>
@@ -748,15 +852,15 @@ export default function App() {
                           {isAdmin ? (
                             <div className="flex items-center gap-2">
                               <span>Sesi:</span>
-                              <ModernDropdown value={sesiKemasukan.sesi} options={[{ label: '1', value: '1' }, { label: '2', value: '2' }]} onChange={(val) => { const updated = { ...sesiKemasukan, sesi: val }; setSesiKemasukan(updated); saveToFirebase({ sesiKemasukan: updated, latestUpdate: { view: 'home', text: 'Sesi kemasukan terkini telah ditukar.' } }); }} />
-                              <ModernDropdown value={sesiKemasukan.tahun} options={[...Array(10)].map((_, i) => { const year = (2025 + i).toString(); return { label: year, value: year }; })} onChange={(val) => { const updated = { ...sesiKemasukan, tahun: val }; setSesiKemasukan(updated); saveToFirebase({ sesiKemasukan: updated, latestUpdate: { view: 'home', text: 'Tahun kemasukan terkini telah ditukar.' } }); }} />
+                              <ModernDropdown value={sesiKemasukan.sesi} options={[{ label: '1', value: '1' }, { label: '2', value: '2' }]} onChange={(val) => { const updated = { ...sesiKemasukan, sesi: val }; setSesiKemasukan(updated); saveToFirebaseWithOffline({ sesiKemasukan: updated, latestUpdate: { view: 'home', text: 'Sesi kemasukan terkini telah ditukar.' } }); }} />
+                              <ModernDropdown value={sesiKemasukan.tahun} options={[...Array(10)].map((_, i) => { const year = (2025 + i).toString(); return { label: year, value: year }; })} onChange={(val) => { const updated = { ...sesiKemasukan, tahun: val }; setSesiKemasukan(updated); saveToFirebaseWithOffline({ sesiKemasukan: updated, latestUpdate: { view: 'home', text: 'Tahun kemasukan terkini telah ditukar.' } }); }} />
                             </div>
                           ) : (
                             <span>Kemasukan {sesiKemasukan.sesi} / {sesiKemasukan.tahun}</span>
                           )}
                         </div>
 
-                        <h1 className="text-4xl md:text-5xl lg:text-[4rem] font-black text-transparent bg-clip-text bg-gradient-to-br from-white via-blue-50 to-blue-400 tracking-tight leading-[1.1] drop-shadow-sm">
+                        <h1 className="text-4xl md:text-5xl lg:text-[4rem] font-black text-white tracking-tight leading-[1.1] drop-shadow-lg">
                           Minggu<br/>Silaturahim
                         </h1>
                         <p className="text-sm md:text-base text-slate-300/90 font-medium max-w-lg mx-auto lg:mx-0 leading-relaxed">
@@ -793,6 +897,7 @@ export default function App() {
                       key={item.id} 
                       onClick={() => navigateTo(item.id)} 
                       className="relative group overflow-hidden bg-white dark:bg-slate-800 p-6 rounded-[2rem] border border-slate-200 dark:border-slate-700 shadow-sm hover:shadow-xl hover:-translate-y-1.5 transition-all duration-300 text-left flex flex-col justify-between min-h-[180px] focus:outline-none"
+                      aria-label={`Buka bahagian ${item.title}`}
                     >
                       <div className={`absolute -right-10 -top-10 w-32 h-32 ${cardStyles[item.color].blob} rounded-full blur-2xl group-hover:scale-150 group-hover:opacity-70 transition-all duration-700 ease-out`}></div>
                       <div className={`relative z-10 ${cardStyles[item.color].bg} p-3 rounded-xl w-fit ${cardStyles[item.color].text} group-hover:scale-110 group-hover:rotate-3 transition-transform duration-300 border ${cardStyles[item.color].border} shadow-sm`}>
@@ -828,7 +933,7 @@ export default function App() {
                         <UploadCloud size={32} className="text-blue-500 mb-2 animate-pulse" />
                         <span className="text-sm font-bold text-slate-700 dark:text-slate-200">Muat Naik Fail Memo Baharu</span>
                         <span className="text-[10px] font-medium text-slate-500 mt-1.5 bg-white dark:bg-slate-800 px-2 py-0.5 rounded-full border border-slate-200 dark:border-slate-700 shadow-sm">Sokongan: PDF / Imej</span>
-                        <input type="file" accept="application/pdf, image/*" className="hidden" onChange={handleDocumentUpload} />
+                        <input type="file" accept="application/pdf, image/*" className="hidden" onChange={handleDocumentUpload} aria-label="Muat naik fail memo" />
                       </label>
                     </div>
                   )}
@@ -863,6 +968,7 @@ export default function App() {
                               <button 
                                 onClick={() => setViewingMemo(memo)} 
                                 className="hidden sm:inline-flex items-center justify-center gap-1.5 text-[11px] font-bold text-blue-700 bg-blue-100 hover:bg-blue-200 dark:bg-blue-900/40 dark:text-blue-300 dark:hover:bg-blue-800/60 px-4 py-2 rounded-xl transition-all active:scale-95"
+                                aria-label="Lihat dokumen"
                               >
                                 <ExternalLink size={14} /> Lihat
                               </button>
@@ -870,6 +976,7 @@ export default function App() {
                               <button 
                                 onClick={() => handleDownloadBlob(memo.url, memo.name)}
                                 className="inline-flex flex-1 sm:flex-none items-center justify-center gap-1.5 text-[11px] font-bold text-white bg-emerald-600 hover:bg-emerald-700 px-4 py-2 rounded-xl transition-all active:scale-95 shadow-md"
+                                aria-label="Muat turun dokumen"
                               >
                                 <Download size={14} /> Muat Turun
                               </button>
@@ -880,7 +987,7 @@ export default function App() {
                                     if(window.confirm("Adakah anda pasti mahu memadam dokumen ini?")) {
                                       try {
                                         await deleteDoc(doc(db, "msr_memos", memo.id));
-                                        saveToFirebase({ latestUpdate: { view: 'memo', text: `Satu dokumen memo telah dipadam.` } });
+                                        saveToFirebaseWithOffline({ latestUpdate: { view: 'memo', text: `Satu dokumen memo telah dipadam.` } });
                                       } catch(err) {
                                         console.error(err);
                                         alert("Gagal memadam dokumen.");
@@ -888,6 +995,7 @@ export default function App() {
                                     }
                                   }} 
                                   className="text-red-500 bg-red-50 hover:bg-red-100 dark:bg-red-900/20 dark:hover:bg-red-900/40 p-2 rounded-xl transition-colors shrink-0 active:scale-90"
+                                  aria-label="Padam dokumen"
                                 >
                                   <Trash2 size={16}/>
                                 </button>
@@ -908,7 +1016,7 @@ export default function App() {
                   {isAdmin && memoList.length === 0 && (
                     <div className="mt-6 animate-in fade-in">
                       <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2 flex items-center gap-1.5"><Edit3 size={12}/> Teks Manual (Jika tiada fail)</label>
-                      <textarea value={memoText} onChange={e => setMemoText(e.target.value)} onBlur={() => saveToFirebase({ memoText, latestUpdate: { view: 'memo', text: 'Teks rasmi dokumen memo telah dikemas kini.' } })} className="w-full p-4 border border-slate-200 dark:border-slate-700 rounded-xl bg-slate-50 dark:bg-slate-900 text-xs focus:border-blue-500 outline-none transition-colors leading-relaxed" rows={6}/>
+                      <textarea value={memoText} onChange={e => setMemoText(e.target.value)} onBlur={() => saveToFirebaseWithOffline({ memoText, latestUpdate: { view: 'memo', text: 'Teks rasmi dokumen memo telah dikemas kini.' } })} className="w-full p-4 border border-slate-200 dark:border-slate-700 rounded-xl bg-slate-50 dark:bg-slate-900 text-xs focus:border-blue-500 outline-none transition-colors leading-relaxed" rows={6} aria-label="Teks manual memo"/>
                     </div>
                   )}
                 </div>
@@ -927,7 +1035,7 @@ export default function App() {
                       <h3 className="text-xl md:text-2xl font-black tracking-tight text-slate-800 dark:text-white">Jawatankuasa Induk</h3>
                     </div>
                     {isAdmin && (
-                      <button onClick={() => { const newAjk = [...ajkInduk, { peranan: "Peranan Baru", nama: "Nama Baru" }]; setAjkInduk(newAjk); saveToFirebase({ ajkInduk: newAjk, latestUpdate: { view: 'ajk', text: 'Senarai Jawatankuasa Induk MSR telah dikemas kini.' } }); }} className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl font-bold text-xs transition-colors active:scale-95 shadow-sm flex items-center gap-1.5"><Plus size={14}/> <span className="hidden sm:inline">Tambah Induk</span></button>
+                      <button onClick={() => { const newAjk = [...ajkInduk, { peranan: "Peranan Baru", nama: "Nama Baru" }]; setAjkInduk(newAjk); saveToFirebaseWithOffline({ ajkInduk: newAjk, latestUpdate: { view: 'ajk', text: 'Senarai Jawatankuasa Induk MSR telah dikemas kini.' } }); }} className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl font-bold text-xs transition-colors active:scale-95 shadow-sm flex items-center gap-1.5" aria-label="Tambah jawatankuasa induk"><Plus size={14}/> <span className="hidden sm:inline">Tambah Induk</span></button>
                     )}
                   </div>
                   
@@ -939,9 +1047,10 @@ export default function App() {
                             <input 
                               value={ajk.peranan} 
                               onChange={e => { const newAjk = [...ajkInduk]; newAjk[idx].peranan = e.target.value; setAjkInduk(newAjk); }} 
-                              onBlur={() => saveToFirebase({ ajkInduk, latestUpdate: { view: 'ajk', text: 'Senarai Jawatankuasa Induk MSR telah dikemas kini.' } })} 
+                              onBlur={() => saveToFirebaseWithOffline({ ajkInduk, latestUpdate: { view: 'ajk', text: 'Senarai Jawatankuasa Induk MSR telah dikemas kini.' } })} 
                               className="border border-slate-200 dark:border-slate-700 p-2 rounded-lg text-xs w-full sm:w-1/3 bg-white dark:bg-slate-900 transition-colors font-bold uppercase focus:ring-2 focus:ring-emerald-500 outline-none" 
                               placeholder="Jawatan"
+                              aria-label="Peranan jawatankuasa"
                             />
                             <div className="w-full flex flex-col gap-1.5 relative">
                               {ajk.nama.split('\n').map((n, nIdx, arr) => (
@@ -959,9 +1068,10 @@ export default function App() {
                                       newAjk[idx].nama = names.join('\n'); 
                                       setAjkInduk(newAjk); 
                                     }} 
-                                    onBlur={() => saveToFirebase({ ajkInduk, latestUpdate: { view: 'ajk', text: 'Senarai Jawatankuasa Induk MSR telah dikemas kini.' } })} 
+                                    onBlur={() => saveToFirebaseWithOffline({ ajkInduk, latestUpdate: { view: 'ajk', text: 'Senarai Jawatankuasa Induk MSR telah dikemas kini.' } })} 
                                     className="border border-slate-200 dark:border-slate-700 p-2 rounded-lg text-xs w-full bg-white dark:bg-slate-900 transition-colors focus:ring-2 focus:ring-emerald-500 outline-none" 
                                     placeholder={arr.length > 1 && nIdx === 0 ? "Cari Nama Ketua" : "Cari Nama Pembantu"}
+                                    aria-label="Nama staf"
                                   />
                                   {arr.length > 1 && (
                                      <button onClick={() => {
@@ -970,8 +1080,8 @@ export default function App() {
                                          const newAjk = [...ajkInduk];
                                          newAjk[idx].nama = names.join('\n');
                                          setAjkInduk(newAjk);
-                                         saveToFirebase({ ajkInduk: newAjk, latestUpdate: { view: 'ajk', text: 'Senarai Jawatankuasa Induk MSR telah dikemas kini.' } });
-                                     }} className="text-red-400 hover:text-red-600 bg-red-50 dark:bg-red-900/20 p-1.5 rounded-md transition-colors">
+                                         saveToFirebaseWithOffline({ ajkInduk: newAjk, latestUpdate: { view: 'ajk', text: 'Senarai Jawatankuasa Induk MSR telah dikemas kini.' } });
+                                     }} className="text-red-400 hover:text-red-600 bg-red-50 dark:bg-red-900/20 p-1.5 rounded-md transition-colors" aria-label="Padam pembantu">
                                          <X size={14}/>
                                      </button>
                                   )}
@@ -984,13 +1094,15 @@ export default function App() {
                                    setAjkInduk(newAjk);
                                 }}
                                 className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold self-start mt-0.5 hover:underline flex items-center gap-1 bg-emerald-50 dark:bg-emerald-900/20 px-2 py-1 rounded-md transition-colors"
+                                aria-label="Tambah pembantu"
                               >
                                 <Plus size={12}/> Tambah Pembantu
                               </button>
                             </div>
                             <button 
-                              onClick={() => { const newAjk = ajkInduk.filter((_, i) => i !== idx); setAjkInduk(newAjk); saveToFirebase({ ajkInduk: newAjk, latestUpdate: { view: 'ajk', text: 'Senarai Jawatankuasa Induk MSR telah dikemas kini.' } }); }} 
+                              onClick={() => { const newAjk = ajkInduk.filter((_, i) => i !== idx); setAjkInduk(newAjk); saveToFirebaseWithOffline({ ajkInduk: newAjk, latestUpdate: { view: 'ajk', text: 'Senarai Jawatankuasa Induk MSR telah dikemas kini.' } }); }} 
                               className="text-red-500 bg-red-50 hover:bg-red-100 dark:bg-red-900/20 p-2 rounded-lg transition-colors shrink-0 self-start sm:self-auto"
+                              aria-label="Padam jawatankuasa induk"
                             >
                               <Trash2 size={16}/>
                             </button>
@@ -1024,7 +1136,7 @@ export default function App() {
                   <div className="flex justify-between items-center mb-6">
                     <h3 className="text-xl md:text-2xl font-black tracking-tight text-slate-800 dark:text-white">Biro Pelaksana</h3>
                     {isAdmin && (
-                      <button onClick={() => { const newBiro = [...biroList, { nama: "Biro Baru", ketua: "", ahli: [] }]; setBiroList(newBiro); saveToFirebase({ biroList: newBiro, latestUpdate: { view: 'ajk', text: 'Senarai Biro Pelaksana MSR telah dikemas kini.' } }); }} className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl font-bold text-xs transition-colors active:scale-95 shadow-sm flex items-center gap-1.5"><Plus size={14}/> <span className="hidden sm:inline">Tambah Biro</span></button>
+                      <button onClick={() => { const newBiro = [...biroList, { nama: "Biro Baru", ketua: "", ahli: [] }]; setBiroList(newBiro); saveToFirebaseWithOffline({ biroList: newBiro, latestUpdate: { view: 'ajk', text: 'Senarai Biro Pelaksana MSR telah dikemas kini.' } }); }} className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl font-bold text-xs transition-colors active:scale-95 shadow-sm flex items-center gap-1.5" aria-label="Tambah biro"><Plus size={14}/> <span className="hidden sm:inline">Tambah Biro</span></button>
                     )}
                   </div>
                   
@@ -1032,26 +1144,26 @@ export default function App() {
                     {biroList.map((biro, idx) => (
                       isAdmin ? (
                         <div key={idx} className="bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 p-4 rounded-2xl relative space-y-2.5 shadow-sm animate-in fade-in">
-                          <button onClick={() => { const newBiro = biroList.filter((_, i) => i !== idx); setBiroList(newBiro); saveToFirebase({ biroList: newBiro, latestUpdate: { view: 'ajk', text: 'Senarai Biro Pelaksana MSR telah dikemas kini.' } }); }} className="absolute top-4 right-4 text-red-500 bg-red-50 hover:bg-red-100 dark:bg-red-900/20 p-1.5 rounded-lg transition-colors"><Trash2 size={16}/></button>
+                          <button onClick={() => { const newBiro = biroList.filter((_, i) => i !== idx); setBiroList(newBiro); saveToFirebaseWithOffline({ biroList: newBiro, latestUpdate: { view: 'ajk', text: 'Senarai Biro Pelaksana MSR telah dikemas kini.' } }); }} className="absolute top-4 right-4 text-red-500 bg-red-50 hover:bg-red-100 dark:bg-red-900/20 p-1.5 rounded-lg transition-colors" aria-label="Padam biro"><Trash2 size={16}/></button>
                           <div>
                             <label className="text-[9px] font-bold text-slate-500 uppercase tracking-widest ml-1 mb-1 block">Nama Biro</label>
-                            <input value={biro.nama} onChange={e => { const newBiro = [...biroList]; newBiro[idx].nama = e.target.value; setBiroList(newBiro); }} onBlur={() => saveToFirebase({ biroList, latestUpdate: { view: 'ajk', text: 'Senarai Biro Pelaksana MSR telah dikemas kini.' } })} className="border border-slate-200 dark:border-slate-700 p-2.5 rounded-lg text-sm w-[85%] font-bold text-slate-800 dark:text-white bg-white dark:bg-slate-900 transition-colors focus:ring-2 focus:ring-blue-500 outline-none" placeholder="Masukkan nama biro..." />
+                            <input value={biro.nama} onChange={e => { const newBiro = [...biroList]; newBiro[idx].nama = e.target.value; setBiroList(newBiro); }} onBlur={() => saveToFirebaseWithOffline({ biroList, latestUpdate: { view: 'ajk', text: 'Senarai Biro Pelaksana MSR telah dikemas kini.' } })} className="border border-slate-200 dark:border-slate-700 p-2.5 rounded-lg text-sm w-[85%] font-bold text-slate-800 dark:text-white bg-white dark:bg-slate-900 transition-colors focus:ring-2 focus:ring-blue-500 outline-none" placeholder="Masukkan nama biro..." aria-label="Nama biro" />
                           </div>
                           <div>
                             <label className="text-[9px] font-bold text-slate-500 uppercase tracking-widest ml-1 mb-1 block">Ketua Biro</label>
-                            <input list="senarai-staf" value={biro.ketua} onChange={e => { const newBiro = [...biroList]; newBiro[idx].ketua = e.target.value; setBiroList(newBiro); }} onBlur={() => saveToFirebase({ biroList, latestUpdate: { view: 'ajk', text: 'Senarai Biro Pelaksana MSR telah dikemas kini.' } })} className="border border-slate-200 dark:border-slate-700 p-2.5 rounded-lg text-xs w-full font-bold bg-white dark:bg-slate-900 transition-colors focus:ring-2 focus:ring-blue-500 outline-none" placeholder="Cari / Masukkan Nama Ketua Biro" />
+                            <input list="senarai-staf" value={biro.ketua} onChange={e => { const newBiro = [...biroList]; newBiro[idx].ketua = e.target.value; setBiroList(newBiro); }} onBlur={() => saveToFirebaseWithOffline({ biroList, latestUpdate: { view: 'ajk', text: 'Senarai Biro Pelaksana MSR telah dikemas kini.' } })} className="border border-slate-200 dark:border-slate-700 p-2.5 rounded-lg text-xs w-full font-bold bg-white dark:bg-slate-900 transition-colors focus:ring-2 focus:ring-blue-500 outline-none" placeholder="Cari / Masukkan Nama Ketua Biro" aria-label="Ketua biro" />
                           </div>
                           <div className="bg-white dark:bg-slate-800 p-3 rounded-xl mt-3 border border-slate-100 dark:border-slate-700">
                             <div className="flex justify-between items-center mb-2">
                               <span className="text-[10px] font-black text-slate-700 dark:text-slate-300 uppercase tracking-wider">Senarai Ahli</span>
-                              <button onClick={() => { const newBiro = [...biroList]; if(!newBiro[idx].ahli) newBiro[idx].ahli=[]; newBiro[idx].ahli.push(""); setBiroList(newBiro); }} className="text-blue-600 hover:text-white bg-blue-50 hover:bg-blue-600 px-2 py-1 rounded-md text-[10px] font-bold transition-colors flex items-center gap-1"><Plus size={12}/> Tambah Ahli</button>
+                              <button onClick={() => { const newBiro = [...biroList]; if(!newBiro[idx].ahli) newBiro[idx].ahli=[]; newBiro[idx].ahli.push(""); setBiroList(newBiro); }} className="text-blue-600 hover:text-white bg-blue-50 hover:bg-blue-600 px-2 py-1 rounded-md text-[10px] font-bold transition-colors flex items-center gap-1" aria-label="Tambah ahli biro"><Plus size={12}/> Tambah Ahli</button>
                             </div>
                             <div className="space-y-1.5">
                               {biro.ahli && biro.ahli.map((ahli, aIdx) => (
                                 <div key={aIdx} className="flex gap-2 items-center">
                                   <span className="text-[10px] font-bold text-slate-400 w-3">{aIdx + 1}.</span>
-                                  <input list="senarai-staf" value={ahli} onChange={e => { const newBiro = [...biroList]; newBiro[idx].ahli[aIdx] = e.target.value; setBiroList(newBiro); }} onBlur={() => saveToFirebase({ biroList, latestUpdate: { view: 'ajk', text: 'Senarai Biro Pelaksana MSR telah dikemas kini.' } })} className="border border-slate-200 dark:border-slate-700 p-2 rounded-md text-xs w-full bg-slate-50 dark:bg-slate-900 transition-colors focus:ring-2 focus:ring-blue-500 outline-none" placeholder="Cari / Masukkan Nama Ahli" />
-                                  <button onClick={() => { const newBiro = [...biroList]; newBiro[idx].ahli = newBiro[idx].ahli.filter((_, i) => i !== aIdx); setBiroList(newBiro); saveToFirebase({ biroList: newBiro, latestUpdate: { view: 'ajk', text: 'Senarai Biro Pelaksana MSR telah dikemas kini.' } }); }} className="text-red-500 bg-red-50 hover:bg-red-100 dark:bg-red-900/20 p-2 rounded-md transition-colors"><X size={14}/></button>
+                                  <input list="senarai-staf" value={ahli} onChange={e => { const newBiro = [...biroList]; newBiro[idx].ahli[aIdx] = e.target.value; setBiroList(newBiro); }} onBlur={() => saveToFirebaseWithOffline({ biroList, latestUpdate: { view: 'ajk', text: 'Senarai Biro Pelaksana MSR telah dikemas kini.' } })} className="border border-slate-200 dark:border-slate-700 p-2 rounded-md text-xs w-full bg-slate-50 dark:bg-slate-900 transition-colors focus:ring-2 focus:ring-blue-500 outline-none" placeholder="Cari / Masukkan Nama Ahli" aria-label="Nama ahli" />
+                                  <button onClick={() => { const newBiro = [...biroList]; newBiro[idx].ahli = newBiro[idx].ahli.filter((_, i) => i !== aIdx); setBiroList(newBiro); saveToFirebaseWithOffline({ biroList: newBiro, latestUpdate: { view: 'ajk', text: 'Senarai Biro Pelaksana MSR telah dikemas kini.' } }); }} className="text-red-500 bg-red-50 hover:bg-red-100 dark:bg-red-900/20 p-2 rounded-md transition-colors" aria-label="Padam ahli"><X size={14}/></button>
                                 </div>
                               ))}
                               {(!biro.ahli || biro.ahli.length === 0) && <p className="text-[10px] text-slate-400 font-medium italic text-center py-1">Tiada ahli ditambah.</p>}
@@ -1084,13 +1196,13 @@ export default function App() {
                       <h3 className="text-xl md:text-2xl font-black tracking-tight text-slate-800 dark:text-white">Tentatif Program</h3>
                     </div>
                     {isAdmin && (
-                      <button onClick={() => { const newId = 'd' + Date.now(); const today = new Date().toISOString().split('T')[0]; const updated = [...jadualData, { id: newId, tarikh: today, slots: [] }]; setJadualData(updated); setActiveJadualTab(newId); saveToFirebase({ jadualData: updated, latestUpdate: { view: 'jadual', text: 'Jadual Tentatif Program telah dikemas kini.' } }); }} className="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-xl font-bold text-xs transition-colors active:scale-95 shadow-sm flex items-center gap-1.5"><Plus size={14}/> <span className="hidden sm:inline">Tambah Hari</span></button>
+                      <button onClick={() => { const newId = 'd' + Date.now(); const today = new Date().toISOString().split('T')[0]; const updated = [...jadualData, { id: newId, tarikh: today, slots: [] }]; setJadualData(updated); setActiveJadualTab(newId); saveToFirebaseWithOffline({ jadualData: updated, latestUpdate: { view: 'jadual', text: 'Jadual Tentatif Program telah dikemas kini.' } }); }} className="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-xl font-bold text-xs transition-colors active:scale-95 shadow-sm flex items-center gap-1.5" aria-label="Tambah hari jadual"><Plus size={14}/> <span className="hidden sm:inline">Tambah Hari</span></button>
                     )}
                   </div>
                   
                   <div className="flex gap-2.5 overflow-x-auto pb-3 mb-6 border-b border-slate-100 dark:border-slate-700 hide-scrollbar snap-x">
                     {jadualData.map((hari) => (
-                      <button key={hari.id} onClick={() => setActiveJadualTab(hari.id)} className={`snap-start px-5 py-2.5 rounded-xl text-xs font-bold shrink-0 transition-all duration-300 ${activeJadualTab === hari.id ? 'bg-orange-500 text-white shadow-md scale-105' : 'bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:bg-orange-50 dark:hover:bg-slate-800'}`}>
+                      <button key={hari.id} onClick={() => setActiveJadualTab(hari.id)} className={`snap-start px-5 py-2.5 rounded-xl text-xs font-bold shrink-0 transition-all duration-300 ${activeJadualTab === hari.id ? 'bg-orange-500 text-white shadow-md scale-105' : 'bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:bg-orange-50 dark:hover:bg-slate-800'}`} aria-label={`Pilih jadual tarikh ${formatTarikh(hari.tarikh)}`}>
                         {formatTarikh(hari.tarikh)}
                       </button>
                     ))}
@@ -1104,10 +1216,10 @@ export default function App() {
                           <div className="bg-slate-50 dark:bg-slate-900/50 p-4 rounded-2xl border border-slate-200 dark:border-slate-700 flex flex-wrap gap-3 items-center shadow-sm">
                             <div className="flex-1 min-w-[150px]">
                               <label className="text-[9px] font-bold text-slate-500 uppercase tracking-widest ml-1 mb-1 block">Tarikh Hari Ini</label>
-                              <input type="date" value={hari.tarikh} onChange={e => { const updated = jadualData.map(d => d.id === hari.id ? { ...d, tarikh: e.target.value } : d); setJadualData(updated); saveToFirebase({ jadualData: updated, latestUpdate: { view: 'jadual', text: 'Tarikh jadual tentatif program telah ditukar.' } }); }} className="w-full border border-slate-200 dark:border-slate-700 p-2.5 rounded-lg text-xs font-bold bg-white dark:bg-slate-800 transition-colors focus:ring-2 focus:ring-orange-500 outline-none" />
+                              <input type="date" value={hari.tarikh} onChange={e => { const updated = jadualData.map(d => d.id === hari.id ? { ...d, tarikh: e.target.value } : d); setJadualData(updated); saveToFirebaseWithOffline({ jadualData: updated, latestUpdate: { view: 'jadual', text: 'Tarikh jadual tentatif program telah ditukar.' } }); }} className="w-full border border-slate-200 dark:border-slate-700 p-2.5 rounded-lg text-xs font-bold bg-white dark:bg-slate-800 transition-colors focus:ring-2 focus:ring-orange-500 outline-none" aria-label="Tarikh jadual" />
                             </div>
-                            <button onClick={() => { const updated = jadualData.map(d => d.id === hari.id ? { ...d, slots: [...d.slots, { id: 's' + Date.now(), startTime: "08:00", endTime: "09:00", aktiviti: "Aktiviti Baru" }] } : d); setJadualData(updated); saveToFirebase({ jadualData: updated, latestUpdate: { view: 'jadual', text: 'Satu slot masa baharu telah ditambah ke dalam jadual.' } }); }} className="bg-orange-100 hover:bg-orange-200 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300 px-4 py-2.5 rounded-lg text-xs font-bold transition-colors mt-4 shadow-sm flex items-center gap-1.5"><Plus size={14}/> Tambah Slot</button>
-                            <button onClick={() => { if(window.confirm("Padam keseluruhan jadual hari ini?")) { const updated = jadualData.filter(h => h.id !== hari.id); setJadualData(updated); if(updated.length > 0) setActiveJadualTab(updated[0].id); saveToFirebase({ jadualData: updated, latestUpdate: { view: 'jadual', text: 'Jadual Tentatif Program telah dikemas kini.' } }); } }} className="text-red-600 bg-red-50 hover:bg-red-100 dark:bg-red-900/20 px-3 py-2.5 rounded-lg text-xs font-bold transition-colors mt-4 ml-auto flex items-center gap-1.5 shadow-sm"><Trash2 size={14}/> Padam</button>
+                            <button onClick={() => { const updated = jadualData.map(d => d.id === hari.id ? { ...d, slots: [...d.slots, { id: 's' + Date.now(), startTime: "08:00", endTime: "09:00", aktiviti: "Aktiviti Baru" }] } : d); setJadualData(updated); saveToFirebaseWithOffline({ jadualData: updated, latestUpdate: { view: 'jadual', text: 'Satu slot masa baharu telah ditambah ke dalam jadual.' } }); }} className="bg-orange-100 hover:bg-orange-200 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300 px-4 py-2.5 rounded-lg text-xs font-bold transition-colors mt-4 shadow-sm flex items-center gap-1.5" aria-label="Tambah slot jadual"><Plus size={14}/> Tambah Slot</button>
+                            <button onClick={() => { if(window.confirm("Padam keseluruhan jadual hari ini?")) { const updated = jadualData.filter(h => h.id !== hari.id); setJadualData(updated); if(updated.length > 0) setActiveJadualTab(updated[0].id); saveToFirebaseWithOffline({ jadualData: updated, latestUpdate: { view: 'jadual', text: 'Jadual Tentatif Program telah dikemas kini.' } }); } }} className="text-red-600 bg-red-50 hover:bg-red-100 dark:bg-red-900/20 px-3 py-2.5 rounded-lg text-xs font-bold transition-colors mt-4 ml-auto flex items-center gap-1.5 shadow-sm" aria-label="Padam hari jadual"><Trash2 size={14}/> Padam</button>
                           </div>
                         )}
                         
@@ -1124,18 +1236,18 @@ export default function App() {
                                 
                                 {isAdmin ? (
                                   <div className="bg-slate-50 dark:bg-slate-900/50 p-4 rounded-[1.5rem] border border-slate-200 dark:border-slate-700 relative shadow-sm transition-shadow">
-                                    <button onClick={() => { const updated = jadualData.map(d => d.id === hari.id ? { ...d, slots: d.slots.filter(s => s.id !== slot.id) } : d); setJadualData(updated); saveToFirebase({ jadualData: updated, latestUpdate: { view: 'jadual', text: 'Satu slot masa telah dibuang dari jadual.' } }); }} className="absolute top-4 right-4 text-red-400 hover:text-red-600 bg-red-50 dark:bg-red-900/20 p-1.5 rounded-lg transition-colors"><Trash2 size={16}/></button>
+                                    <button onClick={() => { const updated = jadualData.map(d => d.id === hari.id ? { ...d, slots: d.slots.filter(s => s.id !== slot.id) } : d); setJadualData(updated); saveToFirebaseWithOffline({ jadualData: updated, latestUpdate: { view: 'jadual', text: 'Satu slot masa telah dibuang dari jadual.' } }); }} className="absolute top-4 right-4 text-red-400 hover:text-red-600 bg-red-50 dark:bg-red-900/20 p-1.5 rounded-lg transition-colors" aria-label="Padam slot"><Trash2 size={16}/></button>
                                     <div className="flex gap-3 mb-3 pr-10">
                                       <div className="flex-1">
                                         <label className="text-[9px] font-bold text-slate-500 uppercase tracking-widest ml-1 mb-1 block">Mula</label>
-                                        <input type="time" value={slot.startTime} onChange={e => { const updated = jadualData.map(d => d.id === hari.id ? { ...d, slots: d.slots.map(s => s.id === slot.id ? { ...s, startTime: e.target.value } : s) } : d); setJadualData(updated); }} onBlur={() => saveToFirebase({ jadualData, latestUpdate: { view: 'jadual', text: 'Masa jadual tentatif program telah diubah.' } })} className="w-full border border-slate-200 dark:border-slate-700 p-2.5 rounded-lg text-xs font-black text-orange-600 dark:text-orange-400 bg-white dark:bg-slate-800 transition-colors focus:ring-2 focus:ring-orange-500 outline-none" />
+                                        <input type="time" value={slot.startTime} onChange={e => { const updated = jadualData.map(d => d.id === hari.id ? { ...d, slots: d.slots.map(s => s.id === slot.id ? { ...s, startTime: e.target.value } : s) } : d); setJadualData(updated); }} onBlur={() => saveToFirebaseWithOffline({ jadualData, latestUpdate: { view: 'jadual', text: 'Masa jadual tentatif program telah diubah.' } })} className="w-full border border-slate-200 dark:border-slate-700 p-2.5 rounded-lg text-xs font-black text-orange-600 dark:text-orange-400 bg-white dark:bg-slate-800 transition-colors focus:ring-2 focus:ring-orange-500 outline-none" aria-label="Waktu mula" />
                                       </div>
                                       <div className="flex-1">
                                         <label className="text-[9px] font-bold text-slate-500 uppercase tracking-widest ml-1 mb-1 block">Tamat</label>
-                                        <input type="time" value={slot.endTime} onChange={e => { const updated = jadualData.map(d => d.id === hari.id ? { ...d, slots: d.slots.map(s => s.id === slot.id ? { ...s, endTime: e.target.value } : s) } : d); setJadualData(updated); }} onBlur={() => saveToFirebase({ jadualData, latestUpdate: { view: 'jadual', text: 'Masa jadual tentatif program telah diubah.' } })} className="w-full border border-slate-200 dark:border-slate-700 p-2.5 rounded-lg text-xs font-black text-orange-600 dark:text-orange-400 bg-white dark:bg-slate-800 transition-colors focus:ring-2 focus:ring-orange-500 outline-none" />
+                                        <input type="time" value={slot.endTime} onChange={e => { const updated = jadualData.map(d => d.id === hari.id ? { ...d, slots: d.slots.map(s => s.id === slot.id ? { ...s, endTime: e.target.value } : s) } : d); setJadualData(updated); }} onBlur={() => saveToFirebaseWithOffline({ jadualData, latestUpdate: { view: 'jadual', text: 'Masa jadual tentatif program telah diubah.' } })} className="w-full border border-slate-200 dark:border-slate-700 p-2.5 rounded-lg text-xs font-black text-orange-600 dark:text-orange-400 bg-white dark:bg-slate-800 transition-colors focus:ring-2 focus:ring-orange-500 outline-none" aria-label="Waktu tamat" />
                                       </div>
                                     </div>
-                                    <textarea value={slot.aktiviti} onChange={e => { const updated = jadualData.map(d => d.id === hari.id ? { ...d, slots: d.slots.map(s => s.id === slot.id ? { ...s, aktiviti: e.target.value } : s) } : d); setJadualData(updated); }} onBlur={() => saveToFirebase({ jadualData, latestUpdate: { view: 'jadual', text: 'Satu aktiviti dalam jadual tentatif program telah dikemas kini.' } })} className="w-full border border-slate-200 dark:border-slate-700 p-3 rounded-xl text-sm font-bold bg-white dark:bg-slate-800 text-slate-800 dark:text-white transition-colors outline-none focus:ring-2 focus:ring-orange-500 custom-scrollbar" rows={2} placeholder="Keterangan Aktiviti..." />
+                                    <textarea value={slot.aktiviti} onChange={e => { const updated = jadualData.map(d => d.id === hari.id ? { ...d, slots: d.slots.map(s => s.id === slot.id ? { ...s, aktiviti: e.target.value } : s) } : d); setJadualData(updated); }} onBlur={() => saveToFirebaseWithOffline({ jadualData, latestUpdate: { view: 'jadual', text: 'Satu aktiviti dalam jadual tentatif program telah dikemas kini.' } })} className="w-full border border-slate-200 dark:border-slate-700 p-3 rounded-xl text-sm font-bold bg-white dark:bg-slate-800 text-slate-800 dark:text-white transition-colors outline-none focus:ring-2 focus:ring-orange-500 custom-scrollbar" rows={2} placeholder="Keterangan Aktiviti..." aria-label="Keterangan aktiviti" />
                                   </div>
                                 ) : (
                                   <div className="bg-white dark:bg-slate-800/80 p-4 md:p-5 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-sm hover:shadow-md transition-all duration-300 hover:-translate-y-1">
@@ -1169,7 +1281,7 @@ export default function App() {
                       <h3 className="text-xl md:text-2xl font-black tracking-tight text-slate-800 dark:text-white">Majlis Penutup</h3>
                     </div>
                     {isAdmin && (
-                      <button onClick={() => { const updated = [...penutupData, { id: 'p' + Date.now(), time: "08:00", aktiviti: "Aktiviti Baru" }]; setPenutupData(updated); saveToFirebase({ penutupData: updated, latestUpdate: { view: 'penutup', text: 'Atur cara Majlis Penutup MSR telah dikemas kini.' } }); }} className="bg-rose-500 hover:bg-rose-600 text-white px-4 py-2 rounded-xl font-bold text-xs transition-colors active:scale-95 shadow-sm flex items-center gap-1.5"><Plus size={14}/> <span className="hidden sm:inline">Tambah Slot</span></button>
+                      <button onClick={() => { const updated = [...penutupData, { id: 'p' + Date.now(), time: "08:00", aktiviti: "Aktiviti Baru" }]; setPenutupData(updated); saveToFirebaseWithOffline({ penutupData: updated, latestUpdate: { view: 'penutup', text: 'Atur cara Majlis Penutup MSR telah dikemas kini.' } }); }} className="bg-rose-500 hover:bg-rose-600 text-white px-4 py-2 rounded-xl font-bold text-xs transition-colors active:scale-95 shadow-sm flex items-center gap-1.5" aria-label="Tambah slot majlis penutup"><Plus size={14}/> <span className="hidden sm:inline">Tambah Slot</span></button>
                     )}
                   </div>
                   
@@ -1186,12 +1298,12 @@ export default function App() {
                           
                           {isAdmin ? (
                             <div className="bg-slate-50 dark:bg-slate-900/50 p-4 rounded-2xl border border-slate-200 dark:border-slate-700 relative shadow-sm transition-shadow">
-                              <button onClick={() => { const updated = penutupData.filter(s => s.id !== slot.id); setPenutupData(updated); saveToFirebase({ penutupData: updated, latestUpdate: { view: 'penutup', text: 'Satu slot masa telah dipadam dari atur cara majlis penutup.' } }); }} className="absolute top-4 right-4 text-red-400 hover:text-red-600 bg-red-50 dark:bg-red-900/20 p-1.5 rounded-lg transition-colors"><Trash2 size={16}/></button>
+                              <button onClick={() => { const updated = penutupData.filter(s => s.id !== slot.id); setPenutupData(updated); saveToFirebaseWithOffline({ penutupData: updated, latestUpdate: { view: 'penutup', text: 'Satu slot masa telah dipadam dari atur cara majlis penutup.' } }); }} className="absolute top-4 right-4 text-red-400 hover:text-red-600 bg-red-50 dark:bg-red-900/20 p-1.5 rounded-lg transition-colors" aria-label="Padam slot"><Trash2 size={16}/></button>
                               <div className="mb-3 pr-10 w-1/2">
                                 <label className="text-[9px] font-bold text-slate-500 uppercase tracking-widest ml-1 mb-1 block">Masa</label>
-                                <input type="time" value={slot.time} onChange={e => { const updated = penutupData.map(s => s.id === slot.id ? { ...s, time: e.target.value } : s); setPenutupData(updated); }} onBlur={() => saveToFirebase({ penutupData, latestUpdate: { view: 'penutup', text: 'Masa atur cara majlis penutup telah dikemas kini.' } })} className="w-full border border-slate-200 dark:border-slate-700 p-2.5 rounded-lg text-xs font-black text-rose-600 dark:text-rose-400 bg-white dark:bg-slate-800 transition-colors focus:ring-2 focus:ring-rose-500 outline-none" />
+                                <input type="time" value={slot.time} onChange={e => { const updated = penutupData.map(s => s.id === slot.id ? { ...s, time: e.target.value } : s); setPenutupData(updated); }} onBlur={() => saveToFirebaseWithOffline({ penutupData, latestUpdate: { view: 'penutup', text: 'Masa atur cara majlis penutup telah dikemas kini.' } })} className="w-full border border-slate-200 dark:border-slate-700 p-2.5 rounded-lg text-xs font-black text-rose-600 dark:text-rose-400 bg-white dark:bg-slate-800 transition-colors focus:ring-2 focus:ring-rose-500 outline-none" aria-label="Waktu slot" />
                               </div>
-                              <textarea value={slot.aktiviti} onChange={e => { const updated = penutupData.map(s => s.id === slot.id ? { ...s, aktiviti: e.target.value } : s); setPenutupData(updated); }} onBlur={() => saveToFirebase({ penutupData, latestUpdate: { view: 'penutup', text: 'Maklumat aktiviti pada majlis penutup telah dikemas kini.' } })} className="w-full border border-slate-200 dark:border-slate-700 p-3 rounded-xl text-sm font-bold bg-white dark:bg-slate-800 text-slate-800 dark:text-white transition-colors outline-none focus:ring-2 focus:ring-rose-500 custom-scrollbar" rows={2} placeholder="Keterangan Aktiviti..." />
+                              <textarea value={slot.aktiviti} onChange={e => { const updated = penutupData.map(s => s.id === slot.id ? { ...s, aktiviti: e.target.value } : s); setPenutupData(updated); }} onBlur={() => saveToFirebaseWithOffline({ penutupData, latestUpdate: { view: 'penutup', text: 'Maklumat aktiviti pada majlis penutup telah dikemas kini.' } })} className="w-full border border-slate-200 dark:border-slate-700 p-3 rounded-xl text-sm font-bold bg-white dark:bg-slate-800 text-slate-800 dark:text-white transition-colors outline-none focus:ring-2 focus:ring-rose-500 custom-scrollbar" rows={2} placeholder="Keterangan Aktiviti..." aria-label="Keterangan aktiviti" />
                             </div>
                           ) : (
                             <div className="bg-white dark:bg-slate-800/80 p-4 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-sm hover:shadow-md transition-all duration-300 hover:-translate-y-1">
@@ -1225,7 +1337,7 @@ export default function App() {
                         <UploadCloud size={32} className="text-purple-500 mb-2 animate-pulse" />
                         <span className="text-sm font-bold text-slate-700 dark:text-slate-200">Muat Naik Fail Pelan Baharu</span>
                         <span className="text-[10px] font-medium text-slate-500 mt-1 bg-white dark:bg-slate-800 px-2 py-0.5 rounded-md shadow-sm">Sokongan: PDF / Imej</span>
-                        <input type="file" accept="application/pdf, image/*" className="hidden" onChange={handleLayoutUpload} />
+                        <input type="file" accept="application/pdf, image/*" className="hidden" onChange={handleLayoutUpload} aria-label="Muat naik pelan" />
                       </label>
                     </div>
                   )}
@@ -1234,7 +1346,7 @@ export default function App() {
                     {layoutImage ? (
                       <div className="w-full flex flex-col gap-5">
                         
-                        {/* MOBILE VIEW: HANYA BUTANG MUAT TURUN */}
+                        {/* MOBILE VIEW: BUTANG MUAT TURUN SAHAJA */}
                         <div className="block sm:hidden w-full bg-slate-50 dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm flex flex-col items-center gap-4">
                            {layoutImage.includes('application/pdf') ? <FileText size={48} className="text-purple-500" /> : <ImageIcon size={48} className="text-purple-500" />}
                            <div className="space-y-1">
@@ -1247,6 +1359,7 @@ export default function App() {
                            <button 
                              onClick={() => handleDownloadBlob(layoutImage, layoutImage.includes('application/pdf') ? 'Pelan_Pendaftaran.pdf' : 'Pelan_Pendaftaran.jpg')}
                              className="w-full inline-flex items-center justify-center gap-2 text-xs font-bold text-white bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 px-4 py-3 rounded-xl shadow-md transition-all active:scale-95 mt-1"
+                             aria-label="Muat turun pelan pendaftaran"
                            >
                              <Download size={16} /> Muat Turun ke Peranti
                            </button>
@@ -1257,11 +1370,12 @@ export default function App() {
                                     setLayoutImage(null); 
                                     try {
                                       await setDoc(doc(db, "msr", "data_layout"), { layoutImage: null, uploadDate: null }); 
-                                      saveToFirebase({ latestUpdate: { view: 'layout', text: 'Dokumen pelan pendaftaran dewan telah dipadam.' } });
+                                      saveToFirebaseWithOffline({ latestUpdate: { view: 'layout', text: 'Dokumen pelan pendaftaran dewan telah dipadam.' } });
                                     } catch(err){}
                                  } 
                                }}
                                className="w-full inline-flex items-center justify-center gap-2 text-xs font-bold text-red-600 bg-red-50 hover:bg-red-100 dark:bg-red-900/20 px-4 py-3 rounded-xl transition-all active:scale-95"
+                               aria-label="Padam pelan"
                              >
                                <Trash2 size={16} /> Padam Rekod Pelan
                              </button>
@@ -1283,7 +1397,7 @@ export default function App() {
                               <label className="absolute inset-0 bg-slate-900/80 opacity-0 group-hover:opacity-100 flex flex-col items-center justify-center cursor-pointer transition-opacity backdrop-blur-sm duration-300 z-10">
                                 <UploadCloud size={40} className="text-white mb-3 animate-bounce"/>
                                 <span className="bg-purple-600 text-white text-xs font-bold px-5 py-2.5 rounded-xl shadow-xl hover:scale-105 transition-transform">Gantikan Fail Pelan</span>
-                                <input type="file" accept="application/pdf, image/*" className="hidden" onChange={handleLayoutUpload} />
+                                <input type="file" accept="application/pdf, image/*" className="hidden" onChange={handleLayoutUpload} aria-label="Gantikan pelan" />
                               </label>
                             )}
                           </div>
@@ -1296,6 +1410,7 @@ export default function App() {
                               <button 
                                 onClick={() => handleDownloadBlob(layoutImage, layoutImage.includes('application/pdf') ? 'Pelan_Pendaftaran.pdf' : 'Pelan_Pendaftaran.jpg')}
                                 className="inline-flex items-center gap-1.5 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 px-5 py-2.5 rounded-lg shadow-sm transition-all active:scale-95"
+                                aria-label="Muat turun pelan"
                               >
                                 <Download size={16} /> Muat Turun Fail
                               </button>
@@ -1306,11 +1421,12 @@ export default function App() {
                                       setLayoutImage(null); 
                                       try {
                                         await setDoc(doc(db, "msr", "data_layout"), { layoutImage: null, uploadDate: null }); 
-                                        saveToFirebase({ latestUpdate: { view: 'layout', text: 'Dokumen pelan pendaftaran dewan telah dipadam.' } });
+                                        saveToFirebaseWithOffline({ latestUpdate: { view: 'layout', text: 'Dokumen pelan pendaftaran dewan telah dipadam.' } });
                                       } catch(err){}
                                    } 
                                   }}
                                   className="inline-flex items-center gap-1.5 text-xs font-bold text-red-600 bg-red-50 hover:bg-red-100 dark:bg-red-900/20 px-5 py-2.5 rounded-lg transition-all active:scale-95"
+                                  aria-label="Padam pelan"
                                 >
                                   <Trash2 size={16} /> Padam
                                 </button>
@@ -1361,16 +1477,16 @@ export default function App() {
           </div>
         </main>
 
-        {/* --- IN-APP MODAL UNTUK PAPARAN MEMO PENUH --- */}
+        {/* --- IN-APP MODAL UNTUK PAPARAN MEMO PENUH (Mobile & Desktop) --- */}
         {viewingMemo && (
-          <div className="hidden sm:flex fixed inset-0 z-[100] bg-slate-900/95 backdrop-blur-xl flex-col animate-in fade-in zoom-in-[0.98] duration-300">
+          <div className="fixed inset-0 z-[100] bg-slate-900/95 backdrop-blur-xl flex flex-col animate-in fade-in zoom-in-[0.98] duration-300">
             <div className="flex justify-between items-center p-3 md:p-4 bg-[#0f172a] border-b border-slate-800 text-white shadow-lg z-10">
               <div className="flex items-center gap-3 overflow-hidden">
                 <div className="bg-blue-500/20 p-2 rounded-lg text-blue-400 shrink-0">
                   <FileText size={20} />
                 </div>
                 <div>
-                  <h3 className="font-bold text-sm md:text-base truncate max-w-xl">{viewingMemo.name}</h3>
+                  <h3 className="font-bold text-sm md:text-base truncate max-w-[180px] md:max-w-xl">{viewingMemo.name}</h3>
                   <div className="flex items-center gap-2">
                     <span className="text-[9px] font-black tracking-widest text-slate-400 uppercase">{viewingMemo.type === 'pdf' ? 'Dokumen PDF' : 'Fail Imej'}</span>
                     {viewingMemo.uploadDate && <span className="text-[9px] font-bold text-slate-500">| {formatDateTime(viewingMemo.uploadDate)}</span>}
@@ -1382,6 +1498,7 @@ export default function App() {
                   onClick={() => handleDownloadBlob(viewingMemo.url, viewingMemo.name)} 
                   className="inline-flex items-center gap-1.5 px-3 py-2 bg-emerald-600 hover:bg-emerald-500 rounded-lg font-bold text-xs transition-colors shadow-sm active:scale-95"
                   title="Muat Turun Dokumen"
+                  aria-label="Muat turun dokumen"
                 >
                   <Download size={16} /> Muat Turun
                 </button>
@@ -1389,6 +1506,7 @@ export default function App() {
                   onClick={() => setViewingMemo(null)} 
                   className="p-2 bg-slate-800 hover:bg-red-500 hover:text-white text-slate-300 rounded-lg transition-all shadow-sm active:scale-90 ml-1"
                   title="Tutup Paparan"
+                  aria-label="Tutup paparan dokumen"
                 >
                   <X size={18} />
                 </button>
@@ -1419,59 +1537,55 @@ export default function App() {
           </p>
         </footer>
 
-        {/* --- BOTTOM NAV (MOBILE) WITH GLASSMORPHISM ICONS --- */}
-        <nav className="md:hidden fixed bottom-0 w-full bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border-t border-slate-200 dark:border-slate-800 flex justify-around items-center pt-1.5 pb-safe-bottom pb-3 z-40 shadow-[0_-10px_40px_rgba(0,0,0,0.05)] dark:shadow-[0_-10px_40px_rgba(0,0,0,0.5)]">
-          {[
-            { id: 'home', icon: Home, label: 'Utama' },
-            { id: 'memo', icon: FileText, label: 'Memo' },
-            { id: 'ajk', icon: Users, label: 'AJK' },
-            { id: 'jadual', icon: Calendar, label: 'Jadual' },
-            { id: 'penutup', icon: Award, label: 'Penutup' }
-          ].map((item) => (
-            <button 
-              key={item.id} 
-              onClick={() => navigateTo(item.id)} 
-              className={`flex flex-col items-center gap-1 p-1.5 w-[20%] text-[9px] font-black transition-all active:scale-90 ${
-                currentView === item.id 
-                  ? 'text-blue-600 dark:text-blue-400 -translate-y-1.5' 
-                  : 'text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300'
-              }`}
-            >
-              <div className={`transition-all duration-300 ${
-                currentView === item.id 
-                  ? 'backdrop-blur-md bg-blue-500/80 dark:bg-blue-600/80 shadow-lg rounded-xl p-2 border border-white/30 text-white' 
-                  : 'backdrop-blur-md bg-white/30 dark:bg-white/10 shadow-sm rounded-xl p-2 border border-white/20'
-              }`}>
-                <item.icon size={20} strokeWidth={currentView === item.id ? 2.5 : 2} />
-              </div>
-              <span className={`tracking-wide ${currentView === item.id ? 'opacity-100' : 'opacity-80'}`}>{item.label}</span>
-            </button>
-          ))}
+        {/* --- BOTTOM NAV (MOBILE) DENGAN 6 BUTANG & SCROLL HORIZONTAL --- */}
+        <nav className="md:hidden fixed bottom-0 w-full bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border-t border-slate-200 dark:border-slate-800 flex items-center pt-1.5 pb-safe-bottom pb-3 z-40 shadow-[0_-10px_40px_rgba(0,0,0,0.05)] dark:shadow-[0_-10px_40px_rgba(0,0,0,0.5)] overflow-x-auto hide-scrollbar">
+          <div className="flex justify-around min-w-full px-2 gap-1">
+            {[
+              { id: 'home', icon: Home, label: 'Utama', ariaLabel: 'Laman utama' },
+              { id: 'memo', icon: FileText, label: 'Memo', ariaLabel: 'Dokumen memo' },
+              { id: 'ajk', icon: Users, label: 'AJK', ariaLabel: 'Jawatankuasa' },
+              { id: 'jadual', icon: Calendar, label: 'Jadual', ariaLabel: 'Jadual program' },
+              { id: 'layout', icon: Map, label: 'Pelan', ariaLabel: 'Pelan pendaftaran' },
+              { id: 'lagu', icon: Music, label: 'Lagu', ariaLabel: 'Lagu korporat' }
+            ].map((item) => (
+              <button 
+                key={item.id} 
+                onClick={() => navigateTo(item.id)} 
+                className={`flex flex-col items-center gap-0.5 p-1.5 w-[16%] text-[9px] font-black transition-all active:scale-90 ${currentView === item.id ? 'text-blue-600 dark:text-blue-400 -translate-y-1' : 'text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300'}`}
+                aria-label={item.ariaLabel}
+              >
+                <div className={`${currentView === item.id ? 'bg-blue-100 dark:bg-blue-900/40 p-1.5 rounded-xl shadow-sm border border-blue-200 dark:border-blue-800/50 mb-0.5' : 'p-0.5'}`}>
+                  <item.icon size={18} strokeWidth={currentView === item.id ? 2.5 : 2} />
+                </div>
+                <span className={`tracking-wide text-[10px] ${currentView === item.id ? 'opacity-100 font-black' : 'opacity-80'}`}>{item.label}</span>
+              </button>
+            ))}
+          </div>
         </nav>
 
-        {/* --- FAB QUICK ACTION BUTTON (MODERNIZED & ANIMATED) --- */}
+        {/* --- FAB QUICK ACTION BUTTON --- */}
         <div className="fixed bottom-28 md:bottom-8 right-4 md:right-6 z-50 flex flex-col items-end gap-2">
            {showFabMenu && (
              <div className="bg-white/85 dark:bg-slate-800/85 backdrop-blur-2xl border border-slate-200/50 dark:border-slate-700/50 shadow-2xl flex flex-col gap-1.5 text-xs font-bold w-44 animate-in slide-in-from-bottom-4 zoom-in-90 duration-200 ease-out origin-bottom-right rounded-2xl p-2 mb-2">
-                <a href="https://www.jtm.gov.my/etatatertib" target="_blank" rel="noopener noreferrer" className="p-3 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-xl transition-colors flex items-center gap-2">
+                <a href="https://www.jtm.gov.my/etatatertib" target="_blank" rel="noopener noreferrer" className="p-3 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-xl transition-colors flex items-center gap-2" aria-label="eTATATERTIB">
                   <Shield size={14} className="text-slate-400"/> eTATATERTIB
                 </a>
-                <a href="https://jims.jtm.gov.my/" target="_blank" rel="noopener noreferrer" className="p-3 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-xl transition-colors flex items-center gap-2">
+                <a href="https://jims.jtm.gov.my/" target="_blank" rel="noopener noreferrer" className="p-3 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-xl transition-colors flex items-center gap-2" aria-label="Sistem JIMS">
                   <Monitor size={14} className="text-slate-400"/> Sistem JIMS
                 </a>
-                <button onClick={toggleTheme} className="p-3 text-left hover:bg-slate-100 dark:hover:bg-slate-700 rounded-xl transition-colors flex items-center gap-2">
+                <button onClick={toggleTheme} className="p-3 text-left hover:bg-slate-100 dark:hover:bg-slate-700 rounded-xl transition-colors flex items-center gap-2" aria-label="Tukar tema">
                   {isDarkMode ? <Sun size={14} className="text-slate-400"/> : <Moon size={14} className="text-slate-400"/>} 
                   Tema: {isDarkMode ? 'Cerah' : 'Gelap'}
                 </button>
                 <div className="h-px bg-slate-200/50 dark:bg-slate-700/50 my-1 mx-2"></div>
                 {isAdmin ? (
-                  <button onClick={() => { setIsAdmin(false); setShowFabMenu(false); }} className="flex items-center gap-2 p-3 text-left text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-xl transition-colors"><LogOut size={16} /> Log Keluar Sesi</button>
+                  <button onClick={() => { setIsAdmin(false); setShowFabMenu(false); }} className="flex items-center gap-2 p-3 text-left text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-xl transition-colors" aria-label="Log keluar"><LogOut size={16} /> Log Keluar Sesi</button>
                 ) : (
-                  <button onClick={() => { setShowLogin(true); setShowFabMenu(false); }} className="flex items-center gap-2 p-3 text-left text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded-xl transition-colors"><Lock size={16} /> Log Masuk Admin</button>
+                  <button onClick={() => { setShowLogin(true); setShowFabMenu(false); }} className="flex items-center gap-2 p-3 text-left text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded-xl transition-colors" aria-label="Log masuk admin"><Lock size={16} /> Log Masuk Admin</button>
                 )}
              </div>
            )}
-           <button onClick={() => setShowFabMenu(!showFabMenu)} className="bg-slate-800 dark:bg-blue-600 text-white p-3.5 md:p-4 rounded-full shadow-[0_8px_24px_rgba(0,0,0,0.3)] hover:scale-105 active:scale-90 transition-all duration-300 focus:outline-none flex items-center justify-center border border-slate-700 dark:border-blue-500 relative group">
+           <button onClick={() => setShowFabMenu(!showFabMenu)} className="bg-slate-800 dark:bg-blue-600 text-white p-3.5 md:p-4 rounded-full shadow-[0_8px_24px_rgba(0,0,0,0.3)] hover:scale-105 active:scale-90 transition-all duration-300 focus:outline-none flex items-center justify-center border border-slate-700 dark:border-blue-500 relative group" aria-label="Menu tindakan pantas">
              <div className="absolute inset-0 bg-white/20 rounded-full scale-0 group-hover:scale-100 transition-transform duration-300"></div>
              <div className="relative w-5 h-5 flex items-center justify-center">
                <Command size={20} className={`absolute transition-all duration-300 ease-out ${showFabMenu ? '-rotate-90 opacity-0 scale-50' : 'rotate-0 opacity-100 scale-100'}`} />
