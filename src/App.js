@@ -1287,7 +1287,7 @@ export default function App() {
                              {jadualFile.includes('application/pdf') ? <FileText size={24} className="text-orange-600 dark:text-orange-400" /> : <ImageIcon size={24} className="text-orange-600 dark:text-orange-400" />}
                           </div>
                           <div>
-                             <p className="text-sm font-bold text-slate-800 dark:text-slate-200">Dokumen Tentatif Penuh</p>
+                             <p className="text-sm font-bold text-slate-800 dark:text-slate-200">Jadual Keseluruhan Program.pdf</p>
                              {jadualFileDate && <p className="text-[9px] font-bold text-slate-500 mt-0.5"><Clock size={10} className="inline mr-1"/>{formatDateTime(jadualFileDate)}</p>}
                           </div>
                        </div>
