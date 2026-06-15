@@ -1,15 +1,15 @@
 {
   "files": {
-    "main.css": "/iMSR-ADTECSDK/static/css/main.ec0259db.css",
-    "main.js": "/iMSR-ADTECSDK/static/js/main.fa18d5ac.js",
+    "main.css": "/iMSR-ADTECSDK/static/css/main.8be1b7a4.css",
+    "main.js": "/iMSR-ADTECSDK/static/js/main.741d802f.js",
     "static/js/453.45d5fb71.chunk.js": "/iMSR-ADTECSDK/static/js/453.45d5fb71.chunk.js",
     "index.html": "/iMSR-ADTECSDK/index.html",
-    "main.ec0259db.css.map": "/iMSR-ADTECSDK/static/css/main.ec0259db.css.map",
-    "main.fa18d5ac.js.map": "/iMSR-ADTECSDK/static/js/main.fa18d5ac.js.map",
+    "main.8be1b7a4.css.map": "/iMSR-ADTECSDK/static/css/main.8be1b7a4.css.map",
+    "main.741d802f.js.map": "/iMSR-ADTECSDK/static/js/main.741d802f.js.map",
     "453.45d5fb71.chunk.js.map": "/iMSR-ADTECSDK/static/js/453.45d5fb71.chunk.js.map"
   },
   "entrypoints": [
-    "static/css/main.ec0259db.css",
-    "static/js/main.fa18d5ac.js"
+    "static/css/main.8be1b7a4.css",
+    "static/js/main.741d802f.js"
   ]
 }
