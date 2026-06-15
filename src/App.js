@@ -1837,25 +1837,23 @@ export default function App() {
           </p>
         </footer>
 
-        {/* --- BOTTOM NAV (MOBILE) DENGAN 6 BUTANG & SCROLL HORIZONTAL --- */}
-        <nav className="md:hidden fixed bottom-0 w-full bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border-t border-slate-200 dark:border-slate-800 flex items-center pt-1.5 pb-safe-bottom pb-3 z-40 shadow-[0_-10px_40px_rgba(0,0,0,0.05)] dark:shadow-[0_-10px_40px_rgba(0,0,0,0.5)] overflow-x-auto hide-scrollbar">
-          <div className="flex justify-around min-w-full px-2 gap-1">
+        {/* --- BOTTOM NAV (MOBILE) DENGAN 4 BUTANG UTAMA --- */}
+        <nav className="md:hidden fixed bottom-0 w-full bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border-t border-slate-200 dark:border-slate-800 flex items-center pt-1.5 pb-safe-bottom pb-3 z-40 shadow-[0_-10px_40px_rgba(0,0,0,0.05)] dark:shadow-[0_-10px_40px_rgba(0,0,0,0.5)]">
+          <div className="flex justify-around w-full px-2 gap-1">
             {[
               { id: 'home', icon: Home, label: 'Utama', ariaLabel: 'Laman utama' },
-              { id: 'memo', icon: FileText, label: 'Memo', ariaLabel: 'Dokumen memo' },
-              { id: 'ajk', icon: Users, label: 'AJK', ariaLabel: 'Jawatankuasa' },
               { id: 'jadual', icon: Calendar, label: 'Jadual', ariaLabel: 'Jadual program' },
               { id: 'layout', icon: Map, label: 'Pelan', ariaLabel: 'Pelan pendaftaran' },
-              { id: 'lagu', icon: Music, label: 'Lagu', ariaLabel: 'Lagu korporat' }
+              { id: 'memo', icon: FileText, label: 'Memo', ariaLabel: 'Dokumen memo' }
             ].map((item) => (
               <button 
                 key={item.id} 
                 onClick={() => navigateTo(item.id)} 
-                className={`flex flex-col items-center gap-0.5 p-1.5 w-[16%] text-[9px] font-black transition-all active:scale-90 ${currentView === item.id ? 'text-blue-600 dark:text-blue-400 -translate-y-1' : 'text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300'}`}
+                className={`flex-1 flex flex-col items-center gap-0.5 p-1.5 text-[9px] font-black transition-all active:scale-90 ${currentView === item.id ? 'text-blue-600 dark:text-blue-400 -translate-y-1' : 'text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300'}`}
                 aria-label={item.ariaLabel}
               >
                 <div className={`${currentView === item.id ? 'bg-blue-100 dark:bg-blue-900/40 p-1.5 rounded-xl shadow-sm border border-blue-200 dark:border-blue-800/50 mb-0.5' : 'p-0.5'}`}>
-                  <item.icon size={18} strokeWidth={currentView === item.id ? 2.5 : 2} />
+                  <item.icon size={20} strokeWidth={currentView === item.id ? 2.5 : 2} />
                 </div>
                 <span className={`tracking-wide text-[10px] ${currentView === item.id ? 'opacity-100 font-black' : 'opacity-80'}`}>{item.label}</span>
               </button>
