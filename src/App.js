@@ -14,7 +14,8 @@ import ToastNotification from './components/ui/ToastNotification';
 import ImageModal from './components/ui/ImageModal';
 import SplashScreen from './components/ui/SplashScreen';
 import LoginModal from './components/ui/LoginModal';
-import PwaInstallBanner from './components/ui/PwaInstallBanner'; // <-- Ditambah baru
+import PwaInstallBanner from './components/ui/PwaInstallBanner';
+import IosInstallBanner from './components/ui/IosInstallBanner'; // <-- Import IOS Banner
 
 // --- IMPORT KOMPONEN VIEWS (PAPARAN) ---
 import HomeView from './components/views/HomeView';
@@ -66,9 +67,10 @@ export default function App() {
   const [latestUpdateInfo, setLatestUpdateInfo] = useState(null);
   const [isScrolled, setIsScrolled] = useState(false);
 
-  // --- PWA ANDROID INSTALL STATES ---
+  // --- PWA ANDROID & IOS INSTALL STATES ---
   const [deferredPrompt, setDeferredPrompt] = useState(null);
   const [showPwaBanner, setShowPwaBanner] = useState(false);
+  const [showIosBanner, setShowIosBanner] = useState(false); // State iOS Banner
 
   // --- LOG IN SECURITY STATES ---
   const [loginForm, setLoginForm] = useState({ username: '', password: '' });
@@ -97,18 +99,27 @@ export default function App() {
   const inactivityTimer = useRef(null);
   const [showOfflineBanner, setShowOfflineBanner] = useState(false);
 
-  // --- LOGIK DETECT & PROMPT INSTALASI PWA (ANDROID TARGET) ---
+  // --- LOGIK DETECT PWA (ANDROID & IOS TARGET) ---
   useEffect(() => {
+    // 1. Logik untuk Android
     const handleBeforeInstallPrompt = (e) => {
       e.preventDefault();
       setDeferredPrompt(e);
-      
-      // Semak jika dibuka menggunakan pelayar Android
-      const isAndroid = /Android/i.test(navigator.userAgent);
-      if (isAndroid) {
+      if (/Android/i.test(navigator.userAgent)) {
         setShowPwaBanner(true);
       }
     };
+
+    // 2. Logik untuk iOS (iPhone / iPad)
+    const isIos = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+    const isStandalone = window.navigator.standalone === true;
+
+    if (isIos && !isStandalone) {
+      const isBannerDismissed = sessionStorage.getItem('imsr_ios_banner_dismissed');
+      if (!isBannerDismissed) {
+        setShowIosBanner(true);
+      }
+    }
 
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
     return () => window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
@@ -278,6 +289,79 @@ export default function App() {
     }
   }, []);
 
+  // --- FUNGSI MUAT NAIK FAIL YANG TERTINGGAL (DIKEMBALIKAN) ---
+  const handleDocumentUpload = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = async (ev) => {
+        const newMemo = {
+          id: 'memo_' + Date.now(),
+          name: file.name,
+          url: ev.target.result,
+          type: file.type.includes('pdf') ? 'pdf' : 'image',
+          uploadDate: new Date().toISOString()
+        };
+        try {
+          await setDoc(doc(db, "msr_memos", newMemo.id), newMemo);
+          saveToFirebaseWithOffline({ latestUpdate: { view: 'memo', text: `Dokumen baharu dimuat naik.` } });
+        } catch (error) { alert("RALAT: Gagal muat naik."); }
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleLayoutUpload = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = async (ev) => {
+        let customName = window.prompt("Nama Pelan:", file.name.split('.')[0]);
+        const newLayout = {
+          id: 'layout_' + Date.now(), url: ev.target.result,
+          name: customName || `Pelan_${Date.now()}`,
+          type: file.type.includes('pdf') ? 'pdf' : 'image',
+          uploadDate: new Date().toISOString()
+        };
+        try {
+          await setDoc(doc(db, "msr", "data_layout"), { layouts: [...layoutList, newLayout] });
+          saveToFirebaseWithOffline({ latestUpdate: { view: 'layout', text: `Pelan baharu ditambah.` } });
+        } catch (error) { alert("Gagal muat naik pelan."); }
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleDeleteLayout = async (idToDel) => {
+    if(window.confirm("Padam pelan ini?")) {
+      await setDoc(doc(db, "msr", "data_layout"), { layouts: layoutList.filter(l => l.id !== idToDel) });
+    }
+  };
+
+  const handleJadualFileUpload = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = async (ev) => {
+        await setDoc(doc(db, "msr", "data_jadual_file"), { fileData: ev.target.result, uploadDate: new Date().toISOString() });
+        saveToFirebaseWithOffline({ latestUpdate: { view: 'jadual', text: 'Tentatif Penuh dimuat naik.' } });
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handlePenutupFileUpload = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = async (ev) => {
+        await setDoc(doc(db, "msr", "data_penutup_file"), { fileData: ev.target.result, uploadDate: new Date().toISOString() });
+        saveToFirebaseWithOffline({ latestUpdate: { view: 'penutup', text: 'Majlis Penutup penuh dimuat naik.' } });
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
   // --- RENDERING ROUTER ---
   const renderView = () => {
     switch(currentView) {
@@ -353,6 +437,15 @@ export default function App() {
         show={showPwaBanner} 
         onInstall={handleInstallPwaClick} 
         onClose={() => setShowPwaBanner(false)} 
+      />
+
+      {/* RENDER PANDUAN PWA KHAS UNTUK PENGGUNA IPHONE */}
+      <IosInstallBanner 
+        show={showIosBanner} 
+        onClose={() => {
+          setShowIosBanner(false);
+          sessionStorage.setItem('imsr_ios_banner_dismissed', 'true');
+        }} 
       />
     </div>
   );
