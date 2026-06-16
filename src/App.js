@@ -8,7 +8,8 @@ import {
   Lock, LogOut, UploadCloud, Plus, Trash2, Edit3, Image as ImageIcon,
   Bell, Eye, EyeOff, ShieldCheck, AlertTriangle, Clock,
   Moon, Sun, Zap, Settings, Command, Award,
-  Globe, Monitor, Shield, X, Info
+  Globe, Monitor, Shield, X, Info, Cpu,
+  FileSignature, UserCog, CalendarClock, GraduationCap, MapPinned, AudioLines
 } from 'lucide-react';
 
 // --- STYLES FOR SCROLLBAR & ANIMATIONS ---
@@ -18,7 +19,7 @@ const GlobalStyles = React.memo(() => (
       .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
       .custom-scrollbar::-webkit-scrollbar-track { background: transparent; border-radius: 10px; }
       .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
-      .dark .custom-scrollbar::-webkit-scrollbar-thumb { background: #475569; }
+      .dark .custom-scrollbar::-webkit-scrollbar-thumb { background: #334155; }
       .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
       .hide-scrollbar::-webkit-scrollbar { display: none; }
       .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
@@ -29,11 +30,13 @@ const GlobalStyles = React.memo(() => (
       }
       .animate-float { animation: float 6s ease-in-out infinite; }
       .animate-float-delayed { animation: float 6s ease-in-out 3s infinite; }
+      
       @keyframes slide {
         0% { transform: translateX(-100%); }
         100% { transform: translateX(200%); }
       }
       .animate-slide { animation: slide 1.5s ease-in-out infinite; }
+      
       @keyframes progress {
         0% { width: 100%; }
         100% { width: 0%; }
@@ -144,7 +147,7 @@ const cardStyles = {
   pink: { bg: 'bg-pink-100 dark:bg-pink-900/40', text: 'text-pink-600 dark:text-pink-400', border: 'border-pink-200 dark:border-pink-800/50', blob: 'bg-pink-500/10' },
 };
 
-// --- NETWORK ANIMATION COMPONENT ---
+// --- TVET TECH ANIMATION COMPONENT (Litar & Data) ---
 const NetworkAnimation = React.memo(() => {
   const canvasRef = useRef(null);
   useEffect(() => {
@@ -162,21 +165,21 @@ const NetworkAnimation = React.memo(() => {
 
     const initParticles = () => {
       particles = [];
-      const numParticles = Math.min(Math.floor((canvas.width * canvas.height) / 20000), 40); 
+      const numParticles = Math.min(Math.floor((canvas.width * canvas.height) / 15000), 50); 
       for (let i = 0; i < numParticles; i++) {
         particles.push({
           x: Math.random() * canvas.width,
           y: Math.random() * canvas.height,
-          vx: (Math.random() - 0.5) * 0.4,
-          vy: (Math.random() - 0.5) * 0.4,
-          radius: Math.random() * 1.5 + 1
+          vx: (Math.random() - 0.5) * 0.3,
+          vy: (Math.random() - 0.5) * 0.3,
+          radius: Math.random() * 2 + 1
         });
       }
     };
 
     const draw = () => {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
-      ctx.lineWidth = 0.8;
+      ctx.lineWidth = 1;
       
       for (let i = 0; i < particles.length; i++) {
         let p = particles[i];
@@ -184,9 +187,11 @@ const NetworkAnimation = React.memo(() => {
         p.y += p.vy;
         if (p.x < 0 || p.x > canvas.width) p.vx *= -1;
         if (p.y < 0 || p.y > canvas.height) p.vy *= -1;
+        
         ctx.beginPath();
         ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+        // Tukar warna node ke warna Tech/Cyan
+        ctx.fillStyle = 'rgba(34, 211, 238, 0.5)';
         ctx.fill();
 
         for (let j = i + 1; j < particles.length; j++) {
@@ -194,11 +199,12 @@ const NetworkAnimation = React.memo(() => {
           let dx = p.x - p2.x;
           let dy = p.y - p2.y;
           let dist = Math.sqrt(dx * dx + dy * dy);
-          if (dist < 100) {
+          if (dist < 110) {
             ctx.beginPath();
             ctx.moveTo(p.x, p.y);
             ctx.lineTo(p2.x, p2.y);
-            ctx.strokeStyle = `rgba(255, 255, 255, ${0.12 - dist / 900})`;
+            // Garis litar
+            ctx.strokeStyle = `rgba(56, 189, 248, ${0.15 - dist / 800})`;
             ctx.stroke();
           }
         }
@@ -215,7 +221,7 @@ const NetworkAnimation = React.memo(() => {
       cancelAnimationFrame(animationFrameId);
     };
   }, []);
-  return <canvas ref={canvasRef} className="absolute inset-0 w-full h-full pointer-events-none z-0 no-print" />;
+  return <canvas ref={canvasRef} className="absolute inset-0 w-full h-full pointer-events-none z-0 no-print mix-blend-screen" />;
 });
 
 // --- LIVE CLOCK COMPONENT ---
@@ -230,15 +236,15 @@ const LiveClock = React.memo(() => {
 
   return (
     <div className="flex flex-col items-center justify-center my-2">
-      <div className="flex items-baseline gap-1 font-mono font-black tracking-tighter text-3xl md:text-4xl text-white drop-shadow-[0_0_15px_rgba(255,255,255,0.3)]">
+      <div className="flex items-baseline gap-1 font-mono font-black tracking-tighter text-3xl md:text-4xl text-white drop-shadow-[0_0_15px_rgba(34,211,238,0.4)]">
         {timeNums}
-        <span className="text-sm md:text-base font-extrabold text-blue-300 tracking-widest drop-shadow-none ml-1">
+        <span className="text-sm md:text-base font-extrabold text-cyan-300 tracking-widest drop-shadow-none ml-1">
           {amPm}
         </span>
       </div>
-      <div className="flex items-center gap-1.5 mt-1.5 px-3 py-1 bg-white/10 rounded-full border border-white/20 backdrop-blur-md">
-        <Clock size={10} className="animate-pulse text-yellow-300" />
-        <span className="text-[9px] font-bold text-blue-100 uppercase tracking-[0.2em]">Waktu Tempatan</span>
+      <div className="flex items-center gap-1.5 mt-1.5 px-3 py-1 bg-white/5 rounded-full border border-cyan-400/20 backdrop-blur-md">
+        <Clock size={10} className="animate-pulse text-cyan-300" />
+        <span className="text-[9px] font-bold text-cyan-100 uppercase tracking-[0.2em]">Waktu Tempatan</span>
       </div>
     </div>
   );
@@ -627,7 +633,7 @@ export default function App() {
       const reader = new FileReader();
       reader.onload = async (ev) => {
         const fileType = file.type === 'application/pdf' ? 'pdf' : 'image';
-        let customName = window.prompt("Sila masukkan nama untuk pelan ini:", file.name.split('.')[0]);
+        let customName = window.prompt("Sila masukkan nama untuk pelan ini (Cth: Pelan Dewan):", file.name.split('.')[0]);
         if (!customName) customName = `Pelan_${Date.now()}`;
         
         const newLayout = {
@@ -788,9 +794,9 @@ export default function App() {
       {/* --- NOTIFIKASI TOAST BOLEH KLIK (KEMAS KINI BAHARU) --- */}
       {showToast && (
         <div className="fixed top-4 left-4 right-4 md:left-auto md:right-8 md:top-8 md:w-[26rem] z-[150] animate-in slide-in-from-top-10 fade-in duration-500">
-          <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white p-5 rounded-2xl shadow-[0_10px_40px_rgba(0,0,0,0.3)] flex flex-col gap-3 border border-blue-400/50 relative overflow-hidden">
+          <div className="bg-gradient-to-r from-cyan-600 to-blue-600 text-white p-5 rounded-2xl shadow-[0_10px_40px_rgba(0,0,0,0.3)] flex flex-col gap-3 border border-cyan-400/50 relative overflow-hidden">
             <div className="absolute bottom-0 left-0 w-full h-1.5 bg-black/20">
-               <div className="h-full bg-yellow-400 animate-progress"></div>
+               <div className="h-full bg-cyan-400 animate-progress"></div>
             </div>
             
             <div className="flex items-start gap-4">
@@ -799,7 +805,7 @@ export default function App() {
               </div>
               <div className="pr-6 mt-0.5">
                 <h4 className="font-extrabold text-sm md:text-base tracking-tight mb-1">Kemas Kini Baharu!</h4>
-                <p className="text-xs text-blue-100 leading-relaxed font-medium">
+                <p className="text-xs text-cyan-100 leading-relaxed font-medium">
                   {latestUpdateInfo?.text || "Terdapat maklumat jadual, fail dokumen, atau pengumuman yang terkini."}
                 </p>
               </div>
@@ -815,7 +821,7 @@ export default function App() {
               </button>
             )}
 
-            <button onClick={() => setShowToast(false)} className="absolute top-4 right-4 text-blue-200 hover:text-white transition-colors bg-black/10 hover:bg-black/30 p-1.5 rounded-full active:scale-90" aria-label="Tutup notifikasi"><X size={16}/></button>
+            <button onClick={() => setShowToast(false)} className="absolute top-4 right-4 text-cyan-200 hover:text-white transition-colors bg-black/10 hover:bg-black/30 p-1.5 rounded-full active:scale-90" aria-label="Tutup notifikasi"><X size={16}/></button>
           </div>
         </div>
       )}
@@ -834,23 +840,23 @@ export default function App() {
       )}
 
       {/* --- SPLASH SCREEN LOADING --- */}
-      <div className={`fixed inset-0 z-[999] bg-[#0f172a] flex flex-col items-center justify-center transition-all duration-700 ease-in-out ${isAppReady ? 'opacity-0 pointer-events-none scale-105 blur-sm' : 'opacity-100 scale-100 blur-none'}`}>
+      <div className={`fixed inset-0 z-[999] bg-[#020817] flex flex-col items-center justify-center transition-all duration-700 ease-in-out ${isAppReady ? 'opacity-0 pointer-events-none scale-105 blur-sm' : 'opacity-100 scale-100 blur-none'}`}>
         <div className="relative flex flex-col items-center">
-           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-24 h-24 md:w-40 md:h-40 bg-blue-600/40 blur-[50px] rounded-full animate-pulse"></div>
+           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-24 h-24 md:w-40 md:h-40 bg-cyan-600/40 blur-[50px] rounded-full animate-pulse"></div>
            <img src="Logo ADTEC JTM 2025 Kampus Sandakan.png" alt="Logo ADTEC" className="w-20 md:w-28 relative z-10 drop-shadow-2xl animate-float" />
            <h1 className="mt-6 text-xl md:text-2xl font-black tracking-tight text-white relative z-10 drop-shadow-lg">
-             iMSR <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-indigo-400">ADTEC JTM</span>
+             iMSR <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-400">ADTEC JTM</span>
            </h1>
-           <span className="text-slate-400 text-[9px] md:text-[10px] font-bold tracking-[0.3em] uppercase mt-1.5 relative z-10">Kampus Sandakan</span>
+           <span className="text-cyan-400/80 text-[9px] md:text-[10px] font-bold tracking-[0.3em] uppercase mt-1.5 relative z-10">Kampus Sandakan</span>
            
            <div className="mt-8 w-40 h-1 bg-slate-800 rounded-full overflow-hidden relative z-10 shadow-inner">
-             <div className="absolute top-0 left-0 h-full bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500 w-1/2 animate-slide rounded-full"></div>
+             <div className="absolute top-0 left-0 h-full bg-gradient-to-r from-cyan-500 via-blue-500 to-indigo-500 w-1/2 animate-slide rounded-full"></div>
            </div>
-           <p className="mt-3 text-[11px] font-semibold text-slate-500 animate-pulse tracking-wider">Please wait...</p>
+           <p className="mt-3 text-[11px] font-semibold text-slate-500 animate-pulse tracking-wider">Memuatkan Sistem...</p>
         </div>
       </div>
 
-      <div className="min-h-screen bg-[#f8fafc] dark:bg-[#0b1121] font-sans text-slate-900 dark:text-slate-100 flex flex-col relative selection:bg-blue-200 dark:selection:bg-blue-900 overflow-x-hidden transition-colors duration-500">
+      <div className="min-h-screen bg-[#f8fafc] dark:bg-[#020817] font-sans text-slate-900 dark:text-slate-100 flex flex-col relative selection:bg-cyan-200 dark:selection:bg-cyan-900 overflow-x-hidden transition-colors duration-500">
         <GlobalStyles />
 
         {/* --- HEADER --- */}
@@ -867,7 +873,7 @@ export default function App() {
               <button onClick={() => navigateTo('home')} className="flex items-center gap-2.5 md:gap-3 text-left focus:outline-none hover:opacity-80 transition-opacity active:scale-95" aria-label="Laman utama">
                 <img src="Logo ADTEC JTM 2025 Kampus Sandakan.png" alt="Logo ADTEC" className={`w-auto object-contain bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-slate-100 dark:border-slate-700 transition-all duration-300 ${isScrolled ? 'h-8 md:h-10 p-1' : 'h-10 md:h-12 p-1.5'}`} />
                 <div>
-                  <h1 className="font-extrabold tracking-tight text-base md:text-xl bg-clip-text text-transparent bg-gradient-to-r from-blue-700 to-indigo-600 dark:from-blue-400 dark:to-indigo-300">iMSR ADTEC JTM</h1>
+                  <h1 className="font-extrabold tracking-tight text-base md:text-xl bg-clip-text text-transparent bg-gradient-to-r from-blue-700 to-indigo-600 dark:from-cyan-400 dark:to-blue-400">iMSR ADTEC JTM</h1>
                   <span className="text-[9px] md:text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-[0.2em] hidden sm:block transition-all">KAMPUS Sandakan</span>
                 </div>
               </button>
@@ -890,19 +896,19 @@ export default function App() {
           <div className="fixed inset-0 bg-slate-900/60 dark:bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
             <div className="bg-white dark:bg-slate-900 rounded-[2rem] shadow-2xl p-6 md:p-8 w-full max-w-sm border border-slate-200 dark:border-slate-700 animate-in zoom-in-[0.95] fade-in duration-300 ease-out">
               <div className="flex justify-between items-center mb-6">
-                <h2 className="text-xl font-extrabold flex items-center gap-2"><Lock size={20} className="text-blue-600" /> Akses Admin</h2>
+                <h2 className="text-xl font-extrabold flex items-center gap-2"><Lock size={20} className="text-cyan-600" /> Akses Admin</h2>
                 <button onClick={() => setShowLogin(false)} className="text-slate-400 hover:text-slate-600 bg-slate-100 dark:bg-slate-800 rounded-full p-1.5 transition-all active:scale-90" aria-label="Tutup dialog log masuk"><X size={18}/></button>
               </div>
               {isLockedOut ? (
                 <div className="bg-red-50 text-red-600 p-3 rounded-xl flex items-center gap-2 mb-4"><AlertTriangle size={20} /><p className="text-xs font-bold">Akaun dikunci 30 saat.</p></div>
               ) : (
                 <form onSubmit={handleLogin} className="space-y-4">
-                  <input type="text" required value={loginForm.username} onChange={(e) => setLoginForm({...loginForm, username: e.target.value})} className="w-full bg-slate-50 dark:bg-slate-800 border px-4 py-2.5 rounded-xl text-sm font-semibold text-slate-800 dark:text-white transition-all focus:ring-2 focus:ring-blue-500 outline-none" placeholder="Nama Pengguna" aria-label="Nama pengguna" />
+                  <input type="text" required value={loginForm.username} onChange={(e) => setLoginForm({...loginForm, username: e.target.value})} className="w-full bg-slate-50 dark:bg-slate-800 border px-4 py-2.5 rounded-xl text-sm font-semibold text-slate-800 dark:text-white transition-all focus:ring-2 focus:ring-cyan-500 outline-none" placeholder="Nama Pengguna" aria-label="Nama pengguna" />
                   <div className="relative">
-                    <input type={showPassword ? "text" : "password"} required value={loginForm.password} onChange={(e) => setLoginForm({...loginForm, password: e.target.value})} className="w-full bg-slate-50 dark:bg-slate-800 border pl-4 pr-10 py-2.5 rounded-xl text-sm font-semibold text-slate-800 dark:text-white transition-all focus:ring-2 focus:ring-blue-500 outline-none" placeholder="Kata Laluan" aria-label="Kata laluan" />
+                    <input type={showPassword ? "text" : "password"} required value={loginForm.password} onChange={(e) => setLoginForm({...loginForm, password: e.target.value})} className="w-full bg-slate-50 dark:bg-slate-800 border pl-4 pr-10 py-2.5 rounded-xl text-sm font-semibold text-slate-800 dark:text-white transition-all focus:ring-2 focus:ring-cyan-500 outline-none" placeholder="Kata Laluan" aria-label="Kata laluan" />
                     <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600" aria-label={showPassword ? "Sembunyikan kata laluan" : "Papar kata laluan"}>{showPassword ? <EyeOff size={18} /> : <Eye size={18} />}</button>
                   </div>
-                  <button type="submit" className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold py-3 rounded-xl text-sm shadow-lg active:scale-95 transition-transform duration-200" aria-label="Log masuk">Sahkan Log Masuk</button>
+                  <button type="submit" className="w-full bg-gradient-to-r from-cyan-600 to-blue-600 text-white font-bold py-3 rounded-xl text-sm shadow-lg active:scale-95 transition-transform duration-200" aria-label="Log masuk">Sahkan Log Masuk</button>
                 </form>
               )}
             </div>
@@ -917,10 +923,11 @@ export default function App() {
             {currentView === 'home' && (
               <div className="px-4 lg:px-8 max-w-6xl mx-auto pb-32 pt-4">
                 
-                <div className="relative rounded-[2.5rem] bg-gradient-to-br from-[#0f172a] via-blue-950 to-indigo-950 overflow-hidden shadow-xl border border-slate-800/60 mb-8">
+                {/* HERO SECTION TECH THEME */}
+                <div className="relative rounded-[2.5rem] bg-gradient-to-br from-slate-900 via-[#0a192f] to-[#020c1b] overflow-hidden shadow-2xl border border-cyan-900/30 mb-8">
                   <NetworkAnimation />
-                  <div className="absolute top-[-20%] left-[-10%] w-[50%] h-[50%] bg-blue-500/30 rounded-full blur-[120px] animate-float pointer-events-none"></div>
-                  <div className="absolute bottom-[-20%] right-[-10%] w-[50%] h-[50%] bg-indigo-500/20 rounded-full blur-[120px] animate-float-delayed pointer-events-none"></div>
+                  <div className="absolute top-[-20%] left-[-10%] w-[50%] h-[50%] bg-cyan-600/20 rounded-full blur-[120px] animate-float pointer-events-none"></div>
+                  <div className="absolute bottom-[-20%] right-[-10%] w-[50%] h-[50%] bg-blue-600/20 rounded-full blur-[120px] animate-float-delayed pointer-events-none"></div>
 
                   <div className="relative z-20 px-6 py-10 md:px-12 md:py-20 flex flex-col lg:flex-row items-center justify-between gap-10">
                     <div className="w-full lg:w-3/5 space-y-6 text-center lg:text-left">
@@ -937,8 +944,8 @@ export default function App() {
                       </div>
 
                       <div className="space-y-3">
-                        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/20 border border-blue-400/30 text-blue-200 text-[10px] md:text-xs font-black tracking-[0.2em] uppercase shadow-inner">
-                          <Zap size={12} className="text-yellow-400"/>
+                        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-cyan-500/20 border border-cyan-400/30 text-cyan-200 text-[10px] md:text-xs font-black tracking-[0.2em] uppercase shadow-inner">
+                          <Cpu size={12} className="text-cyan-400"/>
                           {isAdmin ? (
                             <div className="flex items-center gap-2">
                               <span>Sesi:</span>
@@ -951,7 +958,8 @@ export default function App() {
                         </div>
 
                         <h1 className="text-4xl md:text-5xl lg:text-[4rem] font-black text-white tracking-tight leading-[1.1] drop-shadow-lg">
-                          Minggu<br/>Silaturahim
+                          Minggu<br/>
+                          <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-500">Silaturahim</span>
                         </h1>
                         <p className="text-sm md:text-base text-slate-300/90 font-medium max-w-lg mx-auto lg:mx-0 leading-relaxed">
                           Portal rasmi Pendaftaran dan Minggu Silaturahim Pelajar (MSR) baharu ADTEC JTM Kampus Sandakan.
@@ -961,9 +969,9 @@ export default function App() {
 
                     <div className="w-full lg:w-2/5 flex justify-center lg:justify-end">
                       <div className="relative w-full max-w-[18rem]">
-                          <div className="absolute inset-0 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-[2rem] blur-2xl opacity-40 animate-pulse"></div>
+                          <div className="absolute inset-0 bg-gradient-to-r from-cyan-600 to-blue-600 rounded-[2rem] blur-2xl opacity-40 animate-pulse"></div>
                         <div className="relative bg-white/10 backdrop-blur-2xl border border-white/20 p-6 md:p-8 rounded-[2rem] shadow-xl text-center transform hover:scale-[1.02] transition-transform duration-500">
-                           <p className="text-blue-200/80 text-[10px] font-bold uppercase tracking-[0.3em] mb-2">Waktu Semasa</p>
+                           <p className="text-cyan-200/80 text-[10px] font-bold uppercase tracking-[0.3em] mb-2">Waktu Semasa</p>
                            <LiveClock />
                            <div className="mt-6 pt-4 border-t border-white/10">
                              <p className="text-xs md:text-sm font-semibold text-white tracking-wide">{formatTarikh(new Date().toISOString().split('T')[0])}</p>
@@ -976,12 +984,12 @@ export default function App() {
 
                 <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 md:gap-5">
                   {[
-                    { id: 'memo', icon: FileText, title: 'Memo Lantikan', desc: 'Rujukan surat rasmi', color: 'blue' },
-                    { id: 'ajk', icon: Users, title: 'Senarai AJK', desc: 'Jawatankuasa & biro', color: 'emerald' },
-                    { id: 'jadual', icon: Calendar, title: 'Jadual MSR', desc: 'Tentatif terperinci', color: 'orange' },
-                    { id: 'penutup', icon: Award, title: 'Majlis Penutup', desc: 'Atur cara majlis', color: 'rose' },
-                    { id: 'layout', icon: Map, title: 'Pelan Daftar', desc: 'Susun atur dewan', color: 'purple' },
-                    { id: 'lagu', icon: Music, title: 'Lagu Korporat', desc: 'Lirik nyanyian JTM', color: 'pink' }
+                    { id: 'memo', icon: FileSignature, title: 'Memo Lantikan', desc: 'Rujukan surat rasmi', color: 'blue' },
+                    { id: 'ajk', icon: UserCog, title: 'Senarai AJK', desc: 'Jawatankuasa & biro', color: 'emerald' },
+                    { id: 'jadual', icon: CalendarClock, title: 'Jadual MSR', desc: 'Tentatif terperinci', color: 'orange' },
+                    { id: 'penutup', icon: GraduationCap, title: 'Majlis Penutup', desc: 'Atur cara majlis', color: 'rose' },
+                    { id: 'layout', icon: MapPinned, title: 'Pelan Daftar', desc: 'Susun atur dewan', color: 'purple' },
+                    { id: 'lagu', icon: AudioLines, title: 'Lagu Korporat', desc: 'Lirik nyanyian JTM', color: 'pink' }
                   ].map((item) => (
                     <button 
                       key={item.id} 
@@ -994,10 +1002,10 @@ export default function App() {
                         <item.icon size={26} strokeWidth={2} />
                       </div>
                       <div className="relative z-10 mt-6">
-                        <h3 className="text-lg md:text-xl font-black text-slate-800 dark:text-white mb-1 tracking-tight group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors duration-300">{item.title}</h3>
+                        <h3 className="text-lg md:text-xl font-black text-slate-800 dark:text-white mb-1 tracking-tight group-hover:text-cyan-600 dark:group-hover:text-cyan-400 transition-colors duration-300">{item.title}</h3>
                         <p className="text-xs text-slate-500 dark:text-slate-400 font-medium flex items-center">
                           {item.desc}
-                          <ChevronRight size={14} className="opacity-0 -ml-3 group-hover:opacity-100 group-hover:ml-1 transition-all duration-300 text-blue-500 dark:text-blue-400" />
+                          <ChevronRight size={14} className="opacity-0 -ml-3 group-hover:opacity-100 group-hover:ml-1 transition-all duration-300 text-cyan-500 dark:text-cyan-400" />
                         </p>
                       </div>
                     </button>
@@ -1012,7 +1020,7 @@ export default function App() {
                 <div className="bg-white dark:bg-slate-800 rounded-[2rem] border border-slate-200 dark:border-slate-700 p-6 shadow-xl">
                   <div className="flex items-center gap-3 mb-6">
                     <div className="p-2.5 bg-blue-100 dark:bg-blue-900/50 rounded-xl text-blue-600 dark:text-blue-400">
-                      <FileText size={24} strokeWidth={2.5}/>
+                      <FileSignature size={24} strokeWidth={2.5}/>
                     </div>
                     <h3 className="text-xl md:text-2xl font-black tracking-tight text-slate-800 dark:text-white">Dokumen & Surat</h3>
                   </div>
@@ -1030,7 +1038,7 @@ export default function App() {
 
                   {memoList.length === 0 ? (
                     <div className="text-center py-12 bg-slate-50 dark:bg-slate-900/50 rounded-[1.5rem] border border-slate-100 dark:border-slate-800">
-                      <FileText size={48} className="mx-auto mb-3 text-slate-300 dark:text-slate-600" />
+                      <FileSignature size={48} className="mx-auto mb-3 text-slate-300 dark:text-slate-600" />
                       <p className="text-base font-bold text-slate-500 dark:text-slate-400">Tiada dokumen dijumpai.</p>
                     </div>
                   ) : (
@@ -1120,7 +1128,7 @@ export default function App() {
                   <div className="flex justify-between items-center mb-6">
                     <div className="flex items-center gap-3">
                       <div className="p-2.5 bg-emerald-100 dark:bg-emerald-900/50 rounded-xl text-emerald-600 dark:text-emerald-400">
-                        <Users size={24} strokeWidth={2.5}/>
+                        <UserCog size={24} strokeWidth={2.5}/>
                       </div>
                       <h3 className="text-xl md:text-2xl font-black tracking-tight text-slate-800 dark:text-white">Jawatankuasa Induk</h3>
                     </div>
@@ -1308,7 +1316,7 @@ export default function App() {
                   <div className="flex items-center justify-between mb-6">
                     <div className="flex items-center gap-3">
                       <div className="p-2.5 bg-orange-100 dark:bg-orange-900/50 rounded-xl text-orange-600 dark:text-orange-400">
-                        <Calendar size={24} strokeWidth={2.5}/>
+                        <CalendarClock size={24} strokeWidth={2.5}/>
                       </div>
                       <h3 className="text-xl md:text-2xl font-black tracking-tight text-slate-800 dark:text-white">Tentatif Program</h3>
                     </div>
@@ -1438,7 +1446,7 @@ export default function App() {
                         
                         {(!hari.slots || hari.slots.length === 0) ? (
                           <div className="text-center py-10 text-slate-400 font-medium bg-slate-50 dark:bg-slate-900/50 rounded-[2rem] border border-dashed border-slate-200 dark:border-slate-700">
-                            <Calendar size={40} className="mx-auto mb-2 opacity-30" />
+                            <CalendarClock size={40} className="mx-auto mb-2 opacity-30" />
                             <p className="text-sm font-bold text-slate-500">Tiada aktiviti dijadualkan.</p>
                           </div>
                         ) : (
@@ -1489,7 +1497,7 @@ export default function App() {
                   <div className="flex items-center justify-between mb-6">
                     <div className="flex items-center gap-3">
                       <div className="p-2.5 bg-rose-100 dark:bg-rose-900/50 rounded-xl text-rose-600 dark:text-rose-400">
-                        <Award size={24} strokeWidth={2.5}/>
+                        <GraduationCap size={24} strokeWidth={2.5}/>
                       </div>
                       <h3 className="text-xl md:text-2xl font-black tracking-tight text-slate-800 dark:text-white">Majlis Penutup</h3>
                     </div>
@@ -1596,7 +1604,7 @@ export default function App() {
                   
                   {(!penutupData || penutupData.length === 0) ? (
                     <div className="text-center py-12 text-slate-400 font-medium bg-slate-50 dark:bg-slate-900/50 rounded-[2rem] border border-dashed border-slate-200 dark:border-slate-700">
-                      <Award size={40} className="mx-auto mb-2 opacity-30" />
+                      <GraduationCap size={40} className="mx-auto mb-2 opacity-30" />
                       <p className="text-sm font-bold text-slate-500">Tiada atur cara majlis buat masa ini.</p>
                     </div>
                   ) : (
@@ -1635,7 +1643,7 @@ export default function App() {
               <div className="p-4 max-w-4xl mx-auto pb-32 text-center">
                 <div className="bg-white dark:bg-slate-800 rounded-[2rem] border border-slate-200 dark:border-slate-700 p-6 md:p-10 shadow-xl text-center">
                   <div className="bg-purple-100 dark:bg-purple-900/50 w-16 h-16 md:w-20 md:h-20 mx-auto rounded-[1.5rem] flex items-center justify-center mb-5 transform rotate-3 shadow-inner border border-purple-200 dark:border-purple-800/50">
-                    <Map size={36} className="text-purple-600 dark:text-purple-400 -rotate-3" />
+                    <MapPinned size={36} className="text-purple-600 dark:text-purple-400 -rotate-3" />
                   </div>
                   <h3 className="text-2xl md:text-3xl font-black text-slate-800 dark:text-white mb-2 tracking-tight">Pelan Pendaftaran</h3>
                   <p className="text-slate-500 dark:text-slate-400 mb-8 text-sm md:text-base font-medium">Panduan susun atur dewan bagi melancarkan pergerakan.</p>
@@ -1718,7 +1726,7 @@ export default function App() {
                   <div className="absolute -bottom-16 -left-16 w-48 h-48 bg-rose-500/20 rounded-full blur-[60px] pointer-events-none"></div>
                   
                   <div className="relative z-10 bg-pink-100 dark:bg-pink-900/50 w-20 h-20 mx-auto rounded-2xl flex items-center justify-center mb-6 shadow-inner border border-pink-200 dark:border-pink-800/50">
-                    <Music size={40} className="text-pink-500 dark:text-pink-400 animate-pulse duration-[3000ms]" />
+                    <AudioLines size={40} className="text-pink-500 dark:text-pink-400 animate-pulse duration-[3000ms]" />
                   </div>
                   
                   <h3 className="text-2xl md:text-4xl font-black relative z-10 tracking-tight text-slate-800 dark:text-white">LAGU KORPORAT JTM</h3>
@@ -1744,9 +1752,9 @@ export default function App() {
         {/* --- IN-APP MODAL UNTUK PAPARAN MEMO PENUH (Mobile & Desktop) --- */}
         {viewingMemo && (
           <div className="fixed inset-0 z-[100] bg-slate-900/95 backdrop-blur-xl flex flex-col animate-in fade-in zoom-in-[0.98] duration-300">
-             <div className="flex justify-between items-center p-3 md:p-4 bg-[#0f172a] border-b border-slate-800 text-white shadow-lg z-10">
+             <div className="flex justify-between items-center p-3 md:p-4 bg-[#020817] border-b border-slate-800 text-white shadow-lg z-10">
               <div className="flex items-center gap-3 overflow-hidden">
-                <div className="bg-blue-500/20 p-2 rounded-lg text-blue-400 shrink-0">
+                <div className="bg-cyan-500/20 p-2 rounded-lg text-cyan-400 shrink-0">
                   <FileText size={20} />
                 </div>
                  <div>
@@ -1786,7 +1794,7 @@ export default function App() {
                 )
               ) : (
                 <div className="flex flex-col items-center gap-3 text-white animate-pulse">
-                  <div className="w-10 h-10 border-[3px] border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+                  <div className="w-10 h-10 border-[3px] border-cyan-500 border-t-transparent rounded-full animate-spin"></div>
                   <span className="font-bold tracking-widest uppercase text-[10px] text-slate-400">Memproses Dokumen...</span>
                 </div>
               )}
@@ -1795,28 +1803,28 @@ export default function App() {
         )}
 
         {/* --- FOOTER --- */}
-        <footer className="bg-[#f8fafc] dark:bg-[#0b1121] text-slate-400 py-6 text-center mt-auto pb-24 md:pb-6 border-t border-slate-200 dark:border-slate-800/50 relative z-30">
+        <footer className="bg-[#f8fafc] dark:bg-[#020817] text-slate-400 py-6 text-center mt-auto pb-24 md:pb-6 border-t border-slate-200 dark:border-slate-800/50 relative z-30">
           <p className="text-[10px] md:text-xs text-slate-500 font-bold tracking-wide">
             Hak Cipta Terpelihara &copy; 2026 Kolej Teknologi Termaju (ADTEC) Jabatan Tenaga Manusia Kampus Sandakan.
           </p>
         </footer>
 
         {/* --- BOTTOM NAV (MOBILE) DENGAN 4 BUTANG UTAMA --- */}
-        <nav className="md:hidden fixed bottom-0 w-full bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border-t border-slate-200 dark:border-slate-800 flex items-center pt-1.5 pb-safe-bottom pb-3 z-40 shadow-[0_-10px_40px_rgba(0,0,0,0.05)] dark:shadow-[0_-10px_40px_rgba(0,0,0,0.5)]">
+        <nav className="md:hidden fixed bottom-0 w-full bg-white/95 dark:bg-[#020817]/95 backdrop-blur-xl border-t border-slate-200 dark:border-slate-800 flex items-center pt-1.5 pb-safe-bottom pb-3 z-40 shadow-[0_-10px_40px_rgba(0,0,0,0.05)] dark:shadow-[0_-10px_40px_rgba(0,0,0,0.5)]">
           <div className="flex justify-around w-full px-2 gap-1">
             {[
               { id: 'home', icon: Home, label: 'Utama', ariaLabel: 'Laman utama' },
-              { id: 'jadual', icon: Calendar, label: 'Jadual', ariaLabel: 'Jadual program' },
-              { id: 'layout', icon: Map, label: 'Pelan', ariaLabel: 'Pelan pendaftaran' },
-              { id: 'memo', icon: FileText, label: 'Memo', ariaLabel: 'Dokumen memo' }
+              { id: 'jadual', icon: CalendarClock, label: 'Jadual', ariaLabel: 'Jadual program' },
+              { id: 'layout', icon: MapPinned, label: 'Pelan', ariaLabel: 'Pelan pendaftaran' },
+              { id: 'memo', icon: FileSignature, label: 'Memo', ariaLabel: 'Dokumen memo' }
             ].map((item) => (
               <button 
                 key={item.id} 
                 onClick={() => navigateTo(item.id)} 
-                className={`flex-1 flex flex-col items-center gap-0.5 p-1.5 text-[9px] font-black transition-all active:scale-90 ${currentView === item.id ? 'text-blue-600 dark:text-blue-400 -translate-y-1' : 'text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300'}`}
+                className={`flex-1 flex flex-col items-center gap-0.5 p-1.5 text-[9px] font-black transition-all active:scale-90 ${currentView === item.id ? 'text-cyan-600 dark:text-cyan-400 -translate-y-1' : 'text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300'}`}
                 aria-label={item.ariaLabel}
               >
-                <div className={`${currentView === item.id ? 'bg-blue-100 dark:bg-blue-900/40 p-1.5 rounded-xl shadow-sm border border-blue-200 dark:border-blue-800/50 mb-0.5' : 'p-0.5'}`}>
+                <div className={`${currentView === item.id ? 'bg-cyan-100 dark:bg-cyan-900/40 p-1.5 rounded-xl shadow-sm border border-cyan-200 dark:border-cyan-800/50 mb-0.5' : 'p-0.5'}`}>
                   <item.icon size={20} strokeWidth={currentView === item.id ? 2.5 : 2} />
                 </div>
                 <span className={`tracking-wide text-[10px] ${currentView === item.id ? 'opacity-100 font-black' : 'opacity-80'}`}>{item.label}</span>
@@ -1843,11 +1851,11 @@ export default function App() {
                 {isAdmin ? (
                   <button onClick={() => { setIsAdmin(false); setShowFabMenu(false); }} className="flex items-center gap-2 p-3 text-left text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-xl transition-colors" aria-label="Log keluar"><LogOut size={16} /> Log Keluar Sesi</button>
                 ) : (
-                  <button onClick={() => { setShowLogin(true); setShowFabMenu(false); }} className="flex items-center gap-2 p-3 text-left text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded-xl transition-colors" aria-label="Log masuk admin"><Lock size={16} /> Log Masuk Admin</button>
+                  <button onClick={() => { setShowLogin(true); setShowFabMenu(false); }} className="flex items-center gap-2 p-3 text-left text-cyan-600 hover:bg-cyan-50 dark:hover:bg-cyan-900/30 rounded-xl transition-colors" aria-label="Log masuk admin"><Lock size={16} /> Log Masuk Admin</button>
                 )}
              </div>
            )}
-           <button onClick={() => setShowFabMenu(!showFabMenu)} className="bg-slate-800 dark:bg-blue-600 text-white p-3.5 md:p-4 rounded-full shadow-[0_8px_24px_rgba(0,0,0,0.3)] hover:scale-105 active:scale-90 transition-all duration-300 focus:outline-none flex items-center justify-center border border-slate-700 dark:border-blue-500 relative group" aria-label="Menu tindakan pantas">
+           <button onClick={() => setShowFabMenu(!showFabMenu)} className="bg-slate-800 dark:bg-cyan-600 text-white p-3.5 md:p-4 rounded-full shadow-[0_8px_24px_rgba(0,0,0,0.3)] hover:scale-105 active:scale-90 transition-all duration-300 focus:outline-none flex items-center justify-center border border-slate-700 dark:border-cyan-500 relative group" aria-label="Menu tindakan pantas">
              <div className="absolute inset-0 bg-white/20 rounded-full scale-0 group-hover:scale-100 transition-transform duration-300"></div>
              <div className="relative w-5 h-5 flex items-center justify-center">
                <Command size={20} className={`absolute transition-all duration-300 ease-out ${showFabMenu ? '-rotate-90 opacity-0 scale-50' : 'rotate-0 opacity-100 scale-100'}`} />
