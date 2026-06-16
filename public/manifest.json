@@ -1,20 +1,28 @@
 {
   "short_name": "iMSR ADTEC",
-  "name": "Portal iMSR ADTEC Sandakan",
+  "name": "Sistem Minggu Silaturahim iMSR ADTEC Sandakan",
   "icons": [
     {
-      "src": "logo192.png",
-      "type": "image/png",
-      "sizes": "192x192"
+      "src": "Logo ADTEC JTM 2025 Kampus Sandakan.png",
+      "sizes": "64x64 32x32 24x24 16x16",
+      "type": "image/png"
     },
     {
-      "src": "logo512.png",
+      "src": "Logo ADTEC JTM 2025 Kampus Sandakan.png",
       "type": "image/png",
-      "sizes": "512x512"
+      "sizes": "192x192",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "Logo ADTEC JTM 2025 Kampus Sandakan.png",
+      "type": "image/png",
+      "sizes": "512x512",
+      "purpose": "any maskable"
     }
   ],
   "start_url": ".",
   "display": "standalone",
-  "theme_color": "#1e40af",
-  "background_color": "#f1f5f9"
+  "theme_color": "#020817",
+  "background_color": "#020817",
+  "orientation": "portrait"
 }

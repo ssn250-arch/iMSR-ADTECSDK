@@ -15,3 +15,11 @@ root.render(
 // to log results (for example: reportWebVitals(console.log))
 // or send to an analytics endpoint. Learn more: https://bit.ly/CRA-vitals
 reportWebVitals();
+// Daftarkan PWA Service Worker di bahagian bawah fail src/index.js
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js')
+      .then((reg) => console.log('PWA Service Worker Berjaya Didaftarkan: ', reg.scope))
+      .catch((err) => console.log('PWA Registration Gagal: ', err));
+  });
+}

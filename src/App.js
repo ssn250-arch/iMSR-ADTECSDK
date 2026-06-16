@@ -14,6 +14,7 @@ import ToastNotification from './components/ui/ToastNotification';
 import ImageModal from './components/ui/ImageModal';
 import SplashScreen from './components/ui/SplashScreen';
 import LoginModal from './components/ui/LoginModal';
+import PwaInstallBanner from './components/ui/PwaInstallBanner'; // <-- Ditambah baru
 
 // --- IMPORT KOMPONEN VIEWS (PAPARAN) ---
 import HomeView from './components/views/HomeView';
@@ -65,6 +66,10 @@ export default function App() {
   const [latestUpdateInfo, setLatestUpdateInfo] = useState(null);
   const [isScrolled, setIsScrolled] = useState(false);
 
+  // --- PWA ANDROID INSTALL STATES ---
+  const [deferredPrompt, setDeferredPrompt] = useState(null);
+  const [showPwaBanner, setShowPwaBanner] = useState(false);
+
   // --- LOG IN SECURITY STATES ---
   const [loginForm, setLoginForm] = useState({ username: '', password: '' });
   const [showPassword, setShowPassword] = useState(false);
@@ -73,7 +78,7 @@ export default function App() {
 
   // --- DATA STATES ---
   const [lastUpdated, setLastUpdated] = useState(null);
-  const [announcements, setAnnouncements] = useState([]); // Diubah menjadi Array untuk Multi-Hebahan
+  const [announcements, setAnnouncements] = useState([]); 
   const [sesiKemasukan, setSesiKemasukan] = useState({ sesi: '2', tahun: '2026' });
   const [memoText, setMemoText] = useState('');
   const [memoList, setMemoList] = useState([]); 
@@ -91,6 +96,34 @@ export default function App() {
   const hasCheckedUpdates = useRef(false);
   const inactivityTimer = useRef(null);
   const [showOfflineBanner, setShowOfflineBanner] = useState(false);
+
+  // --- LOGIK DETECT & PROMPT INSTALASI PWA (ANDROID TARGET) ---
+  useEffect(() => {
+    const handleBeforeInstallPrompt = (e) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+      
+      // Semak jika dibuka menggunakan pelayar Android
+      const isAndroid = /Android/i.test(navigator.userAgent);
+      if (isAndroid) {
+        setShowPwaBanner(true);
+      }
+    };
+
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    return () => window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+  }, []);
+
+  const handleInstallPwaClick = async () => {
+    if (!deferredPrompt) return;
+    deferredPrompt.prompt();
+    const { outcome } = await deferredPrompt.userChoice;
+    if (outcome === 'accepted') {
+      console.log('Pelajar bersetuju memasang aplikasi iMSR');
+    }
+    setDeferredPrompt(null);
+    setShowPwaBanner(false);
+  };
 
   // --- CONTROLS ---
   useEffect(() => {
@@ -126,7 +159,6 @@ export default function App() {
     });
   }, []);
 
-  // --- LOG IN FUNCTION ---
   const handleLogin = (e) => {
     e.preventDefault();
     if (isLockedOut) return;
@@ -147,7 +179,7 @@ export default function App() {
     }
   };
 
-  // --- FIREBASE FETCHING (Data Sync) ---
+  // --- FIREBASE FETCHING ---
   useEffect(() => {
     const cachedData = localStorage.getItem('imsr_cached_data');
     if (cachedData) {
@@ -174,7 +206,6 @@ export default function App() {
         if (data.lastUpdated) setLastUpdated(data.lastUpdated);
         if (data.latestUpdate) setLatestUpdateInfo(data.latestUpdate);
         
-        // Mengesan data lama (string) atau data baru (array) untuk mengelakkan ralat crash
         if (data.announcements !== undefined) {
           setAnnouncements(data.announcements);
         } else if (data.announcement !== undefined) {
@@ -247,90 +278,6 @@ export default function App() {
     }
   }, []);
 
-  useEffect(() => {
-    if (isAppReady && lastUpdated && !hasCheckedUpdates.current) {
-      const lastVisit = localStorage.getItem('imsr_last_visit');
-      if (!lastVisit || new Date(lastUpdated) > new Date(lastVisit)) {
-        setTimeout(() => setShowToast(true), 1500); 
-        setTimeout(() => setShowToast(false), 16500);
-      }
-      localStorage.setItem('imsr_last_visit', new Date().toISOString());
-      hasCheckedUpdates.current = true;
-    }
-  }, [isAppReady, lastUpdated]);
-
-  const handleDocumentUpload = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = async (ev) => {
-        const newMemo = {
-          id: 'memo_' + Date.now(),
-          name: file.name,
-          url: ev.target.result,
-          type: file.type.includes('pdf') ? 'pdf' : 'image',
-          uploadDate: new Date().toISOString()
-        };
-        try {
-          await setDoc(doc(db, "msr_memos", newMemo.id), newMemo);
-          saveToFirebaseWithOffline({ latestUpdate: { view: 'memo', text: `Dokumen baharu dimuat naik.` } });
-        } catch (error) { alert("RALAT: Gagal muat naik."); }
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-
-  const handleLayoutUpload = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = async (ev) => {
-        let customName = window.prompt("Nama Pelan:", file.name.split('.')[0]);
-        const newLayout = {
-          id: 'layout_' + Date.now(), url: ev.target.result,
-          name: customName || `Pelan_${Date.now()}`,
-          type: file.type.includes('pdf') ? 'pdf' : 'image',
-          uploadDate: new Date().toISOString()
-        };
-        try {
-          await setDoc(doc(db, "msr", "data_layout"), { layouts: [...layoutList, newLayout] });
-          saveToFirebaseWithOffline({ latestUpdate: { view: 'layout', text: `Pelan baharu ditambah.` } });
-        } catch (error) { alert("Gagal muat naik pelan."); }
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-
-  const handleDeleteLayout = async (idToDel) => {
-    if(window.confirm("Padam pelan ini?")) {
-      await setDoc(doc(db, "msr", "data_layout"), { layouts: layoutList.filter(l => l.id !== idToDel) });
-    }
-  };
-
-  const handleJadualFileUpload = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = async (ev) => {
-        await setDoc(doc(db, "msr", "data_jadual_file"), { fileData: ev.target.result, uploadDate: new Date().toISOString() });
-        saveToFirebaseWithOffline({ latestUpdate: { view: 'jadual', text: 'Tentatif Penuh dimuat naik.' } });
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-
-  const handlePenutupFileUpload = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = async (ev) => {
-        await setDoc(doc(db, "msr", "data_penutup_file"), { fileData: ev.target.result, uploadDate: new Date().toISOString() });
-        saveToFirebaseWithOffline({ latestUpdate: { view: 'penutup', text: 'Majlis Penutup penuh dimuat naik.' } });
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-
   // --- RENDERING ROUTER ---
   const renderView = () => {
     switch(currentView) {
@@ -398,14 +345,14 @@ export default function App() {
       )}
 
       <LoginModal 
-        showLogin={showLogin} 
-        setShowLogin={setShowLogin} 
-        loginForm={loginForm} 
-        setLoginForm={setLoginForm} 
-        handleLogin={handleLogin} 
-        isLockedOut={isLockedOut} 
-        showPassword={showPassword} 
-        setShowPassword={setShowPassword} 
+        showLogin={showLogin} setShowLogin={setShowLogin} loginForm={loginForm} setLoginForm={setLoginForm} handleLogin={handleLogin} isLockedOut={isLockedOut} showPassword={showPassword} setShowPassword={setShowPassword} 
+      />
+
+      {/* RENDER BANNER INSTALASI PWA ANDROID */}
+      <PwaInstallBanner 
+        show={showPwaBanner} 
+        onInstall={handleInstallPwaClick} 
+        onClose={() => setShowPwaBanner(false)} 
       />
     </div>
   );
