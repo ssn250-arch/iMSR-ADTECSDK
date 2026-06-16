@@ -279,13 +279,13 @@ export default function App() {
   const [jadualData, setJadualData] = useState([]);
   const [penutupData, setPenutupData] = useState([]);
   
-  const [layoutImage, setLayoutImage] = useState(null);
-  const [layoutDate, setLayoutDate] = useState(null);
+  // --- State Untuk Fail Pelan Daftar ---
+  const [layoutList, setLayoutList] = useState([]);
 
   const [activeJadualTab, setActiveJadualTab] = useState('');
   const [isScrolled, setIsScrolled] = useState(false);
 
-  // --- TAMBAHAN: State Untuk Fail Jadual & Penutup ---
+  // --- State Untuk Fail Jadual & Penutup ---
   const [jadualFile, setJadualFile] = useState(null);
   const [jadualFileDate, setJadualFileDate] = useState(null);
   const [penutupFile, setPenutupFile] = useState(null);
@@ -356,13 +356,20 @@ export default function App() {
 
     const layoutRef = doc(db, "msr", "data_layout");
     const unsubscribeLayout = onSnapshot(layoutRef, (docSnap) => {
-      if (docSnap.exists() && docSnap.data().layoutImage) {
-        setLayoutImage(docSnap.data().layoutImage);
-        setLayoutDate(docSnap.data().uploadDate || null);
-        localStorage.setItem('imsr_cached_layout', JSON.stringify({ layoutImage: docSnap.data().layoutImage, uploadDate: docSnap.data().uploadDate }));
+      if (docSnap.exists()) {
+        const d = docSnap.data();
+        if (d.layouts) {
+          setLayoutList(d.layouts);
+          localStorage.setItem('imsr_cached_layout', JSON.stringify(d.layouts));
+        } else if (d.layoutImage) {
+          const legacyLayout = [{ id: 'legacy_1', url: d.layoutImage, type: d.layoutImage.includes('pdf')?'pdf':'image', uploadDate: d.uploadDate, name: 'Pelan Pendaftaran' }];
+          setLayoutList(legacyLayout);
+          localStorage.setItem('imsr_cached_layout', JSON.stringify(legacyLayout));
+        } else {
+          setLayoutList([]);
+        }
       } else {
-        setLayoutImage(null);
-        setLayoutDate(null);
+        setLayoutList([]);
       }
       setTimeout(() => { setIsAppReady(true); }, 1500); 
     }, (error) => {
@@ -370,15 +377,12 @@ export default function App() {
       const cachedLayout = localStorage.getItem('imsr_cached_layout');
       if (cachedLayout) {
         try {
-          const layout = JSON.parse(cachedLayout);
-          setLayoutImage(layout.layoutImage);
-          setLayoutDate(layout.uploadDate);
+          setLayoutList(JSON.parse(cachedLayout));
         } catch(e) {}
       }
       setTimeout(() => { setIsAppReady(true); }, 1500);
     });
 
-    // --- TAMBAHAN: Ambil fail Jadual Penuh ---
     const jadualFileRef = doc(db, "msr", "data_jadual_file");
     const unsubscribeJadualFile = onSnapshot(jadualFileRef, (docSnap) => {
       if (docSnap.exists() && docSnap.data().fileData) {
@@ -390,7 +394,6 @@ export default function App() {
       }
     });
 
-    // --- TAMBAHAN: Ambil fail Penutup Penuh ---
     const penutupFileRef = doc(db, "msr", "data_penutup_file");
     const unsubscribePenutupFile = onSnapshot(penutupFileRef, (docSnap) => {
       if (docSnap.exists() && docSnap.data().fileData) {
@@ -614,6 +617,7 @@ export default function App() {
     }
   };
 
+  // --- Fungsi Upload Pelan Pendaftaran Berbilang ---
   const handleLayoutUpload = (e) => {
     const file = e.target.files[0];
     if (file && (file.type.startsWith('image/') || file.type === 'application/pdf')) {
@@ -622,15 +626,25 @@ export default function App() {
       }
       const reader = new FileReader();
       reader.onload = async (ev) => {
+        const fileType = file.type === 'application/pdf' ? 'pdf' : 'image';
+        let customName = window.prompt("Sila masukkan nama untuk pelan ini:", file.name.split('.')[0]);
+        if (!customName) customName = `Pelan_${Date.now()}`;
+        
+        const newLayout = {
+          id: 'layout_' + Date.now(),
+          url: ev.target.result,
+          name: customName,
+          type: fileType,
+          uploadDate: new Date().toISOString()
+        };
+        const updatedLayouts = [...layoutList, newLayout];
+
         try {
-          await setDoc(doc(db, "msr", "data_layout"), { 
-            layoutImage: ev.target.result,
-            uploadDate: new Date().toISOString()
-          });
-          saveToFirebaseWithOffline({ latestUpdate: { view: 'layout', text: 'Satu fail pelan pendaftaran dewan baharu telah dimuat naik.' } });
+          await setDoc(doc(db, "msr", "data_layout"), { layouts: updatedLayouts });
+          saveToFirebaseWithOffline({ latestUpdate: { view: 'layout', text: `Pelan baharu bertajuk '${customName}' telah ditambah.` } });
         } catch (error) {
           console.error(error);
-          alert("RALAT: Gagal memuat naik pelan. Saiz melebihi had (1MB). Sila kompres fail tersebut.");
+          alert("RALAT: Gagal memuat naik pelan. Sila pastikan fail kurang daripada 1MB.");
         }
       };
       reader.readAsDataURL(file);
@@ -639,7 +653,19 @@ export default function App() {
     }
   };
 
-  // --- TAMBAHAN: Fungsi Upload Jadual Penuh ---
+  const handleDeleteLayout = async (idToDel) => {
+    if(window.confirm("Adakah anda pasti mahu memadam pelan ini?")) {
+      const updatedLayouts = layoutList.filter(l => l.id !== idToDel);
+      try {
+        await setDoc(doc(db, "msr", "data_layout"), { layouts: updatedLayouts });
+        saveToFirebaseWithOffline({ latestUpdate: { view: 'layout', text: 'Satu dokumen pelan telah dipadam.' } });
+      } catch(err) {
+        console.error(err);
+        alert("Gagal memadam pelan.");
+      }
+    }
+  };
+
   const handleJadualFileUpload = (e) => {
     const file = e.target.files[0];
     if (file && (file.type.startsWith('image/') || file.type === 'application/pdf')) {
@@ -657,7 +683,6 @@ export default function App() {
     } else { alert("Muat naik format Imej atau PDF sahaja."); }
   };
 
-  // --- TAMBAHAN: Fungsi Upload Penutup Penuh ---
   const handlePenutupFileUpload = (e) => {
     const file = e.target.files[0];
     if (file && (file.type.startsWith('image/') || file.type === 'application/pdf')) {
@@ -1111,7 +1136,11 @@ export default function App() {
                           <>
                             <input 
                               value={ajk.peranan} 
-                              onChange={e => { const newAjk = [...ajkInduk]; newAjk[idx].peranan = e.target.value; setAjkInduk(newAjk); }} 
+                              onChange={e => { 
+                                const newAjk = [...ajkInduk]; 
+                                newAjk[idx].peranan = e.target.value; 
+                                setAjkInduk(newAjk); 
+                              }} 
                               onBlur={() => saveToFirebaseWithOffline({ ajkInduk, latestUpdate: { view: 'ajk', text: 'Senarai Jawatankuasa Induk MSR telah dikemas kini.' } })} 
                               className="border border-slate-200 dark:border-slate-700 p-2 rounded-lg text-xs w-full sm:w-1/3 bg-white dark:bg-slate-900 transition-colors font-bold uppercase focus:ring-2 focus:ring-emerald-500 outline-none" 
                               placeholder="Jawatan"
@@ -1212,11 +1241,26 @@ export default function App() {
                           <button onClick={() => { const newBiro = biroList.filter((_, i) => i !== idx); setBiroList(newBiro); saveToFirebaseWithOffline({ biroList: newBiro, latestUpdate: { view: 'ajk', text: 'Senarai Biro Pelaksana MSR telah dikemas kini.' } }); }} className="absolute top-4 right-4 text-red-500 bg-red-50 hover:bg-red-100 dark:bg-red-900/20 p-1.5 rounded-lg transition-colors" aria-label="Padam biro"><Trash2 size={16}/></button>
                           <div>
                             <label className="text-[9px] font-bold text-slate-500 uppercase tracking-widest ml-1 mb-1 block">Nama Biro</label>
-                            <input value={biro.nama} onChange={e => { const newBiro = [...biroList]; newBiro[idx].nama = e.target.value; setBiroList(newBiro); }} onBlur={() => saveToFirebaseWithOffline({ biroList, latestUpdate: { view: 'ajk', text: 'Senarai Biro Pelaksana MSR telah dikemas kini.' } })} className="border border-slate-200 dark:border-slate-700 p-2.5 rounded-lg text-sm w-[85%] font-bold text-slate-800 dark:text-white bg-white dark:bg-slate-900 transition-colors focus:ring-2 focus:ring-blue-500 outline-none" placeholder="Masukkan nama biro..." aria-label="Nama biro" />
+                            <input 
+                              value={biro.nama} 
+                              onChange={e => { const newBiro = [...biroList]; newBiro[idx].nama = e.target.value; setBiroList(newBiro); }} 
+                              onBlur={() => saveToFirebaseWithOffline({ biroList, latestUpdate: { view: 'ajk', text: 'Senarai Biro Pelaksana MSR telah dikemas kini.' } })} 
+                              className="border border-slate-200 dark:border-slate-700 p-2.5 rounded-lg text-sm w-[85%] font-bold text-slate-800 dark:text-white bg-white dark:bg-slate-900 transition-colors focus:ring-2 focus:ring-blue-500 outline-none" 
+                              placeholder="Masukkan nama biro..." 
+                              aria-label="Nama biro" 
+                            />
                           </div>
                           <div>
                             <label className="text-[9px] font-bold text-slate-500 uppercase tracking-widest ml-1 mb-1 block">Ketua Biro</label>
-                            <input list="senarai-staf" value={biro.ketua} onChange={e => { const newBiro = [...biroList]; newBiro[idx].ketua = e.target.value; setBiroList(newBiro); }} onBlur={() => saveToFirebaseWithOffline({ biroList, latestUpdate: { view: 'ajk', text: 'Senarai Biro Pelaksana MSR telah dikemas kini.' } })} className="border border-slate-200 dark:border-slate-700 p-2.5 rounded-lg text-xs w-full font-bold bg-white dark:bg-slate-900 transition-colors focus:ring-2 focus:ring-blue-500 outline-none" placeholder="Cari / Masukkan Nama Ketua Biro" aria-label="Ketua biro" />
+                            <input 
+                              list="senarai-staf" 
+                              value={biro.ketua} 
+                              onChange={e => { const newBiro = [...biroList]; newBiro[idx].ketua = e.target.value; setBiroList(newBiro); }} 
+                              onBlur={() => saveToFirebaseWithOffline({ biroList, latestUpdate: { view: 'ajk', text: 'Senarai Biro Pelaksana MSR telah dikemas kini.' } })} 
+                              className="border border-slate-200 dark:border-slate-700 p-2.5 rounded-lg text-xs w-full font-bold bg-white dark:bg-slate-900 transition-colors focus:ring-2 focus:ring-blue-500 outline-none" 
+                              placeholder="Cari / Masukkan Nama Ketua Biro" 
+                              aria-label="Ketua biro" 
+                            />
                           </div>
                           <div className="bg-white dark:bg-slate-800 p-3 rounded-xl mt-3 border border-slate-100 dark:border-slate-700">
                             <div className="flex justify-between items-center mb-2">
@@ -1227,7 +1271,15 @@ export default function App() {
                               {biro.ahli && biro.ahli.map((ahli, aIdx) => (
                                 <div key={aIdx} className="flex gap-2 items-center">
                                   <span className="text-[10px] font-bold text-slate-400 w-3">{aIdx + 1}.</span>
-                                  <input list="senarai-staf" value={ahli} onChange={e => { const newBiro = [...biroList]; newBiro[idx].ahli[aIdx] = e.target.value; setBiroList(newBiro); }} onBlur={() => saveToFirebaseWithOffline({ biroList, latestUpdate: { view: 'ajk', text: 'Senarai Biro Pelaksana MSR telah dikemas kini.' } })} className="border border-slate-200 dark:border-slate-700 p-2 rounded-md text-xs w-full bg-slate-50 dark:bg-slate-900 transition-colors focus:ring-2 focus:ring-blue-500 outline-none" placeholder="Cari / Masukkan Nama Ahli" aria-label="Nama ahli" />
+                                  <input 
+                                    list="senarai-staf" 
+                                    value={ahli} 
+                                    onChange={e => { const newBiro = [...biroList]; newBiro[idx].ahli[aIdx] = e.target.value; setBiroList(newBiro); }} 
+                                    onBlur={() => saveToFirebaseWithOffline({ biroList, latestUpdate: { view: 'ajk', text: 'Senarai Biro Pelaksana MSR telah dikemas kini.' } })} 
+                                    className="border border-slate-200 dark:border-slate-700 p-2 rounded-md text-xs w-full bg-slate-50 dark:bg-slate-900 transition-colors focus:ring-2 focus:ring-blue-500 outline-none" 
+                                    placeholder="Cari / Masukkan Nama Ahli" 
+                                    aria-label="Nama ahli" 
+                                  />
                                   <button onClick={() => { const newBiro = [...biroList]; newBiro[idx].ahli = newBiro[idx].ahli.filter((_, i) => i !== aIdx); setBiroList(newBiro); saveToFirebaseWithOffline({ biroList: newBiro, latestUpdate: { view: 'ajk', text: 'Senarai Biro Pelaksana MSR telah dikemas kini.' } }); }} className="text-red-500 bg-red-50 hover:bg-red-100 dark:bg-red-900/20 p-2 rounded-md transition-colors" aria-label="Padam ahli"><X size={14}/></button>
                                 </div>
                               ))}
@@ -1285,16 +1337,16 @@ export default function App() {
                            <FileText size={48} className="text-orange-500" />
                          ) : (
                            <div 
-                             className="w-full relative cursor-pointer group"
+                             className="w-full relative cursor-pointer group overflow-hidden rounded-xl h-48 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 flex items-center justify-center"
                              onClick={() => setViewingMemo({ url: jadualFile, name: "Tentatif_Penuh", type: "image", uploadDate: jadualFileDate })}
                            >
                              <img 
                                src={jadualFile} 
                                alt="Thumbnail Tentatif" 
-                               className="w-full h-40 object-cover rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800" 
+                               className="w-full h-full object-cover group-active:scale-105 transition-transform duration-300" 
                              />
-                             <div className="absolute inset-0 bg-black/40 rounded-xl flex items-center justify-center opacity-0 group-active:opacity-100 transition-opacity">
-                                <span className="text-white text-xs font-bold flex items-center gap-1"><Eye size={16}/> Lihat</span>
+                             <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-active:opacity-100 transition-opacity">
+                                <span className="text-white text-xs font-bold flex items-center gap-1"><Eye size={16}/> Lihat Penuh</span>
                              </div>
                            </div>
                          )}
@@ -1466,16 +1518,16 @@ export default function App() {
                            <FileText size={48} className="text-rose-500" />
                          ) : (
                            <div 
-                             className="w-full relative cursor-pointer group"
+                             className="w-full relative cursor-pointer group overflow-hidden rounded-xl h-48 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 flex items-center justify-center"
                              onClick={() => setViewingMemo({ url: penutupFile, name: "Majlis_Penutup", type: "image", uploadDate: penutupFileDate })}
                            >
                              <img 
                                src={penutupFile} 
                                alt="Thumbnail Majlis Penutup" 
-                               className="w-full h-40 object-cover rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800" 
+                               className="w-full h-full object-cover group-active:scale-105 transition-transform duration-300" 
                              />
-                             <div className="absolute inset-0 bg-black/40 rounded-xl flex items-center justify-center opacity-0 group-active:opacity-100 transition-opacity">
-                                <span className="text-white text-xs font-bold flex items-center gap-1"><Eye size={16}/> Lihat</span>
+                             <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-active:opacity-100 transition-opacity">
+                                <span className="text-white text-xs font-bold flex items-center gap-1"><Eye size={16}/> Lihat Penuh</span>
                              </div>
                            </div>
                          )}
@@ -1578,7 +1630,7 @@ export default function App() {
               </div>
             )}
 
-            {/* VIEW: LAYOUT */}
+            {/* VIEW: LAYOUT (GALERI PELAN) */}
             {currentView === 'layout' && (
               <div className="p-4 max-w-4xl mx-auto pb-32 text-center">
                 <div className="bg-white dark:bg-slate-800 rounded-[2rem] border border-slate-200 dark:border-slate-700 p-6 md:p-10 shadow-xl text-center">
@@ -1588,8 +1640,8 @@ export default function App() {
                   <h3 className="text-2xl md:text-3xl font-black text-slate-800 dark:text-white mb-2 tracking-tight">Pelan Pendaftaran</h3>
                   <p className="text-slate-500 dark:text-slate-400 mb-8 text-sm md:text-base font-medium">Panduan susun atur dewan bagi melancarkan pergerakan.</p>
                   
-                  {isAdmin && !layoutImage && (
-                    <div className="mb-5 p-6 border-2 border-dashed border-purple-200 dark:border-purple-800/50 rounded-2xl bg-purple-50/50 dark:bg-purple-900/10 hover:bg-purple-50 dark:hover:bg-purple-900/20 transition-colors">
+                  {isAdmin && (
+                    <div className="mb-6 p-6 border-2 border-dashed border-purple-200 dark:border-purple-800/50 rounded-2xl bg-purple-50/50 dark:bg-purple-900/10 hover:bg-purple-50 dark:hover:bg-purple-900/20 transition-colors">
                       <label className="cursor-pointer flex flex-col items-center">
                         <UploadCloud size={32} className="text-purple-500 mb-2 animate-pulse" />
                         <span className="text-sm font-bold text-slate-700 dark:text-slate-200">Muat Naik Fail Pelan Baharu</span>
@@ -1599,149 +1651,61 @@ export default function App() {
                     </div>
                   )}
 
-                  <div className={`relative ${layoutImage ? '' : 'border-2 border-dashed border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 rounded-[1.5rem] min-h-[250px] flex items-center justify-center p-4'}`}>
-                    {layoutImage ? (
-                      <div className="w-full flex flex-col gap-5">
-                        
-                        {/* MOBILE VIEW */}
-                        <div className="block sm:hidden w-full bg-slate-50 dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm flex flex-col items-center gap-4">
-                           {/* --- KEMAS KINI: Papar imej sebenar jika format Imej, tunjuk ikon jika PDF --- */}
-                           {layoutImage.includes('application/pdf') ? (
-                             <FileText size={48} className="text-purple-500" />
-                           ) : (
-                             <div 
-                               className="w-full relative cursor-pointer group"
-                               onClick={() => setViewingMemo({ url: layoutImage, name: "Pelan_Pendaftaran", type: "image", uploadDate: layoutDate })}
-                             >
-                               <img 
-                                 src={layoutImage} 
-                                 alt="Thumbnail Pelan Pendaftaran" 
-                                 className="w-full h-40 object-cover rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800" 
-                               />
-                               <div className="absolute inset-0 bg-black/40 rounded-xl flex items-center justify-center opacity-0 group-active:opacity-100 transition-opacity">
-                                  <span className="text-white text-xs font-bold flex items-center gap-1"><Eye size={16}/> Lihat</span>
-                               </div>
-                             </div>
-                           )}
-                           {/* ------------------------------------------------------------------------- */}
-
-                           <div className="space-y-1 text-center w-full mt-2">
-                             <p className="text-sm font-black text-slate-800 dark:text-slate-200">Dokumen Pelan Pendaftaran</p>
-                             <div className="flex flex-col items-center gap-1.5">
-                               <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">{layoutImage.includes('application/pdf') ? 'Format PDF' : 'Format Imej'}</p>
-                               {layoutDate && <p className="text-[9px] font-bold text-slate-400"><Clock size={10} className="inline mr-1"/>{formatDateTime(layoutDate)}</p>}
-                             </div>
-                           </div>
-
-                           {/* Kumpulan Butang Lihat & Muat Turun */}
-                           <div className="flex w-full gap-2 mt-1">
-                             <button 
-                               onClick={() => setViewingMemo({ url: layoutImage, name: "Pelan_Pendaftaran", type: layoutImage.includes('application/pdf') ? 'pdf' : 'image', uploadDate: layoutDate })}
-                               className="flex-1 inline-flex items-center justify-center gap-2 text-xs font-bold text-blue-700 bg-blue-100 hover:bg-blue-200 dark:bg-blue-900/40 dark:text-blue-300 dark:hover:bg-blue-800/60 px-2 py-3 rounded-xl shadow-sm transition-all active:scale-95"
-                               aria-label="Lihat pelan pendaftaran"
-                             >
-                               <ExternalLink size={16} /> Lihat
-                             </button>
-                             
-                             <button 
-                               onClick={() => handleDownloadBlob(layoutImage, layoutImage.includes('application/pdf') ? 'Pelan_Pendaftaran.pdf' : 'Pelan_Pendaftaran.jpg')}
-                               className="flex-[2] inline-flex items-center justify-center gap-2 text-xs font-bold text-white bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 px-2 py-3 rounded-xl shadow-md transition-all active:scale-95"
-                               aria-label="Muat turun pelan pendaftaran"
-                             >
-                               <Download size={16} /> Muat Turun
-                             </button>
-                           </div>
-                           
-                           {isAdmin && (
-                            <button 
-                              onClick={async () => { 
-                                if(window.confirm("Padam pelan ini?")){ 
-                                   setLayoutImage(null); 
-                                   try {
-                                     await setDoc(doc(db, "msr", "data_layout"), { layoutImage: null, uploadDate: null }); 
-                                     saveToFirebaseWithOffline({ latestUpdate: { view: 'layout', text: 'Dokumen pelan pendaftaran dewan telah dipadam.' } });
-                                   } catch(err){}
-                                } 
-                              }}
-                              className="w-full inline-flex items-center justify-center gap-2 text-xs font-bold text-red-600 bg-red-50 hover:bg-red-100 dark:bg-red-900/20 px-4 py-3 rounded-xl transition-all active:scale-95"
-                              aria-label="Padam pelan"
-                            >
-                              <Trash2 size={16} /> Padam Rekod Pelan
-                            </button>
-                           )}
-                        </div>
-
-                        {/* DESKTOP/TABLET VIEW: PREVIEW + BUTANG */}
-                        <div className="hidden sm:flex flex-col gap-4">
-                          <div className="border-[3px] border-slate-100 dark:border-slate-700 rounded-2xl overflow-hidden bg-white dark:bg-slate-900 shadow-lg relative group">
-                            {layoutImage.includes('application/pdf') ? (
-                              <iframe src={layoutImage} className="w-full h-[500px] md:h-[600px]" title="Pelan Pendaftaran" />
-                            ) : (
-                              <div 
-                                className="p-3 bg-slate-100 dark:bg-slate-900/50 cursor-pointer relative group/img"
-                                onClick={() => setViewingMemo({ url: layoutImage, name: "Pelan_Pendaftaran", type: "image", uploadDate: layoutDate })}
-                                title="Klik untuk besarkan imej"
-                              >
-                                 <img src={layoutImage} alt="Pelan Pendaftaran" className="w-full h-auto max-h-[600px] object-contain rounded-xl shadow-sm bg-white dark:bg-slate-800 transition-transform duration-300 group-hover/img:scale-[1.01]" />
-                                 
-                                 {/* Overlay Hover Effect untuk beritahu pengguna boleh klik */}
-                                 <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover/img:opacity-100 transition-opacity duration-300 pointer-events-none z-10">
-                                    <div className="bg-black/60 backdrop-blur-sm text-white px-5 py-2.5 rounded-xl font-bold flex items-center gap-2 shadow-xl transform scale-95 group-hover/img:scale-100 transition-all">
-                                       <Eye size={20} /> Klik untuk Besarkan
-                                    </div>
-                                 </div>
+                  {layoutList.length === 0 ? (
+                    <div className="border-2 border-dashed border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 rounded-[1.5rem] min-h-[200px] flex flex-col items-center justify-center p-4">
+                      <ImageIcon size={48} className="text-slate-300 dark:text-slate-600 mb-3" />
+                      <p className="text-sm font-bold text-slate-500">Tiada fail pelan dimuat naik.</p>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 md:gap-5 mt-6 w-full text-left">
+                      {layoutList.map(layout => (
+                        <div key={layout.id} className="bg-slate-50 dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm flex flex-col group hover:shadow-md transition-all">
+                           {/* Thumbnail */}
+                           <div 
+                              className="w-full relative cursor-pointer overflow-hidden rounded-xl h-48 mb-4 border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-800 flex items-center justify-center"
+                              onClick={() => setViewingMemo({ url: layout.url, name: layout.name, type: layout.type, uploadDate: layout.uploadDate })}
+                           >
+                              {layout.type === 'pdf' ? (
+                                <FileText size={64} className="text-purple-500 opacity-80 group-hover:scale-110 transition-transform duration-300" />
+                              ) : (
+                                <img src={layout.url} alt={layout.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                              )}
+                              <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                                 <span className="text-white text-sm font-bold flex items-center gap-2"><Eye size={18}/> Lihat Penuh</span>
                               </div>
-                            )}
-                            
-                            {isAdmin && (
-                              <label className="absolute inset-0 bg-slate-900/80 opacity-0 group-hover:opacity-100 flex flex-col items-center justify-center cursor-pointer transition-opacity backdrop-blur-sm duration-300 z-10">
-                                <UploadCloud size={40} className="text-white mb-3 animate-bounce"/>
-                                <span className="bg-purple-600 text-white text-xs font-bold px-5 py-2.5 rounded-xl shadow-xl hover:scale-105 transition-transform">Gantikan Fail Pelan</span>
-                                <input type="file" accept="application/pdf, image/*" className="hidden" onChange={handleLayoutUpload} aria-label="Gantikan pelan" />
-                              </label>
-                            )}
-                          </div>
+                           </div>
 
-                          <div className="flex justify-between items-center gap-2 bg-slate-50 dark:bg-slate-900/50 p-3 rounded-2xl border border-slate-200 dark:border-slate-700">
-                            <span className="text-[10px] font-bold text-slate-500 ml-2">
-                              {layoutDate ? `Dimuat naik pada: ${formatDateTime(layoutDate)}` : ''}
-                            </span>
-                            <div className="flex gap-2">
+                           {/* Info */}
+                           <div className="flex-1 px-1">
+                              <p className="text-sm font-bold text-slate-800 dark:text-slate-200 line-clamp-1" title={layout.name}>{layout.name}</p>
+                              <div className="flex items-center gap-2 mt-1.5">
+                                <span className="text-[9px] font-black text-purple-600 bg-purple-100 dark:text-purple-300 dark:bg-purple-900/40 px-1.5 py-0.5 rounded uppercase">{layout.type === 'pdf' ? 'PDF' : 'IMEJ'}</span>
+                                {layout.uploadDate && <span className="text-[9px] font-bold text-slate-500"><Clock size={10} className="inline mr-1"/>{formatDateTime(layout.uploadDate)}</span>}
+                              </div>
+                           </div>
+
+                           {/* Buttons */}
+                           <div className="flex w-full gap-2 mt-4 pt-3 border-t border-slate-200 dark:border-slate-700/50">
                               <button 
-                                onClick={() => handleDownloadBlob(layoutImage, layoutImage.includes('application/pdf') ? 'Pelan_Pendaftaran.pdf' : 'Pelan_Pendaftaran.jpg')}
-                                className="inline-flex items-center gap-1.5 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 px-5 py-2.5 rounded-lg shadow-sm transition-all active:scale-95"
-                                aria-label="Muat turun pelan"
+                                onClick={() => setViewingMemo({ url: layout.url, name: layout.name, type: layout.type, uploadDate: layout.uploadDate })}
+                                className="flex-1 inline-flex items-center justify-center gap-1.5 text-[11px] font-bold text-purple-700 bg-purple-100 hover:bg-purple-200 dark:bg-purple-900/40 dark:text-purple-300 dark:hover:bg-purple-800/60 px-2 py-2.5 rounded-xl transition-all active:scale-95"
                               >
-                                <Download size={16} /> Muat Turun Fail
+                                <ExternalLink size={14}/> Lihat
+                              </button>
+                              <button 
+                                onClick={() => handleDownloadBlob(layout.url, layout.name)}
+                                className="flex-[1.5] inline-flex items-center justify-center gap-1.5 text-[11px] font-bold text-white bg-emerald-600 hover:bg-emerald-700 px-2 py-2.5 rounded-xl shadow-sm transition-all active:scale-95"
+                              >
+                                <Download size={14}/> Muat Turun
                               </button>
                               {isAdmin && (
-                                <button 
-                                  onClick={async () => { 
-                                   if(window.confirm("Padam pelan ini?")){ 
-                                      setLayoutImage(null);
-                                      try {
-                                        await setDoc(doc(db, "msr", "data_layout"), { layoutImage: null, uploadDate: null });
-                                        saveToFirebaseWithOffline({ latestUpdate: { view: 'layout', text: 'Dokumen pelan pendaftaran dewan telah dipadam.' } });
-                                      } catch(err){}
-                                   } 
-                                  }}
-                                  className="inline-flex items-center gap-1.5 text-xs font-bold text-red-600 bg-red-50 hover:bg-red-100 dark:bg-red-900/20 px-5 py-2.5 rounded-lg transition-all active:scale-95"
-                                  aria-label="Padam pelan"
-                                >
-                                  <Trash2 size={16} /> Padam
-                                </button>
+                                 <button onClick={() => handleDeleteLayout(layout.id)} className="bg-red-50 text-red-600 hover:bg-red-100 dark:bg-red-900/20 p-2.5 rounded-xl transition-colors active:scale-90" aria-label="Padam pelan"><Trash2 size={16}/></button>
                               )}
-                            </div>
-                          </div>
+                           </div>
                         </div>
-                      </div>
-                    ) : (
-                      <div className="text-slate-400 flex flex-col items-center gap-2">
-                        <ImageIcon size={48} className="opacity-50" />
-                        <p className="text-sm font-bold text-slate-500">Tiada fail pelan dimuat naik.</p>
-                      </div>
-                    )}
-                  </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
             )}
