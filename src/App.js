@@ -13,7 +13,7 @@ import FabMenu from './components/layout/FabMenu';
 import ToastNotification from './components/ui/ToastNotification';
 import ImageModal from './components/ui/ImageModal';
 import SplashScreen from './components/ui/SplashScreen';
-import LoginModal from './components/ui/LoginModal'; // <-- Ditambah baru
+import LoginModal from './components/ui/LoginModal';
 
 // --- IMPORT KOMPONEN VIEWS (PAPARAN) ---
 import HomeView from './components/views/HomeView';
@@ -73,7 +73,7 @@ export default function App() {
 
   // --- DATA STATES ---
   const [lastUpdated, setLastUpdated] = useState(null);
-  const [announcement, setAnnouncement] = useState('');
+  const [announcements, setAnnouncements] = useState([]); // Diubah menjadi Array untuk Multi-Hebahan
   const [sesiKemasukan, setSesiKemasukan] = useState({ sesi: '2', tahun: '2026' });
   const [memoText, setMemoText] = useState('');
   const [memoList, setMemoList] = useState([]); 
@@ -154,7 +154,7 @@ export default function App() {
       try {
         const data = JSON.parse(cachedData);
         if (data.lastUpdated) setLastUpdated(data.lastUpdated);
-        if (data.announcement !== undefined) setAnnouncement(data.announcement);
+        if (data.announcements) setAnnouncements(data.announcements);
         if (data.sesiKemasukan) setSesiKemasukan(data.sesiKemasukan);
         if (data.memoText !== undefined) setMemoText(data.memoText);
         if (data.ajkInduk) setAjkInduk(data.ajkInduk);
@@ -173,7 +173,14 @@ export default function App() {
         localStorage.setItem('imsr_cached_data', JSON.stringify(data));
         if (data.lastUpdated) setLastUpdated(data.lastUpdated);
         if (data.latestUpdate) setLatestUpdateInfo(data.latestUpdate);
-        if (data.announcement !== undefined) setAnnouncement(data.announcement);
+        
+        // Mengesan data lama (string) atau data baru (array) untuk mengelakkan ralat crash
+        if (data.announcements !== undefined) {
+          setAnnouncements(data.announcements);
+        } else if (data.announcement !== undefined) {
+          setAnnouncements([{ id: 'legacy_1', text: data.announcement }]);
+        }
+
         if (data.sesiKemasukan) setSesiKemasukan(data.sesiKemasukan);
         if (data.memoText !== undefined) setMemoText(data.memoText);
         if (data.ajkInduk) setAjkInduk(data.ajkInduk);
@@ -328,7 +335,7 @@ export default function App() {
   const renderView = () => {
     switch(currentView) {
       case 'home':
-        return <HomeView isAdmin={isAdmin} announcement={announcement} setAnnouncement={setAnnouncement} saveToFirebaseWithOffline={saveToFirebaseWithOffline} sesiKemasukan={sesiKemasukan} setSesiKemasukan={setSesiKemasukan} navigateTo={navigateTo} />;
+        return <HomeView isAdmin={isAdmin} announcements={announcements} setAnnouncements={setAnnouncements} saveToFirebaseWithOffline={saveToFirebaseWithOffline} sesiKemasukan={sesiKemasukan} setSesiKemasukan={setSesiKemasukan} navigateTo={navigateTo} />;
       case 'memo':
         return <MemoView isAdmin={isAdmin} memoList={memoList} handleDocumentUpload={handleDocumentUpload} setViewingMemo={setViewingMemo} handleDownloadBlob={handleDownloadBlob} memoText={memoText} setMemoText={setMemoText} saveToFirebaseWithOffline={saveToFirebaseWithOffline} />;
       case 'ajk':
@@ -386,12 +393,10 @@ export default function App() {
         <FabMenu showFabMenu={showFabMenu} setShowFabMenu={setShowFabMenu} isAdmin={isAdmin} setIsAdmin={setIsAdmin} toggleTheme={toggleTheme} isDarkMode={isDarkMode} setShowLogin={setShowLogin} />
       </div>
 
-      {/* TENTUKAN POPUP MODALS DI BAWAH */}
       {viewingMemo && (
         <ImageModal viewingMemo={viewingMemo} setViewingMemo={setViewingMemo} blobUrl={blobUrl} handleDownloadBlob={handleDownloadBlob} />
       )}
 
-      {/* LOG IN MODAL YANG TERTINGGAL DAH DILETAK SEMULA KAT SINI */}
       <LoginModal 
         showLogin={showLogin} 
         setShowLogin={setShowLogin} 
