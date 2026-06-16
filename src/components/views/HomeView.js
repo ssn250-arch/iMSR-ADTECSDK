@@ -4,18 +4,60 @@ import NetworkAnimation from '../ui/NetworkAnimation';
 import LiveClock from '../ui/LiveClock';
 import { formatTarikh } from '../../utils/helpers';
 
+// Skema Warna Baharu - Lebih Bold, Padat, dan Bernyawa (Menghilangkan kesan kosong)
 const cardStyles = {
-  blue: { iconText: 'text-blue-600 dark:text-blue-400', iconBorder: 'border-blue-200 dark:border-blue-500/20', glow: 'group-hover:shadow-[0_8px_30px_rgba(59,130,246,0.15)] dark:group-hover:shadow-[0_8px_30px_rgba(59,130,246,0.2)]', topLine: 'from-transparent via-blue-500 to-transparent', hoverBg: 'group-hover:bg-blue-50/50 dark:group-hover:bg-blue-900/10' },
-  emerald: { iconText: 'text-emerald-600 dark:text-emerald-400', iconBorder: 'border-emerald-200 dark:border-emerald-500/20', glow: 'group-hover:shadow-[0_8px_30px_rgba(16,185,129,0.15)] dark:group-hover:shadow-[0_8px_30px_rgba(16,185,129,0.2)]', topLine: 'from-transparent via-emerald-500 to-transparent', hoverBg: 'group-hover:bg-emerald-50/50 dark:group-hover:bg-emerald-900/10' },
-  cyan: { iconText: 'text-cyan-600 dark:text-cyan-400', iconBorder: 'border-cyan-200 dark:border-cyan-500/20', glow: 'group-hover:shadow-[0_8px_30px_rgba(6,182,212,0.15)] dark:group-hover:shadow-[0_8px_30px_rgba(6,182,212,0.2)]', topLine: 'from-transparent via-cyan-500 to-transparent', hoverBg: 'group-hover:bg-cyan-50/50 dark:group-hover:bg-cyan-900/10' },
-  indigo: { iconText: 'text-indigo-600 dark:text-indigo-400', iconBorder: 'border-indigo-200 dark:border-indigo-500/20', glow: 'group-hover:shadow-[0_8px_30px_rgba(99,102,241,0.15)] dark:group-hover:shadow-[0_8px_30px_rgba(99,102,241,0.2)]', topLine: 'from-transparent via-indigo-500 to-transparent', hoverBg: 'group-hover:bg-indigo-50/50 dark:group-hover:bg-indigo-900/10' },
-  sky: { iconText: 'text-sky-600 dark:text-sky-400', iconBorder: 'border-sky-200 dark:border-sky-500/20', glow: 'group-hover:shadow-[0_8px_30px_rgba(14,165,233,0.15)] dark:group-hover:shadow-[0_8px_30px_rgba(14,165,233,0.2)]', topLine: 'from-transparent via-sky-500 to-transparent', hoverBg: 'group-hover:bg-sky-50/50 dark:group-hover:bg-sky-900/10' },
-  violet: { iconText: 'text-violet-600 dark:text-violet-400', iconBorder: 'border-violet-200 dark:border-violet-500/20', glow: 'group-hover:shadow-[0_8px_30px_rgba(139,92,246,0.15)] dark:group-hover:shadow-[0_8px_30px_rgba(139,92,246,0.2)]', topLine: 'from-transparent via-violet-500 to-transparent', hoverBg: 'group-hover:bg-violet-50/50 dark:group-hover:bg-violet-900/10' }
+  blue: { 
+    iconBg: 'bg-blue-50 dark:bg-blue-950/40', 
+    iconText: 'text-blue-600 dark:text-blue-400', 
+    iconBorder: 'border-blue-200/60 dark:border-blue-500/30', 
+    glow: 'hover:border-blue-400 dark:hover:border-blue-500/50 hover:shadow-[0_12px_40px_rgba(59,130,246,0.15)]', 
+    badge: 'bg-blue-500/10 text-blue-600 dark:text-blue-400',
+    watermark: 'text-blue-500/[0.04] dark:text-blue-400/[0.03]'
+  },
+  emerald: { 
+    iconBg: 'bg-emerald-50 dark:bg-emerald-950/40', 
+    iconText: 'text-emerald-600 dark:text-emerald-400', 
+    iconBorder: 'border-emerald-200/60 dark:border-emerald-500/30', 
+    glow: 'hover:border-emerald-400 dark:hover:border-emerald-500/50 hover:shadow-[0_12px_40px_rgba(16,185,129,0.15)]', 
+    badge: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400',
+    watermark: 'text-emerald-500/[0.04] dark:text-emerald-400/[0.03]'
+  },
+  cyan: { 
+    iconBg: 'bg-cyan-50 dark:bg-cyan-950/40', 
+    iconText: 'text-cyan-600 dark:text-cyan-400', 
+    iconBorder: 'border-cyan-200/60 dark:border-cyan-500/30', 
+    glow: 'hover:border-cyan-400 dark:hover:border-cyan-500/50 hover:shadow-[0_12px_40px_rgba(6,182,212,0.15)]', 
+    badge: 'bg-cyan-500/10 text-cyan-600 dark:text-cyan-400',
+    watermark: 'text-cyan-500/[0.04] dark:text-cyan-400/[0.03]'
+  },
+  indigo: { 
+    iconBg: 'bg-indigo-50 dark:bg-indigo-950/40', 
+    iconText: 'text-indigo-600 dark:text-indigo-400', 
+    iconBorder: 'border-indigo-200/60 dark:border-indigo-500/30', 
+    glow: 'hover:border-indigo-400 dark:hover:border-indigo-500/50 hover:shadow-[0_12px_40px_rgba(99,102,241,0.15)]', 
+    badge: 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400',
+    watermark: 'text-indigo-500/[0.04] dark:text-indigo-400/[0.03]'
+  },
+  sky: { 
+    iconBg: 'bg-sky-50 dark:bg-sky-950/40', 
+    iconText: 'text-sky-600 dark:text-sky-400', 
+    iconBorder: 'border-sky-200/60 dark:border-sky-500/30', 
+    glow: 'hover:border-sky-400 dark:hover:border-sky-500/50 hover:shadow-[0_12px_40px_rgba(14,165,233,0.15)]', 
+    badge: 'bg-sky-500/10 text-sky-600 dark:text-sky-400',
+    watermark: 'text-sky-500/[0.04] dark:text-sky-400/[0.03]'
+  },
+  violet: { 
+    iconBg: 'bg-violet-50 dark:bg-violet-950/40', 
+    iconText: 'text-violet-600 dark:text-violet-400', 
+    iconBorder: 'border-violet-200/60 dark:border-violet-500/30', 
+    glow: 'hover:border-violet-400 dark:hover:border-violet-500/50 hover:shadow-[0_12px_40px_rgba(139,92,246,0.15)]', 
+    badge: 'bg-violet-500/10 text-violet-600 dark:text-violet-400',
+    watermark: 'text-violet-500/[0.04] dark:text-violet-400/[0.03]'
+  }
 };
 
 export default function HomeView({ isAdmin, announcements, setAnnouncements, saveToFirebaseWithOffline, sesiKemasukan, setSesiKemasukan, navigateTo }) {
   
-  // Satukan semua ayat array pengumuman menjadi satu baris teks panjang (Dipisahkan oleh tanda •)
   const compiledText = announcements && announcements.length > 0
     ? announcements.map(a => a.text.trim()).filter(Boolean).join("   •   ")
     : "Selamat Datang ke Portal iMSR ADTEC JTM Kampus Sandakan. Sila rujuk dokumen jadual dan pelan pendaftaran.";
@@ -23,7 +65,7 @@ export default function HomeView({ isAdmin, announcements, setAnnouncements, sav
   return (
     <div className="px-4 lg:px-8 max-w-6xl mx-auto pb-32 pt-4">
       
-      {/* Pengawal Kelajuan Yang Dioptimumkan (Anti-Cutoff & Anti-Slow) */}
+      {/* Pengawal Kelajuan Marquee Infiniti */}
       <style>{`
         @keyframes seamlessMarquee {
           0% { transform: translate3d(0, 0, 0); }
@@ -32,27 +74,12 @@ export default function HomeView({ isAdmin, announcements, setAnnouncements, sav
         .tech-marquee-track {
           display: flex;
           width: max-content;
-          animation: seamlessMarquee 14s linear infinite; /* Mobile diturunkan ke 14s (Just Nice) */
+          animation: seamlessMarquee 14s linear infinite;
           will-change: transform;
         }
-        
-        /* Skrin Tablet */
-        @media (min-width: 768px) {
-          .tech-marquee-track {
-            animation-duration: 20s; 
-          }
-        }
-        
-        /* Skrin Desktop */
-        @media (min-width: 1024px) {
-          .tech-marquee-track {
-            animation-duration: 25s;
-          }
-        }
-
-        .tech-marquee-track:hover {
-          animation-play-state: paused;
-        }
+        @media (min-width: 768px) { .tech-marquee-track { animation-duration: 20s; } }
+        @media (min-width: 1024px) { .tech-marquee-track { animation-duration: 25s; } }
+        .tech-marquee-track:hover { animation-play-state: paused; }
       `}</style>
 
       {/* HERO SECTION TECH THEME */}
@@ -64,58 +91,26 @@ export default function HomeView({ isAdmin, announcements, setAnnouncements, sav
         <div className="relative z-20 px-6 py-8 md:px-12 md:py-16 flex flex-col lg:flex-row items-center justify-between gap-8 md:gap-10">
           <div className="w-full lg:w-3/5 space-y-5 text-center lg:text-left">
             
-            {/* BOARD INFO KILAT SEAMLESS COMFORTABLE SPEED */}
+            {/* BOARD INFO KILAT */}
             <div className={`flex ${isAdmin ? 'flex-col items-start gap-4' : 'items-center gap-3'} px-4 py-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 backdrop-blur-md text-amber-400 text-xs md:text-sm font-semibold w-full overflow-hidden shadow-inner`}>
-              
               <span className="flex items-center gap-1.5 bg-amber-500 text-slate-950 px-2 py-0.5 rounded-md text-[10px] font-black tracking-wider shrink-0 uppercase relative z-10">
                 <Bell size={12} className="shrink-0 animate-bounce" />
-                INFO {isAdmin && `(${announcements.length})`}
+                INFO KILAT {isAdmin && `(${announcements.length})`}
               </span>
               
               <div className="flex-1 overflow-hidden relative w-full flex items-center">
                 {isAdmin ? (
-                  /* PANEL EDIT UNTUK ADMIN */
                   <div className="w-full flex flex-col gap-2 animate-in fade-in duration-200">
                     {announcements.map((item, index) => (
                       <div key={item.id || index} className="flex items-center gap-2 bg-slate-950/40 border border-slate-800 p-1.5 rounded-lg w-full">
                         <span className="text-[10px] font-mono text-slate-500 px-1.5">{index + 1}</span>
-                        <input 
-                          type="text"
-                          value={item.text} 
-                          onChange={e => {
-                            const updated = [...announcements];
-                            updated[index].text = e.target.value;
-                            setAnnouncements(updated);
-                          }} 
-                          onBlur={() => saveToFirebaseWithOffline({ announcements, latestUpdate: { view: 'home', text: 'Senarai maklumat hebahan utama telah dikemas kini.' } })}
-                          className="flex-1 bg-transparent border-none outline-none text-white text-xs md:text-sm" 
-                          placeholder="Tulis pengumuman kilat di sini..." 
-                        />
-                        <button 
-                          onClick={() => {
-                            const updated = announcements.filter((_, i) => i !== index);
-                            setAnnouncements(updated);
-                            saveToFirebaseWithOffline({ announcements: updated, latestUpdate: { view: 'home', text: 'Satu rekod maklumat hebahan telah dipadam.' } });
-                          }}
-                          className="text-red-400 hover:text-red-500 p-1 bg-red-500/10 hover:bg-red-500/20 rounded"
-                          title="Padam Hebahan"
-                        >
-                          <X size={13} />
-                        </button>
+                        <input type="text" value={item.text} onChange={e => { const updated = [...announcements]; updated[index].text = e.target.value; setAnnouncements(updated); }} onBlur={() => saveToFirebaseWithOffline({ announcements, latestUpdate: { view: 'home', text: 'Senarai maklumat hebahan utama telah dikemas kini.' } })} className="flex-1 bg-transparent border-none outline-none text-white text-xs md:text-sm" placeholder="Tulis pengumuman kilat di sini..." />
+                        <button onClick={() => { const updated = announcements.filter((_, i) => i !== index); setAnnouncements(updated); saveToFirebaseWithOffline({ announcements: updated, latestUpdate: { view: 'home', text: 'Satu rekod maklumat hebahan telah dipadam.' } }); }} className="text-red-400 hover:text-red-500 p-1 bg-red-500/10 hover:bg-red-500/20 rounded"><X size={13} /></button>
                       </div>
                     ))}
-                    <button 
-                      onClick={() => {
-                        const updated = [...announcements, { id: 'ann_' + Date.now(), text: '' }];
-                        setAnnouncements(updated);
-                      }}
-                      className="text-[11px] bg-amber-500 hover:bg-amber-600 text-slate-950 px-3 py-1.5 rounded-lg font-black tracking-wide mt-1 self-start flex items-center gap-1 shadow transition-colors"
-                    >
-                      <Plus size={12} /> Tambah Hebahan Baru
-                    </button>
+                    <button onClick={() => { const updated = [...announcements, { id: 'ann_' + Date.now(), text: '' }]; setAnnouncements(updated); }} className="text-[11px] bg-amber-500 hover:bg-amber-600 text-slate-950 px-3 py-1.5 rounded-lg font-black tracking-wide mt-1 self-start flex items-center gap-1 shadow"><Plus size={12} /> Tambah Hebahan Baru</button>
                   </div>
                 ) : (
-                  /* MARQUEE DENGAN PERGERAKAN SELESA & TETAPAN ANTI-SQUISH */
                   <div className="tech-marquee-track font-bold text-amber-300/90 tracking-wide gap-12 whitespace-nowrap">
                     <div className="flex items-center gap-3 shrink-0 whitespace-nowrap">
                       <span>{compiledText}</span>
@@ -148,14 +143,8 @@ export default function HomeView({ isAdmin, announcements, setAnnouncements, sav
                   <span>Kemasukan {sesiKemasukan.sesi} / {sesiKemasukan.tahun}</span>
                 )}
               </div>
-
-              <h1 className="text-4xl md:text-5xl lg:text-[4rem] font-black text-white tracking-tight leading-[1.1] drop-shadow-lg">
-                Minggu<br/>
-                <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-500">Silaturahim</span>
-              </h1>
-              <p className="text-sm md:text-base text-slate-300/90 font-medium max-w-lg mx-auto lg:mx-0 leading-relaxed">
-                Portal rasmi Pendaftaran dan Minggu Silaturahim Pelajar (MSR) baharu ADTEC JTM Kampus Sandakan.
-              </p>
+              <h1 className="text-4xl md:text-5xl lg:text-[4rem] font-black text-white tracking-tight leading-[1.1] drop-shadow-lg">Minggu<br/><span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-500">Silaturahim</span></h1>
+              <p className="text-sm md:text-base text-slate-300/90 font-medium max-w-lg mx-auto lg:mx-0 leading-relaxed">Portal rasmi Pendaftaran dan Minggu Silaturahim Pelajar (MSR) baharu ADTEC JTM Kampus Sandakan.</p>
             </div>
           </div>
 
@@ -175,40 +164,54 @@ export default function HomeView({ isAdmin, announcements, setAnnouncements, sav
         </div>
       </div>
 
-      {/* MENU GRID SECTION */}
-      <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 md:gap-5">
+      {/* NEW PREMIUM & MODERN CARD GRID SECTIONS (Menghilangkan Kesan Kosong) */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
         {[
-          { id: 'memo', icon: FileSignature, title: 'Memo Lantikan', desc: 'Rujukan surat rasmi', color: 'blue' },
-          { id: 'ajk', icon: UserCog, title: 'Senarai AJK', desc: 'Jawatankuasa & biro', color: 'emerald' },
-          { id: 'jadual', icon: CalendarClock, title: 'Jadual MSR', desc: 'Tentatif terperinci', color: 'cyan' },
-          { id: 'penutup', icon: GraduationCap, title: 'Majlis Penutup', desc: 'Atur cara majlis', color: 'indigo' },
-          { id: 'layout', icon: MapPinned, title: 'Pelan Daftar', desc: 'Susun atur dewan', color: 'sky' },
-          { id: 'lagu', icon: AudioLines, title: 'Lirik Nyanyian', desc: 'Lirik korporat JTM', color: 'violet' }
-        ].map((item) => (
-          <button 
-            key={item.id} 
-            onClick={() => navigateTo(item.id)} 
-            className={`relative group overflow-hidden bg-white/80 dark:bg-[#0a1526]/80 backdrop-blur-xl p-6 md:p-8 rounded-[2rem] border border-slate-200/80 dark:border-slate-800/80 shadow-lg hover:-translate-y-2 ${cardStyles[item.color].glow} ${cardStyles[item.color].hoverBg} transition-all duration-500 text-left flex flex-col justify-between min-h-[190px] focus:outline-none`}
-            aria-label={`Buka bahagian ${item.title}`}
-          >
-            <div className={`absolute top-0 left-0 w-full h-[2px] bg-gradient-to-r ${cardStyles[item.color].topLine} opacity-0 group-hover:opacity-100 transition-opacity duration-500`}></div>
-
-            <div className="flex justify-between items-start relative z-10 w-full">
-              <div className={`p-4 rounded-2xl bg-white dark:bg-slate-900 border ${cardStyles[item.color].iconBorder} shadow-sm group-hover:scale-110 transition-transform duration-500 ease-out`}>
-                <item.icon size={28} strokeWidth={1.5} className={cardStyles[item.color].iconText} />
+          { id: 'memo', icon: FileSignature, title: 'Memo Lantikan', desc: 'Rujukan surat pelantikan rasmi', color: 'blue' },
+          { id: 'ajk', icon: UserCog, title: 'Senarai AJK', desc: 'Struktur jawatankuasa & biro pelaksana', color: 'emerald' },
+          { id: 'jadual', icon: CalendarClock, title: 'Jadual MSR', desc: 'Tentatif program & aktiviti harian terperinci', color: 'cyan' },
+          { id: 'penutup', icon: GraduationCap, title: 'Majlis Penutup', desc: 'Atur cara & protokol majlis penutupan rasmi', color: 'indigo' },
+          { id: 'layout', icon: MapPinned, title: 'Pelan Daftar', desc: 'Panduan susun atur kaunter & pelan dewan', color: 'sky' },
+          { id: 'lagu', icon: AudioLines, title: 'Lirik Nyanyian', desc: 'Nyanyian lagu korporat & aspirasi JTM', color: 'violet' }
+        ].map((item) => {
+          const style = cardStyles[item.color];
+          return (
+            <button 
+              key={item.id} 
+              onClick={() => navigateTo(item.id)} 
+              className={`relative group overflow-hidden bg-white/90 dark:bg-slate-900/80 backdrop-blur-md p-6 rounded-[2rem] border border-slate-200/70 dark:border-slate-800/80 shadow-[0_4px_20px_rgba(0,0,0,0.03)] hover:-translate-y-1.5 ${style.glow} transition-all duration-300 text-left flex flex-col justify-between min-h-[175px] focus:outline-none`}
+              aria-label={`Buka bahagian ${item.title}`}
+            >
+              {/* WATERMARK ICON (Mengisi ruang kosong di sebelah kanan kad) */}
+              <div className={`absolute -right-3 -bottom-5 pointer-events-none transform rotate-12 transition-transform duration-500 group-hover:rotate-6 group-hover:scale-105 ${style.watermark}`}>
+                <item.icon size={100} strokeWidth={1} />
               </div>
-              
-              <div className={`p-2 rounded-full bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700 shadow-sm opacity-0 group-hover:opacity-100 transform translate-x-2 group-hover:translate-x-0 transition-all duration-300`}>
-                <ChevronRight size={16} className={cardStyles[item.color].iconText} />
-              </div>
-            </div>
 
-            <div className="relative z-10 mt-8">
-              <h3 className={`text-lg md:text-xl font-bold text-slate-800 dark:text-slate-100 mb-1 tracking-tight group-hover:${cardStyles[item.color].iconText} transition-colors duration-300`}>{item.title}</h3>
-              <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">{item.desc}</p>
-            </div>
-          </button>
-        ))}
+              {/* Top Row: Icon Box & Arrow */}
+              <div className="flex justify-between items-center relative z-10 w-full">
+                {/* Solit Fill Icon Container (Dah tak kosong!) */}
+                <div className={`p-3.5 rounded-2xl border ${style.iconBg} ${style.iconBorder} shadow-sm group-hover:scale-105 transition-transform duration-300`}>
+                  <item.icon size={22} strokeWidth={2} className={style.iconText} />
+                </div>
+                
+                {/* Arrow indicator */}
+                <div className={`p-2 rounded-xl bg-slate-50 dark:bg-slate-800/80 border border-slate-100 dark:border-slate-700/50 shadow-sm opacity-60 group-hover:opacity-100 group-hover:translate-x-1 transition-all duration-300`}>
+                  <ChevronRight size={14} className={style.iconText} />
+                </div>
+              </div>
+
+              {/* Bottom Row: Text Content */}
+              <div className="relative z-10 mt-6">
+                <h3 className="text-base md:text-lg font-black text-slate-800 dark:text-slate-100 tracking-tight transition-colors duration-300">
+                  {item.title}
+                </h3>
+                <p className="text-xs text-slate-400 dark:text-slate-500 font-bold mt-1 line-clamp-1 leading-relaxed">
+                  {item.desc}
+                </p>
+              </div>
+            </button>
+          );
+        })}
       </div>
     </div>
   );
