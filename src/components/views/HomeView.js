@@ -23,7 +23,7 @@ export default function HomeView({ isAdmin, announcements, setAnnouncements, sav
   return (
     <div className="px-4 lg:px-8 max-w-6xl mx-auto pb-32 pt-4">
       
-      {/* Pengawal Kelajuan Responsif Pintar Mengikut Lebar Skrin Peranti */}
+      {/* Pengawal Kelajuan Yang Dioptimumkan (Anti-Cutoff & Anti-Slow) */}
       <style>{`
         @keyframes seamlessMarquee {
           0% { transform: translate3d(0, 0, 0); }
@@ -32,21 +32,21 @@ export default function HomeView({ isAdmin, announcements, setAnnouncements, sav
         .tech-marquee-track {
           display: flex;
           width: max-content;
-          animation: seamlessMarquee 7s linear infinite; /* Laju Asal Skrin Mobile (7s) */
+          animation: seamlessMarquee 14s linear infinite; /* Mobile diturunkan ke 14s (Just Nice) */
           will-change: transform;
         }
         
-        /* Skrin Tablet (Sederhana Lebar) */
+        /* Skrin Tablet */
         @media (min-width: 768px) {
           .tech-marquee-track {
-            animation-duration: 11s; 
+            animation-duration: 20s; 
           }
         }
         
-        /* Skrin Desktop / Laptop (Sangat Lebar) */
+        /* Skrin Desktop */
         @media (min-width: 1024px) {
           .tech-marquee-track {
-            animation-duration: 14s;
+            animation-duration: 25s;
           }
         }
 
@@ -64,7 +64,7 @@ export default function HomeView({ isAdmin, announcements, setAnnouncements, sav
         <div className="relative z-20 px-6 py-8 md:px-12 md:py-16 flex flex-col lg:flex-row items-center justify-between gap-8 md:gap-10">
           <div className="w-full lg:w-3/5 space-y-5 text-center lg:text-left">
             
-            {/* BOARD INFO KILAT SEAMLESS ADAPTIVE SPEED */}
+            {/* BOARD INFO KILAT SEAMLESS COMFORTABLE SPEED */}
             <div className={`flex ${isAdmin ? 'flex-col items-start gap-4' : 'items-center gap-3'} px-4 py-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 backdrop-blur-md text-amber-400 text-xs md:text-sm font-semibold w-full overflow-hidden shadow-inner`}>
               
               <span className="flex items-center gap-1.5 bg-amber-500 text-slate-950 px-2 py-0.5 rounded-md text-[10px] font-black tracking-wider shrink-0 uppercase relative z-10">
@@ -115,13 +115,13 @@ export default function HomeView({ isAdmin, announcements, setAnnouncements, sav
                     </button>
                   </div>
                 ) : (
-                  /* MARQUEE RUNNING TEXT DENGAN ADAPTIVE RESPONSIVE SPEED */
-                  <div className="tech-marquee-track font-bold text-amber-300/90 tracking-wide gap-12">
-                    <div className="flex items-center gap-3 shrink-0">
+                  /* MARQUEE DENGAN PERGERAKAN SELESA & TETAPAN ANTI-SQUISH */
+                  <div className="tech-marquee-track font-bold text-amber-300/90 tracking-wide gap-12 whitespace-nowrap">
+                    <div className="flex items-center gap-3 shrink-0 whitespace-nowrap">
                       <span>{compiledText}</span>
                       <span className="text-amber-500/60 font-black shrink-0 ml-4">•</span>
                     </div>
-                    <div className="flex items-center gap-3 shrink-0" aria-hidden="true">
+                    <div className="flex items-center gap-3 shrink-0 whitespace-nowrap" aria-hidden="true">
                       <span>{compiledText}</span>
                       <span className="text-amber-500/60 font-black shrink-0 ml-4">•</span>
                     </div>
@@ -183,7 +183,7 @@ export default function HomeView({ isAdmin, announcements, setAnnouncements, sav
           { id: 'jadual', icon: CalendarClock, title: 'Jadual MSR', desc: 'Tentatif terperinci', color: 'cyan' },
           { id: 'penutup', icon: GraduationCap, title: 'Majlis Penutup', desc: 'Atur cara majlis', color: 'indigo' },
           { id: 'layout', icon: MapPinned, title: 'Pelan Daftar', desc: 'Susun atur dewan', color: 'sky' },
-          { id: 'lagu', icon: AudioLines, title: 'Lagu Korporat', desc: 'Lirik nyanyian JTM', color: 'violet' }
+          { id: 'lagu', icon: AudioLines, title: 'Lirik Nyanyian', desc: 'Lirik korporat JTM', color: 'violet' }
         ].map((item) => (
           <button 
             key={item.id} 
