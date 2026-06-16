@@ -4,7 +4,7 @@ import NetworkAnimation from '../ui/NetworkAnimation';
 import LiveClock from '../ui/LiveClock';
 import { formatTarikh } from '../../utils/helpers';
 
-// Skema Warna Kad
+// Skema Warna Kad Menu Utama
 const cardStyles = {
   blue: { iconText: 'text-blue-600 dark:text-blue-400', iconBorder: 'border-blue-200 dark:border-blue-500/20', glow: 'group-hover:shadow-[0_8px_30px_rgba(59,130,246,0.15)] dark:group-hover:shadow-[0_8px_30px_rgba(59,130,246,0.2)]', topLine: 'from-transparent via-blue-500 to-transparent', hoverBg: 'group-hover:bg-blue-50/50 dark:group-hover:bg-blue-900/10' },
   emerald: { iconText: 'text-emerald-600 dark:text-emerald-400', iconBorder: 'border-emerald-200 dark:border-emerald-500/20', glow: 'group-hover:shadow-[0_8px_30px_rgba(16,185,129,0.15)] dark:group-hover:shadow-[0_8px_30px_rgba(16,185,129,0.2)]', topLine: 'from-transparent via-emerald-500 to-transparent', hoverBg: 'group-hover:bg-emerald-50/50 dark:group-hover:bg-emerald-900/10' },
@@ -17,24 +17,57 @@ const cardStyles = {
 export default function HomeView({ isAdmin, announcement, setAnnouncement, saveToFirebaseWithOffline, sesiKemasukan, setSesiKemasukan, navigateTo }) {
   return (
     <div className="px-4 lg:px-8 max-w-6xl mx-auto pb-32 pt-4">
+      
+      {/* Standalone CSS untuk Cyber Ticker Marquee Effect */}
+      <style>{`
+        @keyframes cyberTicker {
+          0% { transform: translate3d(100%, 0, 0); }
+          100% { transform: translate3d(-100%, 0, 0); }
+        }
+        .tech-marquee-text {
+          display: inline-block;
+          white-space: nowrap;
+          animation: cyberTicker 25s linear infinite;
+        }
+        .tech-marquee-text:hover {
+          animation-play-state: paused;
+        }
+      `}</style>
+
       {/* HERO SECTION TECH THEME */}
-      <div className="relative rounded-[2.5rem] bg-gradient-to-br from-slate-900 via-[#0a192f] to-[#020c1b] overflow-hidden shadow-2xl border border-cyan-900/30 mb-8">
+      <div className="relative rounded-[2.5rem] bg-gradient-to-br from-slate-900 via-[#0a192f] to-[#020c1b] overflow-hidden shadow-2xl border border-cyan-900/30 mb-8 py-2 md:py-6">
         <NetworkAnimation />
         <div className="absolute top-[-20%] left-[-10%] w-[50%] h-[50%] bg-cyan-600/20 rounded-full blur-[120px] animate-float pointer-events-none"></div>
         <div className="absolute bottom-[-20%] right-[-10%] w-[50%] h-[50%] bg-blue-600/20 rounded-full blur-[120px] animate-float-delayed pointer-events-none"></div>
 
-        <div className="relative z-20 px-6 py-10 md:px-12 md:py-20 flex flex-col lg:flex-row items-center justify-between gap-10">
-          <div className="w-full lg:w-3/5 space-y-6 text-center lg:text-left">
+        <div className="relative z-20 px-6 py-8 md:px-12 md:py-16 flex flex-col lg:flex-row items-center justify-between gap-8 md:gap-10">
+          <div className="w-full lg:w-3/5 space-y-5 text-center lg:text-left">
             
-            <div className="flex flex-col md:flex-row items-start md:items-center gap-3 px-5 py-3 md:py-2.5 rounded-2xl md:rounded-full bg-white/5 border border-white/10 backdrop-blur-xl text-amber-300 text-sm font-medium w-full text-left shadow-sm hover:bg-white/10 transition-colors duration-300">
-              <Bell className="animate-bounce shrink-0 mt-0.5 md:mt-0" size={18}/>
-              {isAdmin ? (
-                <div className="flex-1 flex items-center gap-2 w-full">
-                  <input value={announcement} onChange={e => setAnnouncement(e.target.value)} onBlur={() => saveToFirebaseWithOffline({ announcement, latestUpdate: { view: 'home', text: 'Teks pengumuman portal telah dikemas kini.' } })} className="w-full bg-transparent border-b border-amber-500/50 outline-none text-white focus:border-amber-400 px-1 py-0.5" placeholder="Tulis pengumuman..." aria-label="Teks pengumuman" />
-                </div>
-              ) : (
-                <span className="flex-1 whitespace-normal break-words leading-relaxed">{announcement || "Selamat Datang ke iMSR ADTEC Sandakan"}</span>
-              )}
+            {/* SLEEK DIGITAL TICKER ANNOUNCEMENT BOARD */}
+            <div className="flex items-center gap-3 px-4 py-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 backdrop-blur-md text-amber-400 text-xs md:text-sm font-semibold w-full overflow-hidden shadow-inner">
+              <span className="flex items-center gap-1.5 bg-amber-500 text-slate-950 px-2 py-0.5 rounded-md text-[10px] font-black tracking-wider shrink-0 uppercase animate-pulse">
+                <Bell size={12} className="shrink-0" />
+                INFO KILAT
+              </span>
+              
+              <div className="flex-1 overflow-hidden relative w-full h-5 flex items-center">
+                {isAdmin ? (
+                  <div className="flex-1 flex items-center gap-2 w-full">
+                    <input 
+                      value={announcement} 
+                      onChange={e => setAnnouncement(e.target.value)} 
+                      onBlur={() => saveToFirebaseWithOffline({ announcement, latestUpdate: { view: 'home', text: 'Teks pengumuman portal telah dikemas kini.' } })} 
+                      className="w-full bg-transparent border-b border-amber-500/50 scale-95 outline-none text-white focus:border-amber-400 px-1" 
+                      placeholder="Masukkan pengumuman di sini..." 
+                      aria-label="Teks pengumuman" 
+                    />
+                  </div>
+                ) : (
+                  <div className="tech-marquee-text will-change-transform font-bold text-amber-300/90 tracking-wide">
+                    {announcement || "Selamat Datang ke Portal iMSR ADTEC JTM Kampus Sandakan. Sila rujuk dokumen jadual dan pelan pendaftaran."}
+                  </div>
+                )}
+              </div>
             </div>
 
             <div className="space-y-3">
@@ -44,11 +77,11 @@ export default function HomeView({ isAdmin, announcement, setAnnouncement, saveT
                   <div className="flex items-center gap-2">
                     <span>Sesi:</span>
                     <select value={sesiKemasukan.sesi} onChange={(e) => { const updated = { ...sesiKemasukan, sesi: e.target.value }; setSesiKemasukan(updated); saveToFirebaseWithOffline({ sesiKemasukan: updated }); }} className="bg-transparent outline-none text-white font-bold border-b border-cyan-400/50">
-                      <option value="1">1</option><option value="2">2</option>
+                      <option value="1" className="text-slate-950">1</option><option value="2" className="text-slate-950">2</option>
                     </select>
                     <span>/</span>
                     <select value={sesiKemasukan.tahun} onChange={(e) => { const updated = { ...sesiKemasukan, tahun: e.target.value }; setSesiKemasukan(updated); saveToFirebaseWithOffline({ sesiKemasukan: updated }); }} className="bg-transparent outline-none text-white font-bold border-b border-cyan-400/50">
-                      {[...Array(10)].map((_, i) => { const year = (2025 + i).toString(); return <option key={year} value={year}>{year}</option>; })}
+                      {[...Array(10)].map((_, i) => { const year = (2025 + i).toString(); return <option key={year} value={year} className="text-slate-950">{year}</option>; })}
                     </select>
                   </div>
                 ) : (
@@ -68,12 +101,13 @@ export default function HomeView({ isAdmin, announcement, setAnnouncement, saveT
 
           <div className="w-full lg:w-2/5 flex justify-center lg:justify-end">
             <div className="relative w-full max-w-[18rem]">
-                <div className="absolute inset-0 bg-gradient-to-r from-cyan-600 to-blue-600 rounded-[2rem] blur-2xl opacity-40 animate-pulse"></div>
+              <div className="absolute inset-0 bg-gradient-to-r from-cyan-600 to-blue-600 rounded-[2rem] blur-2xl opacity-40 animate-pulse"></div>
               <div className="relative bg-white/10 backdrop-blur-2xl border border-white/20 p-6 md:p-8 rounded-[2rem] shadow-xl text-center transform hover:scale-[1.02] transition-transform duration-500">
                  <p className="text-cyan-200/80 text-[10px] font-bold uppercase tracking-[0.3em] mb-2">Waktu Semasa</p>
                  <LiveClock />
-                 <div className="mt-6 pt-4 border-t border-white/10">
-                   <p className="text-xs md:text-sm font-semibold text-white tracking-wide">{formatTarikh(new Date().toISOString().split('T')[0])}</p>
+                 <div className="mt-6 pt-4 border-t border-white/10 flex items-center justify-center gap-1.5 text-xs md:text-sm font-semibold text-white tracking-wide">
+                   <CalendarClock size={14} className="text-cyan-400" />
+                   <span>{formatTarikh(new Date().toISOString().split('T')[0])}</span>
                  </div>
               </div>
             </div>
@@ -81,6 +115,7 @@ export default function HomeView({ isAdmin, announcement, setAnnouncement, saveT
         </div>
       </div>
 
+      {/* MENU GRID SECTION */}
       <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 md:gap-5">
         {[
           { id: 'memo', icon: FileSignature, title: 'Memo Lantikan', desc: 'Rujukan surat rasmi', color: 'blue' },
