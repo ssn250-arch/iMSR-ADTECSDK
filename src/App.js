@@ -316,10 +316,12 @@ export default function App() {
   const [viewingMemo, setViewingMemo] = useState(null);
   const [blobUrl, setBlobUrl] = useState(null);
 
+  // Notifications (Toast) State
   const [showToast, setShowToast] = useState(false);
   const [latestUpdateInfo, setLatestUpdateInfo] = useState(null);
   const hasCheckedUpdates = useRef(false);
 
+  // Data States
   const [lastUpdated, setLastUpdated] = useState(null);
   const [announcement, setAnnouncement] = useState('');
   const [sesiKemasukan, setSesiKemasukan] = useState({ sesi: '2', tahun: '2026' });
@@ -350,7 +352,9 @@ export default function App() {
     }
   }, [isAppReady]);
 
+  // --- FIREBASE FETCH DATA (dengan cache offline) ---
   useEffect(() => {
+    // Load cached data first
     const cachedData = localStorage.getItem('imsr_cached_data');
     if (cachedData) {
       try {
@@ -458,6 +462,7 @@ export default function App() {
     };
   }, []);
 
+  // --- OFFLINE EVENT HANDLERS ---
   useEffect(() => {
     const handleOnline = () => {
       setIsOnline(true);
@@ -522,6 +527,7 @@ export default function App() {
     }
   }, []);
 
+  // --- LOGIK NOTIFIKASI KEMAS KINI (TOAST PINTAR) ---
   useEffect(() => {
     if (isAppReady && lastUpdated && !hasCheckedUpdates.current) {
       const lastVisit = localStorage.getItem('imsr_last_visit');
@@ -1281,7 +1287,7 @@ export default function App() {
                   <div className="flex justify-between items-center mb-6">
                     <h3 className="text-xl md:text-2xl font-black tracking-tight text-slate-800 dark:text-white">Biro Pelaksana</h3>
                     {isAdmin && (
-                      <button onClick={() => { const newBiro = [...biroList, { nama: "Biro Baru", ketua: "", ahli: [] }]; setBiroList(newBiro); saveToFirebaseWithOffline({ biroList: newBiro, latestUpdate: { view: 'ajk', text: 'Senarai Biro Pelaksana MSR telah dikemas kini.' } }); }} className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl font-bold text-xs transition-colors active:scale-95 shadow-sm flex items-center gap-1.5" aria-label="Tambah biro"><Plus size={14}/> <span className="hidden sm:inline">Tambah Biro</span></button>
+                      <button onClick={() => { const newBiro = [...biroList, { nama: "Biro Baru", ketua: "", ahli: [] }]; setBiroList(newBiro); saveToFirebaseWithOffline({ biroList: newBiro, latestUpdate: { view: 'ajk', text: 'Senarai Biro Pelaksana MSR telah dikemas kini.' } }); }} className="bg-cyan-600 hover:bg-cyan-700 text-white px-4 py-2 rounded-xl font-bold text-xs transition-colors active:scale-95 shadow-sm flex items-center gap-1.5" aria-label="Tambah biro"><Plus size={14}/> <span className="hidden sm:inline">Tambah Biro</span></button>
                     )}
                   </div>
                   
@@ -1296,7 +1302,7 @@ export default function App() {
                               value={biro.nama} 
                               onChange={e => { const newBiro = [...biroList]; newBiro[idx].nama = e.target.value; setBiroList(newBiro); }} 
                               onBlur={() => saveToFirebaseWithOffline({ biroList, latestUpdate: { view: 'ajk', text: 'Senarai Biro Pelaksana MSR telah dikemas kini.' } })} 
-                              className="border border-slate-200 dark:border-slate-700 p-2.5 rounded-lg text-sm w-[85%] font-bold text-slate-800 dark:text-white bg-white dark:bg-slate-900 transition-colors focus:ring-2 focus:ring-emerald-500 outline-none" 
+                              className="border border-slate-200 dark:border-slate-700 p-2.5 rounded-lg text-sm w-[85%] font-bold text-slate-800 dark:text-white bg-white dark:bg-slate-900 transition-colors focus:ring-2 focus:ring-cyan-500 outline-none" 
                               placeholder="Masukkan nama biro..." 
                               aria-label="Nama biro" 
                             />
@@ -1308,7 +1314,7 @@ export default function App() {
                               value={biro.ketua} 
                               onChange={e => { const newBiro = [...biroList]; newBiro[idx].ketua = e.target.value; setBiroList(newBiro); }} 
                               onBlur={() => saveToFirebaseWithOffline({ biroList, latestUpdate: { view: 'ajk', text: 'Senarai Biro Pelaksana MSR telah dikemas kini.' } })} 
-                              className="border border-slate-200 dark:border-slate-700 p-2.5 rounded-lg text-xs w-full font-bold bg-white dark:bg-slate-900 transition-colors focus:ring-2 focus:ring-emerald-500 outline-none" 
+                              className="border border-slate-200 dark:border-slate-700 p-2.5 rounded-lg text-xs w-full font-bold bg-white dark:bg-slate-900 transition-colors focus:ring-2 focus:ring-cyan-500 outline-none" 
                               placeholder="Cari / Masukkan Nama Ketua Biro" 
                               aria-label="Ketua biro" 
                             />
@@ -1316,7 +1322,7 @@ export default function App() {
                           <div className="bg-white dark:bg-slate-800 p-3 rounded-xl mt-3 border border-slate-100 dark:border-slate-700">
                             <div className="flex justify-between items-center mb-2">
                               <span className="text-[10px] font-black text-slate-700 dark:text-slate-300 uppercase tracking-wider">Senarai Ahli</span>
-                              <button onClick={() => { const newBiro = [...biroList]; if(!newBiro[idx].ahli) newBiro[idx].ahli=[]; newBiro[idx].ahli.push(""); setBiroList(newBiro); }} className="text-emerald-600 hover:text-white bg-emerald-50 hover:bg-emerald-600 px-2 py-1 rounded-md text-[10px] font-bold transition-colors flex items-center gap-1" aria-label="Tambah ahli biro"><Plus size={12}/> Tambah Ahli</button>
+                              <button onClick={() => { const newBiro = [...biroList]; if(!newBiro[idx].ahli) newBiro[idx].ahli=[]; newBiro[idx].ahli.push(""); setBiroList(newBiro); }} className="text-cyan-600 hover:text-white bg-cyan-50 hover:bg-cyan-600 px-2 py-1 rounded-md text-[10px] font-bold transition-colors flex items-center gap-1" aria-label="Tambah ahli biro"><Plus size={12}/> Tambah Ahli</button>
                             </div>
                             <div className="space-y-1.5">
                               {biro.ahli && biro.ahli.map((ahli, aIdx) => (
@@ -1327,7 +1333,7 @@ export default function App() {
                                     value={ahli} 
                                     onChange={e => { const newBiro = [...biroList]; newBiro[idx].ahli[aIdx] = e.target.value; setBiroList(newBiro); }} 
                                     onBlur={() => saveToFirebaseWithOffline({ biroList, latestUpdate: { view: 'ajk', text: 'Senarai Biro Pelaksana MSR telah dikemas kini.' } })} 
-                                    className="border border-slate-200 dark:border-slate-700 p-2 rounded-md text-xs w-full bg-slate-50 dark:bg-slate-900 transition-colors focus:ring-2 focus:ring-emerald-500 outline-none" 
+                                    className="border border-slate-200 dark:border-slate-700 p-2 rounded-md text-xs w-full bg-slate-50 dark:bg-slate-900 transition-colors focus:ring-2 focus:ring-cyan-500 outline-none" 
                                     placeholder="Cari / Masukkan Nama Ahli" 
                                     aria-label="Nama ahli" 
                                   />
@@ -1420,7 +1426,7 @@ export default function App() {
                            
                            <button 
                              onClick={() => handleDownloadBlob(jadualFile, jadualFile.includes('application/pdf') ? 'Tentatif_Program.pdf' : 'Tentatif_Program.jpg')}
-                             className="flex-[2] inline-flex items-center justify-center gap-2 text-xs font-bold text-white bg-cyan-600 hover:bg-cyan-700 px-2 py-3 rounded-xl shadow-md transition-all active:scale-95"
+                             className="flex-[2] inline-flex items-center justify-center gap-2 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 px-2 py-3 rounded-xl shadow-md transition-all active:scale-95"
                            >
                              <Download size={16} /> Muat Turun
                            </button>
@@ -1451,7 +1457,7 @@ export default function App() {
                             <button onClick={() => setViewingMemo({ url: jadualFile, name: "Tentatif_Penuh", type: jadualFile.includes('application/pdf') ? 'pdf' : 'image', uploadDate: jadualFileDate })} className="flex-none flex items-center justify-center gap-1.5 text-[11px] font-bold text-cyan-700 bg-cyan-100 hover:bg-cyan-200 dark:bg-cyan-900/40 dark:text-cyan-300 dark:hover:bg-cyan-800/60 px-4 py-2 rounded-xl transition-all active:scale-95">
                                <ExternalLink size={14}/> Lihat
                             </button>
-                            <button onClick={() => handleDownloadBlob(jadualFile, jadualFile.includes('application/pdf') ? 'Tentatif_Program.pdf' : 'Tentatif_Program.jpg')} className="flex-none flex items-center justify-center gap-1.5 text-[11px] font-bold text-white bg-cyan-600 hover:bg-cyan-700 px-4 py-2 rounded-xl transition-all active:scale-95 shadow-sm">
+                            <button onClick={() => handleDownloadBlob(jadualFile, jadualFile.includes('application/pdf') ? 'Tentatif_Program.pdf' : 'Tentatif_Program.jpg')} className="flex-none flex items-center justify-center gap-1.5 text-[11px] font-bold text-white bg-emerald-600 hover:bg-emerald-700 px-4 py-2 rounded-xl transition-all active:scale-95 shadow-sm">
                                <Download size={14}/> Muat Turun
                             </button>
                             {isAdmin && (
@@ -1601,7 +1607,7 @@ export default function App() {
                            
                            <button 
                              onClick={() => handleDownloadBlob(penutupFile, penutupFile.includes('application/pdf') ? 'Majlis_Penutup.pdf' : 'Majlis_Penutup.jpg')}
-                             className="flex-[2] inline-flex items-center justify-center gap-2 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 px-2 py-3 rounded-xl shadow-md transition-all active:scale-95"
+                             className="flex-[2] inline-flex items-center justify-center gap-2 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 px-2 py-3 rounded-xl shadow-md transition-all active:scale-95"
                            >
                              <Download size={16} /> Muat Turun
                            </button>
@@ -1632,7 +1638,7 @@ export default function App() {
                             <button onClick={() => setViewingMemo({ url: penutupFile, name: "Majlis_Penutup", type: penutupFile.includes('application/pdf') ? 'pdf' : 'image', uploadDate: penutupFileDate })} className="flex-none flex items-center justify-center gap-1.5 text-[11px] font-bold text-indigo-700 bg-indigo-100 hover:bg-indigo-200 dark:bg-indigo-900/40 dark:text-indigo-300 dark:hover:bg-indigo-800/60 px-4 py-2 rounded-xl transition-all active:scale-95">
                                <ExternalLink size={14}/> Lihat
                             </button>
-                            <button onClick={() => handleDownloadBlob(penutupFile, penutupFile.includes('application/pdf') ? 'Majlis_Penutup.pdf' : 'Majlis_Penutup.jpg')} className="flex-none flex items-center justify-center gap-1.5 text-[11px] font-bold text-white bg-indigo-600 hover:bg-indigo-700 px-4 py-2 rounded-xl transition-all active:scale-95 shadow-sm">
+                            <button onClick={() => handleDownloadBlob(penutupFile, penutupFile.includes('application/pdf') ? 'Majlis_Penutup.pdf' : 'Majlis_Penutup.jpg')} className="flex-none flex items-center justify-center gap-1.5 text-[11px] font-bold text-white bg-emerald-600 hover:bg-emerald-700 px-4 py-2 rounded-xl transition-all active:scale-95 shadow-sm">
                                <Download size={14}/> Muat Turun
                             </button>
                             {isAdmin && (
@@ -1846,10 +1852,23 @@ export default function App() {
         )}
 
         {/* --- FOOTER --- */}
-        <footer className="bg-[#f8fafc] dark:bg-[#020817] text-slate-400 py-6 text-center mt-auto pb-24 md:pb-6 border-t border-slate-200 dark:border-slate-800/50 relative z-30">
-          <p className="text-[10px] md:text-xs text-slate-500 font-bold tracking-wide">
-            Hak Cipta Terpelihara &copy; 2026 Kolej Teknologi Termaju (ADTEC) Jabatan Tenaga Manusia Kampus Sandakan.
-          </p>
+        <footer className="w-full bg-[#f8fafc]/50 dark:bg-[#020817]/50 backdrop-blur-md border-t border-slate-200/50 dark:border-slate-800/50 py-8 md:py-10 mt-auto pb-28 md:pb-8 relative z-30">
+          <div className="max-w-4xl mx-auto px-6 text-center flex flex-col items-center gap-4">
+            
+            {/* Tagline */}
+            <h4 className="text-[11px] md:text-xs font-black tracking-[0.25em] uppercase text-transparent bg-clip-text bg-gradient-to-r from-cyan-600 to-blue-600 dark:from-cyan-400 dark:to-blue-400">
+              Empowering Skills, Igniting Futures
+            </h4>
+            
+            {/* Subtle Line */}
+            <div className="w-8 h-[2px] bg-slate-300 dark:bg-slate-700 rounded-full"></div>
+            
+            {/* Copyright Text */}
+            <div className="flex flex-col items-center gap-1.5 text-[9px] md:text-[10px] text-slate-500 dark:text-slate-400 font-semibold tracking-wide">
+              <p>Hak Cipta Terpelihara &copy; {new Date().getFullYear()}</p>
+              <p className="text-slate-600 dark:text-slate-300">Kolej Teknologi Termaju (ADTEC) Jabatan Tenaga Manusia Kampus Sandakan</p>
+            </div>
+          </div>
         </footer>
 
         {/* --- BOTTOM NAV (MOBILE) DENGAN 4 BUTANG UTAMA --- */}
