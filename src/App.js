@@ -13,6 +13,7 @@ import FabMenu from './components/layout/FabMenu';
 import ToastNotification from './components/ui/ToastNotification';
 import ImageModal from './components/ui/ImageModal';
 import SplashScreen from './components/ui/SplashScreen';
+import LoginModal from './components/ui/LoginModal'; // <-- Ditambah baru
 
 // --- IMPORT KOMPONEN VIEWS (PAPARAN) ---
 import HomeView from './components/views/HomeView';
@@ -23,7 +24,6 @@ import PenutupView from './components/views/PenutupView';
 import LayoutView from './components/views/LayoutView';
 import LaguView from './components/views/LaguView';
 
-// --- STYLES FOR SCROLLBAR & ANIMATIONS (Global) ---
 const GlobalStyles = React.memo(() => (
   <style>
     {`
@@ -65,7 +65,13 @@ export default function App() {
   const [latestUpdateInfo, setLatestUpdateInfo] = useState(null);
   const [isScrolled, setIsScrolled] = useState(false);
 
-  // --- DATA STATES (Diurus oleh Firebase) ---
+  // --- LOG IN SECURITY STATES ---
+  const [loginForm, setLoginForm] = useState({ username: '', password: '' });
+  const [showPassword, setShowPassword] = useState(false);
+  const [loginAttempts, setLoginAttempts] = useState(0);
+  const [isLockedOut, setIsLockedOut] = useState(false);
+
+  // --- DATA STATES ---
   const [lastUpdated, setLastUpdated] = useState(null);
   const [announcement, setAnnouncement] = useState('');
   const [sesiKemasukan, setSesiKemasukan] = useState({ sesi: '2', tahun: '2026' });
@@ -86,7 +92,7 @@ export default function App() {
   const inactivityTimer = useRef(null);
   const [showOfflineBanner, setShowOfflineBanner] = useState(false);
 
-  // --- KESAN SCROLL / TEMA GELAP ---
+  // --- CONTROLS ---
   useEffect(() => {
     if (!isAppReady) {
       document.body.style.overflow = 'hidden';
@@ -104,7 +110,6 @@ export default function App() {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  // --- NAVIGASI ---
   const navigateTo = useCallback((view) => {
     setShowFabMenu(false);
     setCurrentView(view);
@@ -121,9 +126,29 @@ export default function App() {
     });
   }, []);
 
+  // --- LOG IN FUNCTION ---
+  const handleLogin = (e) => {
+    e.preventDefault();
+    if (isLockedOut) return;
+    if (loginForm.username === 'admin' && loginForm.password === 'abc@12345') {
+      setIsAdmin(true);
+      setShowLogin(false);
+      setLoginForm({ username: '', password: '' });
+      setLoginAttempts(0);
+    } else {
+      const newAttempts = loginAttempts + 1;
+      setLoginAttempts(newAttempts);
+      if (newAttempts >= 3) {
+        setIsLockedOut(true);
+        setTimeout(() => { setIsLockedOut(false); setLoginAttempts(0); }, 30000);
+      } else {
+        alert(`Log Masuk Gagal. Baki cubaan: ${3 - newAttempts}`);
+      }
+    }
+  };
+
   // --- FIREBASE FETCHING (Data Sync) ---
   useEffect(() => {
-    // 1. Ambil dari Cache LocalStorage
     const cachedData = localStorage.getItem('imsr_cached_data');
     if (cachedData) {
       try {
@@ -142,7 +167,6 @@ export default function App() {
       } catch(e) {}
     }
 
-    // 2. Langganan Firebase MSR Utama
     const unsubscribeUtama = onSnapshot(doc(db, "msr", "data_utama"), (docSnap) => {
       if (docSnap.exists()) {
         const data = docSnap.data();
@@ -162,7 +186,6 @@ export default function App() {
       }
     });
 
-    // 3. Langganan Fail Memos, Pelan, Jadual Penuh, & Penutup Penuh
     const unsubscribeMemos = onSnapshot(collection(db, "msr_memos"), (snapshot) => {
       const memosArray = [];
       snapshot.forEach((doc) => memosArray.push(doc.data()));
@@ -200,7 +223,6 @@ export default function App() {
     };
   }, []);
 
-  // --- KEMAS KINI OFFLINE FIREBASE ---
   const saveToFirebaseWithOffline = useCallback(async (fieldsToUpdate) => {
     const payload = { ...fieldsToUpdate, lastUpdated: new Date().toISOString() };
     if (!navigator.onLine) {
@@ -218,7 +240,6 @@ export default function App() {
     }
   }, []);
 
-  // --- NOTIFIKASI TOAST ---
   useEffect(() => {
     if (isAppReady && lastUpdated && !hasCheckedUpdates.current) {
       const lastVisit = localStorage.getItem('imsr_last_visit');
@@ -231,7 +252,6 @@ export default function App() {
     }
   }, [isAppReady, lastUpdated]);
 
-  // --- FUNGSI MUAT NAIK FAIL (Dipanjangkan sebagai Props) ---
   const handleDocumentUpload = (e) => {
     const file = e.target.files[0];
     if (file) {
@@ -304,7 +324,7 @@ export default function App() {
     }
   };
 
-  // --- RENDER PER VIEWS ---
+  // --- RENDERING ROUTER ---
   const renderView = () => {
     switch(currentView) {
       case 'home':
@@ -326,7 +346,6 @@ export default function App() {
     }
   };
 
-  // --- LOGIK BLOB UTK MODAL ---
   useEffect(() => {
     if (viewingMemo) {
       try {
@@ -343,7 +362,6 @@ export default function App() {
       if (blobUrl) { window.URL.revokeObjectURL(blobUrl); setBlobUrl(null); }
     }
   }, [viewingMemo]);
-
 
   return (
     <div className={isDarkMode ? 'dark' : ''}>
@@ -368,9 +386,22 @@ export default function App() {
         <FabMenu showFabMenu={showFabMenu} setShowFabMenu={setShowFabMenu} isAdmin={isAdmin} setIsAdmin={setIsAdmin} toggleTheme={toggleTheme} isDarkMode={isDarkMode} setShowLogin={setShowLogin} />
       </div>
 
+      {/* TENTUKAN POPUP MODALS DI BAWAH */}
       {viewingMemo && (
         <ImageModal viewingMemo={viewingMemo} setViewingMemo={setViewingMemo} blobUrl={blobUrl} handleDownloadBlob={handleDownloadBlob} />
       )}
+
+      {/* LOG IN MODAL YANG TERTINGGAL DAH DILETAK SEMULA KAT SINI */}
+      <LoginModal 
+        showLogin={showLogin} 
+        setShowLogin={setShowLogin} 
+        loginForm={loginForm} 
+        setLoginForm={setLoginForm} 
+        handleLogin={handleLogin} 
+        isLockedOut={isLockedOut} 
+        showPassword={showPassword} 
+        setShowPassword={setShowPassword} 
+      />
     </div>
   );
 }
