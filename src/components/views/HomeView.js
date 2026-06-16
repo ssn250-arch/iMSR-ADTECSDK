@@ -4,7 +4,7 @@ import NetworkAnimation from '../ui/NetworkAnimation';
 import LiveClock from '../ui/LiveClock';
 import { formatTarikh } from '../../utils/helpers';
 
-// Skema Warna Baharu - Lebih Bold, Padat, dan Bernyawa (Menghilangkan kesan kosong)
+// Skema Warna Dioptimumkan - Opasiti Watermark Dinaikkan (0.08 Cerah / 0.06 Gelap) Agar Jelas & Tegas
 const cardStyles = {
   blue: { 
     iconBg: 'bg-blue-50 dark:bg-blue-950/40', 
@@ -12,7 +12,7 @@ const cardStyles = {
     iconBorder: 'border-blue-200/60 dark:border-blue-500/30', 
     glow: 'hover:border-blue-400 dark:hover:border-blue-500/50 hover:shadow-[0_12px_40px_rgba(59,130,246,0.15)]', 
     badge: 'bg-blue-500/10 text-blue-600 dark:text-blue-400',
-    watermark: 'text-blue-500/[0.04] dark:text-blue-400/[0.03]'
+    watermark: 'text-blue-500/[0.08] dark:text-blue-400/[0.06]'
   },
   emerald: { 
     iconBg: 'bg-emerald-50 dark:bg-emerald-950/40', 
@@ -20,7 +20,7 @@ const cardStyles = {
     iconBorder: 'border-emerald-200/60 dark:border-emerald-500/30', 
     glow: 'hover:border-emerald-400 dark:hover:border-emerald-500/50 hover:shadow-[0_12px_40px_rgba(16,185,129,0.15)]', 
     badge: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400',
-    watermark: 'text-emerald-500/[0.04] dark:text-emerald-400/[0.03]'
+    watermark: 'text-emerald-500/[0.08] dark:text-emerald-400/[0.06]'
   },
   cyan: { 
     iconBg: 'bg-cyan-50 dark:bg-cyan-950/40', 
@@ -28,7 +28,7 @@ const cardStyles = {
     iconBorder: 'border-cyan-200/60 dark:border-cyan-500/30', 
     glow: 'hover:border-cyan-400 dark:hover:border-cyan-500/50 hover:shadow-[0_12px_40px_rgba(6,182,212,0.15)]', 
     badge: 'bg-cyan-500/10 text-cyan-600 dark:text-cyan-400',
-    watermark: 'text-cyan-500/[0.04] dark:text-cyan-400/[0.03]'
+    watermark: 'text-cyan-500/[0.08] dark:text-cyan-400/[0.06]'
   },
   indigo: { 
     iconBg: 'bg-indigo-50 dark:bg-indigo-950/40', 
@@ -36,7 +36,7 @@ const cardStyles = {
     iconBorder: 'border-indigo-200/60 dark:border-indigo-500/30', 
     glow: 'hover:border-indigo-400 dark:hover:border-indigo-500/50 hover:shadow-[0_12px_40px_rgba(99,102,241,0.15)]', 
     badge: 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400',
-    watermark: 'text-indigo-500/[0.04] dark:text-indigo-400/[0.03]'
+    watermark: 'text-indigo-500/[0.08] dark:text-indigo-400/[0.06]'
   },
   sky: { 
     iconBg: 'bg-sky-50 dark:bg-sky-950/40', 
@@ -44,7 +44,7 @@ const cardStyles = {
     iconBorder: 'border-sky-200/60 dark:border-sky-500/30', 
     glow: 'hover:border-sky-400 dark:hover:border-sky-500/50 hover:shadow-[0_12px_40px_rgba(14,165,233,0.15)]', 
     badge: 'bg-sky-500/10 text-sky-600 dark:text-sky-400',
-    watermark: 'text-sky-500/[0.04] dark:text-sky-400/[0.03]'
+    watermark: 'text-sky-500/[0.08] dark:text-sky-400/[0.06]'
   },
   violet: { 
     iconBg: 'bg-violet-50 dark:bg-violet-950/40', 
@@ -52,7 +52,7 @@ const cardStyles = {
     iconBorder: 'border-violet-200/60 dark:border-violet-500/30', 
     glow: 'hover:border-violet-400 dark:hover:border-violet-500/50 hover:shadow-[0_12px_40px_rgba(139,92,246,0.15)]', 
     badge: 'bg-violet-500/10 text-violet-600 dark:text-violet-400',
-    watermark: 'text-violet-500/[0.04] dark:text-violet-400/[0.03]'
+    watermark: 'text-violet-500/[0.08] dark:text-violet-400/[0.06]'
   }
 };
 
@@ -164,7 +164,7 @@ export default function HomeView({ isAdmin, announcements, setAnnouncements, sav
         </div>
       </div>
 
-      {/* NEW PREMIUM & MODERN CARD GRID SECTIONS (Menghilangkan Kesan Kosong) */}
+      {/* SECTION KAD MUKTAMAD (Saiz Watermark 150 & Opasiti Lebih Tegas) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
         {[
           { id: 'memo', icon: FileSignature, title: 'Memo Lantikan', desc: 'Rujukan surat pelantikan rasmi', color: 'blue' },
@@ -179,22 +179,20 @@ export default function HomeView({ isAdmin, announcements, setAnnouncements, sav
             <button 
               key={item.id} 
               onClick={() => navigateTo(item.id)} 
-              className={`relative group overflow-hidden bg-white/90 dark:bg-slate-900/80 backdrop-blur-md p-6 rounded-[2rem] border border-slate-200/70 dark:border-slate-800/80 shadow-[0_4px_20px_rgba(0,0,0,0.03)] hover:-translate-y-1.5 ${style.glow} transition-all duration-300 text-left flex flex-col justify-between min-h-[175px] focus:outline-none`}
+              className={`relative group overflow-hidden bg-white/90 dark:bg-slate-900/80 backdrop-blur-md p-6 rounded-[2rem] border border-slate-200/70 dark:border-slate-800/80 shadow-[0_4px_20px_rgba(0,0,0,0.02)] hover:-translate-y-1.5 ${style.glow} transition-all duration-300 text-left flex flex-col justify-between min-h-[175px] focus:outline-none`}
               aria-label={`Buka bahagian ${item.title}`}
             >
-              {/* WATERMARK ICON (Mengisi ruang kosong di sebelah kanan kad) */}
-              <div className={`absolute -right-3 -bottom-5 pointer-events-none transform rotate-12 transition-transform duration-500 group-hover:rotate-6 group-hover:scale-105 ${style.watermark}`}>
-                <item.icon size={100} strokeWidth={1} />
+              {/* WATERMARK RE-ENGINEERED (Saiz ditingkatkan ke 150 & kedudukan anjakan diubah) */}
+              <div className={`absolute -right-6 -bottom-10 pointer-events-none transform rotate-12 transition-all duration-500 group-hover:rotate-6 group-hover:scale-110 ${style.watermark}`}>
+                <item.icon size={150} strokeWidth={1} />
               </div>
 
               {/* Top Row: Icon Box & Arrow */}
               <div className="flex justify-between items-center relative z-10 w-full">
-                {/* Solit Fill Icon Container (Dah tak kosong!) */}
                 <div className={`p-3.5 rounded-2xl border ${style.iconBg} ${style.iconBorder} shadow-sm group-hover:scale-105 transition-transform duration-300`}>
                   <item.icon size={22} strokeWidth={2} className={style.iconText} />
                 </div>
                 
-                {/* Arrow indicator */}
                 <div className={`p-2 rounded-xl bg-slate-50 dark:bg-slate-800/80 border border-slate-100 dark:border-slate-700/50 shadow-sm opacity-60 group-hover:opacity-100 group-hover:translate-x-1 transition-all duration-300`}>
                   <ChevronRight size={14} className={style.iconText} />
                 </div>
