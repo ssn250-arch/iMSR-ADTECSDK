@@ -1,18 +1,29 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { doc, onSnapshot, setDoc, collection, deleteDoc } from 'firebase/firestore';
+import { doc, onSnapshot, setDoc, collection } from 'firebase/firestore';
 import { db } from './firebase';
 
-import { 
-  FileText, Users, Map, Calendar, ExternalLink, Music, 
-  ChevronLeft, ChevronDown, Home, Download, ChevronRight,
-  Lock, LogOut, UploadCloud, Plus, Trash2, Edit3, Image as ImageIcon,
-  Bell, Eye, EyeOff, ShieldCheck, AlertTriangle, Clock,
-  Moon, Sun, Zap, Settings, Command, Award,
-  Globe, Monitor, Shield, X, Info, Cpu,
-  FileSignature, UserCog, CalendarClock, GraduationCap, MapPinned, AudioLines
-} from 'lucide-react';
+// --- IMPORT DARI UTILS ---
+import { handleDownloadBlob, senaraiStaf } from './utils/helpers';
 
-// --- STYLES FOR SCROLLBAR, ANIMATIONS & TECH GRID ---
+// --- IMPORT KOMPONEN UI & LAYOUT ---
+import Header from './components/layout/Header';
+import Footer from './components/layout/Footer';
+import BottomNav from './components/layout/BottomNav';
+import FabMenu from './components/layout/FabMenu';
+import ToastNotification from './components/ui/ToastNotification';
+import ImageModal from './components/ui/ImageModal';
+import SplashScreen from './components/ui/SplashScreen';
+
+// --- IMPORT KOMPONEN VIEWS (PAPARAN) ---
+import HomeView from './components/views/HomeView';
+import MemoView from './components/views/MemoView';
+import AjkView from './components/views/AjkView';
+import JadualView from './components/views/JadualView';
+import PenutupView from './components/views/PenutupView';
+import LayoutView from './components/views/LayoutView';
+import LaguView from './components/views/LaguView';
+
+// --- STYLES FOR SCROLLBAR & ANIMATIONS (Global) ---
 const GlobalStyles = React.memo(() => (
   <style>
     {`
@@ -23,303 +34,38 @@ const GlobalStyles = React.memo(() => (
       .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
       .hide-scrollbar::-webkit-scrollbar { display: none; }
       .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-   
-      /* --- Corak Grid TVET / Kejuruteraan --- */
       .tech-grid {
-        background-image: 
-          linear-gradient(to right, rgba(148, 163, 184, 0.15) 1px, transparent 1px),
-          linear-gradient(to bottom, rgba(148, 163, 184, 0.15) 1px, transparent 1px);
-        background-size: 30px 30px;
+        background-image: linear-gradient(to right, rgba(148, 163, 184, 0.15) 1px, transparent 1px), linear-gradient(to bottom, rgba(148, 163, 184, 0.15) 1px, transparent 1px); background-size: 30px 30px;
       }
       .dark .tech-grid {
-        background-image: 
-          linear-gradient(to right, rgba(34, 211, 238, 0.07) 1px, transparent 1px),
-          linear-gradient(to bottom, rgba(34, 211, 238, 0.07) 1px, transparent 1px);
+        background-image: linear-gradient(to right, rgba(34, 211, 238, 0.07) 1px, transparent 1px), linear-gradient(to bottom, rgba(34, 211, 238, 0.07) 1px, transparent 1px);
       }
-
-      @keyframes float {
-        0%, 100% { transform: translateY(0px) scale(1); }
-        50% { transform: translateY(-8px) scale(1.02); }
-      }
+      @keyframes float { 0%, 100% { transform: translateY(0px) scale(1); } 50% { transform: translateY(-8px) scale(1.02); } }
       .animate-float { animation: float 6s ease-in-out infinite; }
       .animate-float-delayed { animation: float 6s ease-in-out 3s infinite; }
-      
-      @keyframes slide {
-        0% { transform: translateX(-100%); }
-        100% { transform: translateX(200%); }
-      }
+      @keyframes slide { 0% { transform: translateX(-100%); } 100% { transform: translateX(200%); } }
       .animate-slide { animation: slide 1.5s ease-in-out infinite; }
-      
-      @keyframes progress {
-        0% { width: 100%; }
-        100% { width: 0%; }
-      }
+      @keyframes progress { 0% { width: 100%; } 100% { width: 0%; } }
       .animate-progress { animation: progress 15s linear forwards; }
     `}
   </style>
 ));
 
-// --- HELPERS ---
-const formatTime = (time24) => {
-  if (!time24) return "";
-  const [h, m] = time24.split(':');
-  let hours = parseInt(h, 10);
-  const ampm = hours >= 12 ? 'PM' : 'AM';
-  hours = hours % 12 || 12;
-  return `${hours}:${m} ${ampm}`;
-};
-
-const formatTarikh = (dateString) => {
-  if (!dateString) return "Sila Pilih Tarikh";
-  const [y, m, d] = dateString.split('-');
-  if (!y || !m || !d) return dateString;
-  const date = new Date(y, m - 1, d);
-  const days = ['Ahad', 'Isnin', 'Selasa', 'Rabu', 'Khamis', 'Jumaat', 'Sabtu'];
-  const months = ['Jan', 'Feb', 'Mac', 'Apr', 'Mei', 'Jun', 'Jul', 'Ogo', 'Sep', 'Okt', 'Nov', 'Dis'];
-  return `${date.getDate()} ${months[date.getMonth()]} ${date.getFullYear()} (${days[date.getDay()]})`;
-};
-
-const formatDateTime = (isoString) => {
-  if (!isoString) return "";
-  const date = new Date(isoString);
-  const days = ['Ahad', 'Isnin', 'Selasa', 'Rabu', 'Khamis', 'Jumaat', 'Sabtu'];
-  const months = ['Jan', 'Feb', 'Mac', 'Apr', 'Mei', 'Jun', 'Jul', 'Ogo', 'Sep', 'Okt', 'Nov', 'Dis'];
-  const h = date.getHours();
-  const m = date.getMinutes().toString().padStart(2, '0');
-  const ampm = h >= 12 ? 'PM' : 'AM';
-  const hr12 = h % 12 || 12;
-  return `${date.getDate()} ${months[date.getMonth()]} ${date.getFullYear()} (${hr12}:${m} ${ampm})`;
-};
-
-// --- FUNGSI MUAT TURUN PDF UNTUK MOBILE (BLOB CONVERSION) ---
-const handleDownloadBlob = (base64Url, fileName) => {
-  try {
-    const parts = base64Url.split(';');
-    const mime = parts[0].split(':')[1];
-    const raw = window.atob(parts[1].split(',')[1]);
-    const rawLength = raw.length;
-    const uInt8Array = new Uint8Array(rawLength);
-    for (let i = 0; i < rawLength; ++i) {
-      uInt8Array[i] = raw.charCodeAt(i);
-    }
-    const blob = new Blob([uInt8Array], { type: mime });
-    const blobUrl = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.style.display = 'none';
-    a.href = blobUrl;
-    a.download = fileName || 'Dokumen_MSR';
-    document.body.appendChild(a);
-    a.click();
-    setTimeout(() => {
-      document.body.removeChild(a);
-      window.URL.revokeObjectURL(blobUrl);
-    }, 200);
-  } catch (error) {
-    console.error("Ralat Muat Turun: ", error);
-    alert("Maaf, ralat berlaku semasa memuat turun fail. Sila cuba lagi.");
-  }
-};
-
-// --- ICON FACEBOOK MANUAL ---
-const CustomFacebookIcon = React.memo(({ size = 20 }) => (
-  <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"/>
-  </svg>
-));
-
-// --- SENARAI STAF (AUTOCOMPLETE) ---
-const senaraiStaf = [
-  "Encik Abdul Hamid bin Sakmud @ Abdullah", "Puan Adiniah Binti Muhamad Radzai", "Puan Anamary binti Madyusah",
-  "Encik Andrew Bin Arih", "Encik Anzari bin Mohd Daud", "Puan Aslinah binti Aldan", "Puan Asriyani binti Seraila",
-  "Encik Azryzan bin Besri", "Encik Azwie bin Jafri", "Encik Billy Anak Rejap", "Encik Darman bin Daming",
-  "Puan Enceng binti Saleng Jaga", "Cik Faten Farhana binti Wong", "Puan Haslinda binti Bohari", 
-  "Encik Hazrudy bin Ahmad Nasaruddin", "Encik Ibrahim bin Lamusa", "Cik Isabella Francis Xavier", 
-  "Encik Ismail Bin Muin", "Encik Jaikol bin Udar", "Encik Jamludin bin Assat", "Encik Japri Bin Patomdang",
-  "Puan Juraini binti Sahid", "Encik Lynn Noell Ending", "Encik Mohamad Sali bin Saleh", "Encik Mohammad Nasir bin Awang",
-  "Encik Mohd Faiz Fathullah bin Ali Hassan", "Encik Mohd Hafizul bin Ibrahim Apani", "Encik Mohd Hairi bin Mohd Shah",
-  "Encik Mohd Hakimin Mohd Hussin", "Encik Mohd Nur Fitri bin Jamil", "Encik Mohd Shamin bin Ahmad",
-  "Encik Muhaidi bin Mohamad", "Encik Muhammad Alinafiah bin Sabril", "Encik Muhalis bin Nonchi", 
-  "Cik Nadzihah binti Ahmad", "Encik Nasri bin Kipple", "Puan Nazriati binti Nasib", "Encik Nazry bin Yusof",
-  "Cik Norashikin Binti Ariffin", "Cik Norashsikin binti Mohd Arsad", "Puan Norhadzla binti Abd Halim", 
-  "Cik Nur Syafiqah binti Arman", "Puan Nurulizaty binti Ibrahim", "Encik Omrei bin Okong", "Encik Peter Masawa",
-  "Encik Richard Joanes", "Puan Roha binti Awang Latif", "Puan Rohana binti Ahmad", "Puan Roshayati binti Mohammad",
-  "Puan Rusyieni @ Wendy Binti Payah", "Cik Sakinah binti Pitungut", "Puan Satria binti Murtala", 
-  "Encik Shaharul bin Abu Talib", "Tc. Johannes Belili", "Tc. Mohd Radznan bin Malek", "Tc. Mohd Sabri bin Mohd Sarif",
-  "Tc. Ng Vui Chien", "Tc. Silvester bin Lawai", "Ts. Joey Eriksen Teo", "Ts. Muhammad Haziq bin Hamzah",
-  "Ts. Muhammad Hifzan bin Salimun", "Ts. Nurzharfan bin Rafei Bui", "Ts. Suhaidi bin Mustar", 
-  "Ts. Syed Mohd Yusri bin Syed Yusoff", "Puan Zuliza binti Roslan"
-];
-
-// --- GAYA KAD PREMIUM / PROFESIONAL ---
-const cardStyles = {
-  blue: { 
-    iconText: 'text-blue-600 dark:text-blue-400', 
-    iconBorder: 'border-blue-200 dark:border-blue-500/20', 
-    glow: 'group-hover:shadow-[0_8px_30px_rgba(59,130,246,0.15)] dark:group-hover:shadow-[0_8px_30px_rgba(59,130,246,0.2)]',
-    topLine: 'from-transparent via-blue-500 to-transparent',
-    hoverBg: 'group-hover:bg-blue-50/50 dark:group-hover:bg-blue-900/10'
-  },
-  emerald: { 
-    iconText: 'text-emerald-600 dark:text-emerald-400', 
-    iconBorder: 'border-emerald-200 dark:border-emerald-500/20', 
-    glow: 'group-hover:shadow-[0_8px_30px_rgba(16,185,129,0.15)] dark:group-hover:shadow-[0_8px_30px_rgba(16,185,129,0.2)]',
-    topLine: 'from-transparent via-emerald-500 to-transparent',
-    hoverBg: 'group-hover:bg-emerald-50/50 dark:group-hover:bg-emerald-900/10'
-  },
-  cyan: { 
-    iconText: 'text-cyan-600 dark:text-cyan-400', 
-    iconBorder: 'border-cyan-200 dark:border-cyan-500/20', 
-    glow: 'group-hover:shadow-[0_8px_30px_rgba(6,182,212,0.15)] dark:group-hover:shadow-[0_8px_30px_rgba(6,182,212,0.2)]',
-    topLine: 'from-transparent via-cyan-500 to-transparent',
-    hoverBg: 'group-hover:bg-cyan-50/50 dark:group-hover:bg-cyan-900/10'
-  },
-  indigo: { 
-    iconText: 'text-indigo-600 dark:text-indigo-400', 
-    iconBorder: 'border-indigo-200 dark:border-indigo-500/20', 
-    glow: 'group-hover:shadow-[0_8px_30px_rgba(99,102,241,0.15)] dark:group-hover:shadow-[0_8px_30px_rgba(99,102,241,0.2)]',
-    topLine: 'from-transparent via-indigo-500 to-transparent',
-    hoverBg: 'group-hover:bg-indigo-50/50 dark:group-hover:bg-indigo-900/10'
-  },
-  sky: { 
-    iconText: 'text-sky-600 dark:text-sky-400', 
-    iconBorder: 'border-sky-200 dark:border-sky-500/20', 
-    glow: 'group-hover:shadow-[0_8px_30px_rgba(14,165,233,0.15)] dark:group-hover:shadow-[0_8px_30px_rgba(14,165,233,0.2)]',
-    topLine: 'from-transparent via-sky-500 to-transparent',
-    hoverBg: 'group-hover:bg-sky-50/50 dark:group-hover:bg-sky-900/10'
-  },
-  violet: { 
-    iconText: 'text-violet-600 dark:text-violet-400', 
-    iconBorder: 'border-violet-200 dark:border-violet-500/20', 
-    glow: 'group-hover:shadow-[0_8px_30px_rgba(139,92,246,0.15)] dark:group-hover:shadow-[0_8px_30px_rgba(139,92,246,0.2)]',
-    topLine: 'from-transparent via-violet-500 to-transparent',
-    hoverBg: 'group-hover:bg-violet-50/50 dark:group-hover:bg-violet-900/10'
-  }
-};
-
-// --- TVET TECH ANIMATION COMPONENT (Litar & Data) ---
-const NetworkAnimation = React.memo(() => {
-  const canvasRef = useRef(null);
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    let animationFrameId;
-    let particles = [];
-    
-    const resizeCanvas = () => {
-      canvas.width = canvas.parentElement.offsetWidth || window.innerWidth;
-      canvas.height = canvas.parentElement.offsetHeight || 400;
-      initParticles();
-    };
-
-    const initParticles = () => {
-      particles = [];
-      const numParticles = Math.min(Math.floor((canvas.width * canvas.height) / 15000), 50); 
-      for (let i = 0; i < numParticles; i++) {
-        particles.push({
-          x: Math.random() * canvas.width,
-          y: Math.random() * canvas.height,
-          vx: (Math.random() - 0.5) * 0.3,
-          vy: (Math.random() - 0.5) * 0.3,
-          radius: Math.random() * 2 + 1
-        });
-      }
-    };
-
-    const draw = () => {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      ctx.lineWidth = 1;
-      
-      for (let i = 0; i < particles.length; i++) {
-        let p = particles[i];
-        p.x += p.vx;
-        p.y += p.vy;
-        if (p.x < 0 || p.x > canvas.width) p.vx *= -1;
-        if (p.y < 0 || p.y > canvas.height) p.vy *= -1;
-        
-        ctx.beginPath();
-        ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
-        ctx.fillStyle = 'rgba(34, 211, 238, 0.5)';
-        ctx.fill();
-
-        for (let j = i + 1; j < particles.length; j++) {
-          let p2 = particles[j];
-          let dx = p.x - p2.x;
-          let dy = p.y - p2.y;
-          let dist = Math.sqrt(dx * dx + dy * dy);
-          if (dist < 110) {
-            ctx.beginPath();
-            ctx.moveTo(p.x, p.y);
-            ctx.lineTo(p2.x, p2.y);
-            ctx.strokeStyle = `rgba(56, 189, 248, ${0.15 - dist / 800})`;
-            ctx.stroke();
-          }
-        }
-      }
-      animationFrameId = requestAnimationFrame(draw);
-    };
-
-    resizeCanvas();
-    window.addEventListener('resize', resizeCanvas);
-    draw();
-
-    return () => {
-      window.removeEventListener('resize', resizeCanvas);
-      cancelAnimationFrame(animationFrameId);
-    };
-  }, []);
-  return <canvas ref={canvasRef} className="absolute inset-0 w-full h-full pointer-events-none z-0 no-print mix-blend-screen" />;
-});
-
-// --- LIVE CLOCK COMPONENT ---
-const LiveClock = React.memo(() => {
-  const [time, setTime] = useState(new Date());
-  useEffect(() => {
-    const timer = setInterval(() => setTime(new Date()), 1000);
-    return () => clearInterval(timer);
-  }, []);
-  const timeString = time.toLocaleTimeString('en-US', { hour12: true, hour: '2-digit', minute: '2-digit', second: '2-digit' });
-  const [timeNums, amPm] = timeString.split(' ');
-
-  return (
-    <div className="flex flex-col items-center justify-center my-2">
-      <div className="flex items-baseline gap-1 font-mono font-black tracking-tighter text-3xl md:text-4xl text-white drop-shadow-[0_0_15px_rgba(34,211,238,0.4)]">
-        {timeNums}
-        <span className="text-sm md:text-base font-extrabold text-cyan-300 tracking-widest drop-shadow-none ml-1">
-          {amPm}
-        </span>
-      </div>
-      <div className="flex items-center gap-1.5 mt-1.5 px-3 py-1 bg-white/5 rounded-full border border-cyan-400/20 backdrop-blur-md">
-        <Clock size={10} className="animate-pulse text-cyan-300" />
-        <span className="text-[9px] font-bold text-cyan-100 uppercase tracking-[0.2em]">Waktu Tempatan</span>
-      </div>
-    </div>
-  );
-});
-
-// --- MAIN APP COMPONENT ---
 export default function App() {
+  // --- STATES ---
   const [currentView, setCurrentView] = useState('home');
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [isAppReady, setIsAppReady] = useState(false);
-  
   const [showFabMenu, setShowFabMenu] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   const [showLogin, setShowLogin] = useState(false);
-  const [loginForm, setLoginForm] = useState({ username: '', password: '' });
-  const [showPassword, setShowPassword] = useState(false);
-  const [loginAttempts, setLoginAttempts] = useState(0);
-  const [isLockedOut, setIsLockedOut] = useState(false);
-  const inactivityTimer = useRef(null);
-
-  const [openBiroIndex, setOpenBiroIndex] = useState(null);
   const [viewingMemo, setViewingMemo] = useState(null);
   const [blobUrl, setBlobUrl] = useState(null);
-
   const [showToast, setShowToast] = useState(false);
   const [latestUpdateInfo, setLatestUpdateInfo] = useState(null);
-  const hasCheckedUpdates = useRef(false);
+  const [isScrolled, setIsScrolled] = useState(false);
 
+  // --- DATA STATES (Diurus oleh Firebase) ---
   const [lastUpdated, setLastUpdated] = useState(null);
   const [announcement, setAnnouncement] = useState('');
   const [sesiKemasukan, setSesiKemasukan] = useState({ sesi: '2', tahun: '2026' });
@@ -330,18 +76,17 @@ export default function App() {
   const [jadualData, setJadualData] = useState([]);
   const [penutupData, setPenutupData] = useState([]);
   const [layoutList, setLayoutList] = useState([]);
-
   const [activeJadualTab, setActiveJadualTab] = useState('');
-  const [isScrolled, setIsScrolled] = useState(false);
-
   const [jadualFile, setJadualFile] = useState(null);
   const [jadualFileDate, setJadualFileDate] = useState(null);
   const [penutupFile, setPenutupFile] = useState(null);
   const [penutupFileDate, setPenutupFileDate] = useState(null);
 
-  const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const hasCheckedUpdates = useRef(false);
+  const inactivityTimer = useRef(null);
   const [showOfflineBanner, setShowOfflineBanner] = useState(false);
 
+  // --- KESAN SCROLL / TEMA GELAP ---
   useEffect(() => {
     if (!isAppReady) {
       document.body.style.overflow = 'hidden';
@@ -351,6 +96,34 @@ export default function App() {
   }, [isAppReady]);
 
   useEffect(() => {
+    if (localStorage.theme === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+      setIsDarkMode(true);
+    }
+    const handleScroll = () => setIsScrolled(window.scrollY > 20);
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  // --- NAVIGASI ---
+  const navigateTo = useCallback((view) => {
+    setShowFabMenu(false);
+    setCurrentView(view);
+    requestAnimationFrame(() => {
+      window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+    });
+  }, []);
+
+  const toggleTheme = useCallback(() => {
+    setIsDarkMode(prev => {
+      const nextMode = !prev;
+      localStorage.theme = nextMode ? 'dark' : 'light';
+      return nextMode;
+    });
+  }, []);
+
+  // --- FIREBASE FETCHING (Data Sync) ---
+  useEffect(() => {
+    // 1. Ambil dari Cache LocalStorage
     const cachedData = localStorage.getItem('imsr_cached_data');
     if (cachedData) {
       try {
@@ -366,11 +139,11 @@ export default function App() {
           setJadualData(data.jadualData);
           setActiveJadualTab(prev => prev || (data.jadualData.length > 0 ? data.jadualData[0].id : ''));
         }
-      } catch(e) { console.warn("Cache error", e); }
+      } catch(e) {}
     }
 
-    const docRef = doc(db, "msr", "data_utama");
-    const unsubscribeUtama = onSnapshot(docRef, (docSnap) => {
+    // 2. Langganan Firebase MSR Utama
+    const unsubscribeUtama = onSnapshot(doc(db, "msr", "data_utama"), (docSnap) => {
       if (docSnap.exists()) {
         const data = docSnap.data();
         localStorage.setItem('imsr_cached_data', JSON.stringify(data));
@@ -387,66 +160,35 @@ export default function App() {
           setActiveJadualTab(prev => prev || (data.jadualData.length > 0 ? data.jadualData[0].id : ''));
         }
       }
-    }, (error) => console.error("Firebase fetch error:", error));
+    });
 
-    const memosRef = collection(db, "msr_memos");
-    const unsubscribeMemos = onSnapshot(memosRef, (snapshot) => {
+    // 3. Langganan Fail Memos, Pelan, Jadual Penuh, & Penutup Penuh
+    const unsubscribeMemos = onSnapshot(collection(db, "msr_memos"), (snapshot) => {
       const memosArray = [];
       snapshot.forEach((doc) => memosArray.push(doc.data()));
       memosArray.sort((a, b) => a.id.localeCompare(b.id));
       setMemoList(memosArray);
-      localStorage.setItem('imsr_cached_memos', JSON.stringify(memosArray));
-    }, (error) => console.error("Ralat memo:", error));
+    });
 
-    const layoutRef = doc(db, "msr", "data_layout");
-    const unsubscribeLayout = onSnapshot(layoutRef, (docSnap) => {
-      if (docSnap.exists()) {
-        const d = docSnap.data();
-        if (d.layouts) {
-          setLayoutList(d.layouts);
-          localStorage.setItem('imsr_cached_layout', JSON.stringify(d.layouts));
-        } else if (d.layoutImage) {
-          const legacyLayout = [{ id: 'legacy_1', url: d.layoutImage, type: d.layoutImage.includes('pdf')?'pdf':'image', uploadDate: d.uploadDate, name: 'Pelan Pendaftaran' }];
-          setLayoutList(legacyLayout);
-          localStorage.setItem('imsr_cached_layout', JSON.stringify(legacyLayout));
-        } else {
-          setLayoutList([]);
-        }
-      } else {
-        setLayoutList([]);
-      }
-      setTimeout(() => { setIsAppReady(true); }, 1500); 
-    }, (error) => {
-      console.error("Ralat layout:", error);
-      const cachedLayout = localStorage.getItem('imsr_cached_layout');
-      if (cachedLayout) {
-        try {
-          setLayoutList(JSON.parse(cachedLayout));
-        } catch(e) {}
-      }
+    const unsubscribeLayout = onSnapshot(doc(db, "msr", "data_layout"), (docSnap) => {
+      if (docSnap.exists() && docSnap.data().layouts) {
+        setLayoutList(docSnap.data().layouts);
+      } else { setLayoutList([]); }
       setTimeout(() => { setIsAppReady(true); }, 1500);
     });
 
-    const jadualFileRef = doc(db, "msr", "data_jadual_file");
-    const unsubscribeJadualFile = onSnapshot(jadualFileRef, (docSnap) => {
+    const unsubscribeJadualFile = onSnapshot(doc(db, "msr", "data_jadual_file"), (docSnap) => {
       if (docSnap.exists() && docSnap.data().fileData) {
         setJadualFile(docSnap.data().fileData);
-        setJadualFileDate(docSnap.data().uploadDate || null);
-      } else {
-        setJadualFile(null);
-        setJadualFileDate(null);
-      }
+        setJadualFileDate(docSnap.data().uploadDate);
+      } else { setJadualFile(null); setJadualFileDate(null); }
     });
 
-    const penutupFileRef = doc(db, "msr", "data_penutup_file");
-    const unsubscribePenutupFile = onSnapshot(penutupFileRef, (docSnap) => {
+    const unsubscribePenutupFile = onSnapshot(doc(db, "msr", "data_penutup_file"), (docSnap) => {
       if (docSnap.exists() && docSnap.data().fileData) {
         setPenutupFile(docSnap.data().fileData);
-        setPenutupFileDate(docSnap.data().uploadDate || null);
-      } else {
-        setPenutupFile(null);
-        setPenutupFileDate(null);
-      }
+        setPenutupFileDate(docSnap.data().uploadDate);
+      } else { setPenutupFile(null); setPenutupFileDate(null); }
     });
 
     return () => {
@@ -458,39 +200,7 @@ export default function App() {
     };
   }, []);
 
-  useEffect(() => {
-    const handleOnline = () => {
-      setIsOnline(true);
-      setShowOfflineBanner(false);
-      retryFailedUpdates();
-    };
-    const handleOffline = () => {
-      setIsOnline(false);
-      setShowOfflineBanner(true);
-      setTimeout(() => setShowOfflineBanner(false), 10000);
-    };
-    window.addEventListener('online', handleOnline);
-    window.addEventListener('offline', handleOffline);
-    return () => {
-      window.removeEventListener('online', handleOnline);
-      window.removeEventListener('offline', handleOffline);
-    };
-  }, []);
-
-  const retryFailedUpdates = useCallback(async () => {
-    const pending = JSON.parse(localStorage.getItem('imsr_pending_updates') || '[]');
-    if (pending.length === 0) return;
-    for (const update of pending) {
-      try {
-        const docRef = doc(db, "msr", "data_utama");
-        await setDoc(docRef, update.payload, { merge: true });
-      } catch (err) {
-        console.warn("Gagal sync semula:", err);
-      }
-    }
-    localStorage.removeItem('imsr_pending_updates');
-  }, []);
-
+  // --- KEMAS KINI OFFLINE FIREBASE ---
   const saveToFirebaseWithOffline = useCallback(async (fieldsToUpdate) => {
     const payload = { ...fieldsToUpdate, lastUpdated: new Date().toISOString() };
     if (!navigator.onLine) {
@@ -499,29 +209,16 @@ export default function App() {
       localStorage.setItem('imsr_pending_updates', JSON.stringify(pending));
       setShowOfflineBanner(true);
       setTimeout(() => setShowOfflineBanner(false), 6000);
-      const cached = localStorage.getItem('imsr_cached_data');
-      if (cached) {
-        try {
-          const data = JSON.parse(cached);
-          const updatedData = { ...data, ...fieldsToUpdate, lastUpdated: payload.lastUpdated };
-          localStorage.setItem('imsr_cached_data', JSON.stringify(updatedData));
-        } catch(e) {}
-      }
       return;
     }
     try {
-      const docRef = doc(db, "msr", "data_utama");
-      await setDoc(docRef, payload, { merge: true });
+      await setDoc(doc(db, "msr", "data_utama"), payload, { merge: true });
     } catch (error) {
-      console.error("Gagal mengemaskini:", error);
-      const pending = JSON.parse(localStorage.getItem('imsr_pending_updates') || '[]');
-      pending.push({ timestamp: Date.now(), payload });
-      localStorage.setItem('imsr_pending_updates', JSON.stringify(pending));
-      setShowOfflineBanner(true);
-      setTimeout(() => setShowOfflineBanner(false), 6000);
+      console.error(error);
     }
   }, []);
 
+  // --- NOTIFIKASI TOAST ---
   useEffect(() => {
     if (isAppReady && lastUpdated && !hasCheckedUpdates.current) {
       const lastVisit = localStorage.getItem('imsr_last_visit');
@@ -534,15 +231,102 @@ export default function App() {
     }
   }, [isAppReady, lastUpdated]);
 
-  useEffect(() => {
-    if (localStorage.theme === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
-      setIsDarkMode(true);
+  // --- FUNGSI MUAT NAIK FAIL (Dipanjangkan sebagai Props) ---
+  const handleDocumentUpload = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = async (ev) => {
+        const newMemo = {
+          id: 'memo_' + Date.now(),
+          name: file.name,
+          url: ev.target.result,
+          type: file.type.includes('pdf') ? 'pdf' : 'image',
+          uploadDate: new Date().toISOString()
+        };
+        try {
+          await setDoc(doc(db, "msr_memos", newMemo.id), newMemo);
+          saveToFirebaseWithOffline({ latestUpdate: { view: 'memo', text: `Dokumen baharu dimuat naik.` } });
+        } catch (error) { alert("RALAT: Gagal muat naik."); }
+      };
+      reader.readAsDataURL(file);
     }
-    const handleScroll = () => setIsScrolled(window.scrollY > 20);
-    window.addEventListener('scroll', handleScroll, { passive: true });
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, []);
+  };
 
+  const handleLayoutUpload = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = async (ev) => {
+        let customName = window.prompt("Nama Pelan:", file.name.split('.')[0]);
+        const newLayout = {
+          id: 'layout_' + Date.now(), url: ev.target.result,
+          name: customName || `Pelan_${Date.now()}`,
+          type: file.type.includes('pdf') ? 'pdf' : 'image',
+          uploadDate: new Date().toISOString()
+        };
+        try {
+          await setDoc(doc(db, "msr", "data_layout"), { layouts: [...layoutList, newLayout] });
+          saveToFirebaseWithOffline({ latestUpdate: { view: 'layout', text: `Pelan baharu ditambah.` } });
+        } catch (error) { alert("Gagal muat naik pelan."); }
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleDeleteLayout = async (idToDel) => {
+    if(window.confirm("Padam pelan ini?")) {
+      await setDoc(doc(db, "msr", "data_layout"), { layouts: layoutList.filter(l => l.id !== idToDel) });
+    }
+  };
+
+  const handleJadualFileUpload = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = async (ev) => {
+        await setDoc(doc(db, "msr", "data_jadual_file"), { fileData: ev.target.result, uploadDate: new Date().toISOString() });
+        saveToFirebaseWithOffline({ latestUpdate: { view: 'jadual', text: 'Tentatif Penuh dimuat naik.' } });
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handlePenutupFileUpload = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = async (ev) => {
+        await setDoc(doc(db, "msr", "data_penutup_file"), { fileData: ev.target.result, uploadDate: new Date().toISOString() });
+        saveToFirebaseWithOffline({ latestUpdate: { view: 'penutup', text: 'Majlis Penutup penuh dimuat naik.' } });
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  // --- RENDER PER VIEWS ---
+  const renderView = () => {
+    switch(currentView) {
+      case 'home':
+        return <HomeView isAdmin={isAdmin} announcement={announcement} setAnnouncement={setAnnouncement} saveToFirebaseWithOffline={saveToFirebaseWithOffline} sesiKemasukan={sesiKemasukan} setSesiKemasukan={setSesiKemasukan} navigateTo={navigateTo} />;
+      case 'memo':
+        return <MemoView isAdmin={isAdmin} memoList={memoList} handleDocumentUpload={handleDocumentUpload} setViewingMemo={setViewingMemo} handleDownloadBlob={handleDownloadBlob} memoText={memoText} setMemoText={setMemoText} saveToFirebaseWithOffline={saveToFirebaseWithOffline} />;
+      case 'ajk':
+        return <AjkView isAdmin={isAdmin} ajkInduk={ajkInduk} setAjkInduk={setAjkInduk} biroList={biroList} setBiroList={setBiroList} saveToFirebaseWithOffline={saveToFirebaseWithOffline} />;
+      case 'jadual':
+        return <JadualView isAdmin={isAdmin} jadualData={jadualData} setJadualData={setJadualData} activeJadualTab={activeJadualTab} setActiveJadualTab={setActiveJadualTab} jadualFile={jadualFile} jadualFileDate={jadualFileDate} setJadualFile={setJadualFile} handleJadualFileUpload={handleJadualFileUpload} setViewingMemo={setViewingMemo} handleDownloadBlob={handleDownloadBlob} saveToFirebaseWithOffline={saveToFirebaseWithOffline} />;
+      case 'penutup':
+        return <PenutupView isAdmin={isAdmin} penutupData={penutupData} setPenutupData={setPenutupData} penutupFile={penutupFile} penutupFileDate={penutupFileDate} setPenutupFile={setPenutupFile} handlePenutupFileUpload={handlePenutupFileUpload} setViewingMemo={setViewingMemo} handleDownloadBlob={handleDownloadBlob} saveToFirebaseWithOffline={saveToFirebaseWithOffline} />;
+      case 'layout':
+        return <LayoutView isAdmin={isAdmin} layoutList={layoutList} handleLayoutUpload={handleLayoutUpload} handleDeleteLayout={handleDeleteLayout} setViewingMemo={setViewingMemo} handleDownloadBlob={handleDownloadBlob} />;
+      case 'lagu':
+        return <LaguView />;
+      default:
+        return <HomeView navigateTo={navigateTo} />;
+    }
+  };
+
+  // --- LOGIK BLOB UTK MODAL ---
   useEffect(() => {
     if (viewingMemo) {
       try {
@@ -551,1363 +335,42 @@ export default function App() {
         const raw = window.atob(parts[1].split(',')[1]);
         const rawLength = raw.length;
         const uInt8Array = new Uint8Array(rawLength);
-        for (let i = 0; i < rawLength; ++i) {
-          uInt8Array[i] = raw.charCodeAt(i);
-        }
+        for (let i = 0; i < rawLength; ++i) { uInt8Array[i] = raw.charCodeAt(i); }
         const blob = new Blob([uInt8Array], { type: mime });
-        const url = window.URL.createObjectURL(blob);
-        setBlobUrl(url);
-      } catch (e) {
-        setBlobUrl(viewingMemo.url); 
-      }
+        setBlobUrl(window.URL.createObjectURL(blob));
+      } catch (e) { setBlobUrl(viewingMemo.url); }
     } else {
-      if (blobUrl) {
-        window.URL.revokeObjectURL(blobUrl);
-        setBlobUrl(null);
-      }
+      if (blobUrl) { window.URL.revokeObjectURL(blobUrl); setBlobUrl(null); }
     }
   }, [viewingMemo]);
 
-  const toggleTheme = useCallback(() => {
-    setIsDarkMode(prev => {
-      const nextMode = !prev;
-      localStorage.theme = nextMode ? 'dark' : 'light';
-      return nextMode;
-    });
-  }, []);
-
-  const navigateTo = useCallback((view) => {
-    setShowFabMenu(false);
-    setCurrentView(view);
-    setOpenBiroIndex(null); 
-    requestAnimationFrame(() => {
-      window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
-    });
-  }, []);
-
-  const resetInactivityTimer = useCallback(() => {
-    if (inactivityTimer.current) clearTimeout(inactivityTimer.current);
-    if (isAdmin) {
-      inactivityTimer.current = setTimeout(() => {
-        setIsAdmin(false);
-        alert('Sesi ditamatkan secara automatik atas faktor keselamatan (15 minit tiada aktiviti).');
-      }, 15 * 60 * 1000);
-    }
-  }, [isAdmin]);
-
-  useEffect(() => {
-    if (!isAdmin) return;
-    window.addEventListener('mousemove', resetInactivityTimer, { passive: true });
-    window.addEventListener('keypress', resetInactivityTimer, { passive: true });
-    return () => {
-      window.removeEventListener('mousemove', resetInactivityTimer);
-      window.removeEventListener('keypress', resetInactivityTimer);
-      if (inactivityTimer.current) clearTimeout(inactivityTimer.current);
-    };
-  }, [isAdmin, resetInactivityTimer]);
-
-  const handleLogin = (e) => {
-    e.preventDefault();
-    if (isLockedOut) return;
-    if (loginForm.username === 'admin' && loginForm.password === 'abc@12345') {
-      setIsAdmin(true);
-      setShowLogin(false);
-      setLoginForm({ username: '', password: '' });
-      setLoginAttempts(0);
-    } else {
-      const newAttempts = loginAttempts + 1;
-      setLoginAttempts(newAttempts);
-      if (newAttempts >= 3) {
-        setIsLockedOut(true);
-        setTimeout(() => { setIsLockedOut(false); setLoginAttempts(0); }, 30000);
-      } else {
-        alert(`Log Masuk Gagal. Baki cubaan: ${3 - newAttempts}`);
-      }
-    }
-  };
-
-  const handleDocumentUpload = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      if (file.size > 800 * 1024) {
-         alert("PERHATIAN: Saiz fail ini agak besar. Jika gagal, sila gunakan aplikasi pemampat PDF/Imej.");
-      }
-      
-      const reader = new FileReader();
-      reader.onload = async (ev) => {
-        const base64Data = ev.target.result;
-        const fileType = file.type === 'application/pdf' ? 'pdf' : 'image';
-        let ext = file.name.split('.').pop() || (fileType === 'pdf' ? 'pdf' : 'jpg');
-        let defaultName = `Dokumen_MSR.${ext}`;
-        const newMemo = {
-          id: 'memo_' + Date.now(),
-          name: file.name || defaultName,
-          url: base64Data,
-          type: fileType,
-          uploadDate: new Date().toISOString()
-        };
-        try {
-          await setDoc(doc(db, "msr_memos", newMemo.id), newMemo);
-          saveToFirebaseWithOffline({ latestUpdate: { view: 'memo', text: `Dokumen baharu bertajuk '${newMemo.name}' telah dimuat naik.` } });
-        } catch (error) {
-          console.error(error);
-          alert("RALAT: Gagal memuat naik fail. Sila pastikan fail kurang daripada 1MB.");
-        }
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-
-  const handleLayoutUpload = (e) => {
-    const file = e.target.files[0];
-    if (file && (file.type.startsWith('image/') || file.type === 'application/pdf')) {
-      if (file.size > 800 * 1024) {
-         alert("PERHATIAN: Saiz pelan agak besar. Jika gagal, kompres imej/PDF tersebut.");
-      }
-      const reader = new FileReader();
-      reader.onload = async (ev) => {
-        const fileType = file.type === 'application/pdf' ? 'pdf' : 'image';
-        let customName = window.prompt("Sila masukkan nama untuk pelan ini (Cth: Pelan Dewan):", file.name.split('.')[0]);
-        if (!customName) customName = `Pelan_${Date.now()}`;
-        
-        const newLayout = {
-          id: 'layout_' + Date.now(),
-          url: ev.target.result,
-          name: customName,
-          type: fileType,
-          uploadDate: new Date().toISOString()
-        };
-        const updatedLayouts = [...layoutList, newLayout];
-
-        try {
-          await setDoc(doc(db, "msr", "data_layout"), { layouts: updatedLayouts });
-          saveToFirebaseWithOffline({ latestUpdate: { view: 'layout', text: `Pelan baharu bertajuk '${customName}' telah ditambah.` } });
-        } catch (error) {
-          console.error(error);
-          alert("RALAT: Gagal memuat naik pelan. Sila pastikan fail kurang daripada 1MB.");
-        }
-      };
-      reader.readAsDataURL(file);
-    } else {
-      alert("Sila muat naik fail berformat Imej atau PDF sahaja.");
-    }
-  };
-
-  const handleDeleteLayout = async (idToDel) => {
-    if(window.confirm("Adakah anda pasti mahu memadam pelan ini?")) {
-      const updatedLayouts = layoutList.filter(l => l.id !== idToDel);
-      try {
-        await setDoc(doc(db, "msr", "data_layout"), { layouts: updatedLayouts });
-        saveToFirebaseWithOffline({ latestUpdate: { view: 'layout', text: 'Satu dokumen pelan telah dipadam.' } });
-      } catch(err) {
-        console.error(err);
-        alert("Gagal memadam pelan.");
-      }
-    }
-  };
-
-  const handleJadualFileUpload = (e) => {
-    const file = e.target.files[0];
-    if (file && (file.type.startsWith('image/') || file.type === 'application/pdf')) {
-      if (file.size > 800 * 1024) alert("PERHATIAN: Saiz fail agak besar. Sila kompres jika gagal.");
-      const reader = new FileReader();
-      reader.onload = async (ev) => {
-        try {
-          await setDoc(doc(db, "msr", "data_jadual_file"), { 
-            fileData: ev.target.result, uploadDate: new Date().toISOString() 
-          });
-          saveToFirebaseWithOffline({ latestUpdate: { view: 'jadual', text: 'Satu fail Tentatif Program penuh telah dimuat naik.' } });
-        } catch (error) { console.error(error); alert("Gagal memuat naik fail."); }
-      };
-      reader.readAsDataURL(file);
-    } else { alert("Muat naik format Imej atau PDF sahaja."); }
-  };
-
-  const handlePenutupFileUpload = (e) => {
-    const file = e.target.files[0];
-    if (file && (file.type.startsWith('image/') || file.type === 'application/pdf')) {
-      if (file.size > 800 * 1024) alert("PERHATIAN: Saiz fail agak besar. Sila kompres jika gagal.");
-      const reader = new FileReader();
-      reader.onload = async (ev) => {
-        try {
-          await setDoc(doc(db, "msr", "data_penutup_file"), { 
-            fileData: ev.target.result, uploadDate: new Date().toISOString() 
-          });
-          saveToFirebaseWithOffline({ latestUpdate: { view: 'penutup', text: 'Satu fail Majlis Penutup penuh telah dimuat naik.' } });
-        } catch (error) { console.error(error); alert("Gagal memuat naik fail."); }
-      };
-      reader.readAsDataURL(file);
-    } else { alert("Muat naik format Imej atau PDF sahaja."); }
-  };
-
-  const ModernDropdown = ({ value, options, onChange }) => {
-    const [isOpen, setIsOpen] = useState(false);
-    const dropdownRef = useRef(null);
-
-    useEffect(() => {
-      const handleClickOutside = (event) => {
-        if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
-          setIsOpen(false);
-        }
-      };
-      document.addEventListener("mousedown", handleClickOutside);
-      return () => document.removeEventListener("mousedown", handleClickOutside);
-    }, []);
-
-    return (
-      <div className="relative" ref={dropdownRef}>
-        <button
-          type="button"
-          onClick={() => setIsOpen(!isOpen)}
-          className="flex items-center gap-1 bg-white/10 hover:bg-white/20 px-3 py-1.5 rounded-lg text-[11px] font-extrabold text-white transition-all backdrop-blur-md shadow-sm border border-white/20 outline-none"
-          aria-label="Pilih nilai dropdown"
-        >
-          {options.find(o => o.value === value)?.label || value}
-          <ChevronDown size={14} className={`transition-transform duration-300 ${isOpen ? 'rotate-180' : ''}`} />
-        </button>
-        
-        {isOpen && (
-          <div className="absolute top-full left-0 mt-2 min-w-[80px] max-h-48 overflow-y-auto custom-scrollbar bg-white/95 dark:bg-slate-800/95 backdrop-blur-xl rounded-xl shadow-2xl border border-slate-200 dark:border-slate-700 z-[60] py-1.5 animate-in slide-in-from-top-2">
-            {options.map((opt) => (
-              <button
-                key={opt.value}
-                type="button"
-                onClick={() => { onChange(opt.value); setIsOpen(false); }}
-                className={`w-full text-left px-4 py-2.5 text-xs font-bold transition-colors ${value === opt.value ?
-                'text-cyan-600 dark:text-cyan-400 bg-cyan-50/80 dark:bg-cyan-900/30' : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700/80'}`}
-                aria-label={`Pilih ${opt.label}`}
-              >
-                {opt.label}
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
-    );
-  };
-
-  const AccordionBiro = ({ biro, isOpen, onToggle }) => {
-    return (
-      <div className="border border-slate-200 dark:border-slate-700 rounded-xl mb-3 overflow-hidden bg-white dark:bg-slate-800 shadow-sm transition-all duration-300">
-        <button 
-          className="w-full px-4 py-3 text-left flex justify-between items-center bg-slate-50 hover:bg-slate-100 dark:bg-slate-800 dark:hover:bg-slate-700 transition-colors"
-          onClick={onToggle}
-          aria-label={`Kembangkan biro ${biro.nama}`}
-        >
-         <span className="font-bold text-slate-800 dark:text-slate-100 text-sm">{biro.nama}</span>
-          <ChevronDown className={`text-slate-500 transition-transform duration-300 ${isOpen ? 'rotate-180 text-cyan-500' : ''}`} size={18} />
-        </button>
-        {isOpen && (
-          <div className="px-4 py-3 border-t border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/50 animate-in slide-in-from-top-2 fade-in duration-200">
-            <div className="mb-3">
-              <span className="text-[11px] font-bold text-cyan-600 dark:text-cyan-400 uppercase tracking-wider bg-cyan-50 dark:bg-cyan-900/30 px-2 py-0.5 rounded">Ketua Biro</span>
-              <p className="text-slate-900 dark:text-slate-200 font-bold text-sm mt-1.5 ml-1">{biro.ketua}</p>
-            </div>
-            <div>
-              <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider bg-slate-100 dark:bg-slate-700 px-2 py-0.5 rounded">Ahli Jawatankuasa</span>
-              <ul className="list-disc pl-5 mt-1.5 space-y-1">
-                {biro.ahli && biro.ahli.map((ahli, idx) => (
-                  <li key={idx} className="text-sm text-slate-700 dark:text-slate-300 font-medium">{ahli}</li>
-                ))}
-              </ul>
-            </div>
-          </div>
-        )}
-      </div>
-    );
-  };
 
   return (
     <div className={isDarkMode ? 'dark' : ''}>
+      <GlobalStyles />
       <datalist id="senarai-staf">
-        {senaraiStaf.map((staf, i) => (
-          <option key={i} value={staf} />
-        ))}
+        {senaraiStaf.map((staf, i) => <option key={i} value={staf} />)}
       </datalist>
 
-      {/* --- NOTIFIKASI TOAST BOLEH KLIK (KEMAS KINI BAHARU) --- */}
-      {showToast && (
-        <div className="fixed top-4 left-4 right-4 md:left-auto md:right-8 md:top-8 md:w-[26rem] z-[150] animate-in slide-in-from-top-10 fade-in duration-500">
-          <div className="bg-gradient-to-r from-cyan-600 to-blue-600 text-white p-5 rounded-2xl shadow-[0_10px_40px_rgba(0,0,0,0.3)] flex flex-col gap-3 border border-cyan-400/50 relative overflow-hidden">
-            <div className="absolute bottom-0 left-0 w-full h-1.5 bg-black/20">
-               <div className="h-full bg-cyan-400 animate-progress"></div>
-            </div>
-            
-            <div className="flex items-start gap-4">
-              <div className="bg-white/20 p-2.5 rounded-xl shrink-0 mt-1">
-                <Info className="animate-pulse" size={24} />
-              </div>
-              <div className="pr-6 mt-0.5">
-                <h4 className="font-extrabold text-sm md:text-base tracking-tight mb-1">Kemas Kini Baharu!</h4>
-                <p className="text-xs text-cyan-100 leading-relaxed font-medium">
-                  {latestUpdateInfo?.text || "Terdapat maklumat jadual, fail dokumen, atau pengumuman yang terkini."}
-                </p>
-              </div>
-            </div>
-
-            {latestUpdateInfo?.view && (
-              <button 
-                onClick={() => { navigateTo(latestUpdateInfo.view); setShowToast(false); }}
-                className="w-full mt-2 bg-white/10 hover:bg-white/20 border border-white/20 text-white text-xs font-bold py-2.5 rounded-xl transition-colors flex items-center justify-center gap-2 active:scale-95"
-                aria-label="Lihat bahagian kemas kini"
-              >
-                Lihat Bahagian {latestUpdateInfo.view.charAt(0).toUpperCase() + latestUpdateInfo.view.slice(1)} <ChevronRight size={14} />
-              </button>
-            )}
-
-            <button onClick={() => setShowToast(false)} className="absolute top-4 right-4 text-cyan-200 hover:text-white transition-colors bg-black/10 hover:bg-black/30 p-1.5 rounded-full active:scale-90" aria-label="Tutup notifikasi"><X size={16}/></button>
-          </div>
-        </div>
-      )}
-
-      {/* Banner Offline */}
-      {showOfflineBanner && (
-        <div className="fixed bottom-20 left-4 right-4 md:bottom-8 md:left-auto md:right-8 z-[200] bg-red-600 text-white p-3 rounded-xl shadow-xl flex items-center justify-between gap-3 animate-in slide-in-from-bottom-5 fade-in">
-          <div className="flex items-center gap-2">
-            <AlertTriangle size={18} className="text-yellow-300" />
-            <span className="text-xs font-bold">Tiada sambungan internet. Perubahan akan disimpan dan disegerak apabila sambungan pulih.</span>
-          </div>
-          <button onClick={() => setShowOfflineBanner(false)} className="text-white/70 hover:text-white p-1" aria-label="Tutup amaran offline">
-            <X size={16} />
-          </button>
-        </div>
-      )}
-
-      {/* --- SPLASH SCREEN LOADING --- */}
-      <div className={`fixed inset-0 z-[999] bg-[#020817] flex flex-col items-center justify-center transition-all duration-700 ease-in-out ${isAppReady ? 'opacity-0 pointer-events-none scale-105 blur-sm' : 'opacity-100 scale-100 blur-none'}`}>
-        <div className="relative flex flex-col items-center">
-           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-24 h-24 md:w-40 md:h-40 bg-cyan-600/40 blur-[50px] rounded-full animate-pulse"></div>
-           <img src="Logo ADTEC JTM 2025 Kampus Sandakan.png" alt="Logo ADTEC" className="w-20 md:w-28 relative z-10 drop-shadow-2xl animate-float" />
-           <h1 className="mt-6 text-xl md:text-2xl font-black tracking-tight text-white relative z-10 drop-shadow-lg">
-             iMSR <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-400">ADTEC JTM</span>
-           </h1>
-           <span className="text-cyan-400/80 text-[9px] md:text-[10px] font-bold tracking-[0.3em] uppercase mt-1.5 relative z-10">Kampus Sandakan</span>
-           
-           <div className="mt-8 w-40 h-1 bg-slate-800 rounded-full overflow-hidden relative z-10 shadow-inner">
-             <div className="absolute top-0 left-0 h-full bg-gradient-to-r from-cyan-500 via-blue-500 to-indigo-500 w-1/2 animate-slide rounded-full"></div>
-           </div>
-           <p className="mt-3 text-[11px] font-semibold text-slate-500 animate-pulse tracking-wider">Memuatkan Sistem...</p>
-        </div>
-      </div>
-
+      <SplashScreen isAppReady={isAppReady} />
+      <ToastNotification showToast={showToast} info={latestUpdateInfo} setShowToast={setShowToast} navigateTo={navigateTo} />
+      
       <div className="min-h-screen bg-[#f8fafc] dark:bg-[#020817] font-sans text-slate-900 dark:text-slate-100 flex flex-col relative selection:bg-cyan-200 dark:selection:bg-cyan-900 overflow-x-hidden transition-colors duration-500">
-        <GlobalStyles />
-
-        {/* --- HEADER --- */}
-        <header className={`sticky top-0 z-40 backdrop-blur-2xl transition-all duration-300 ease-out ${
-          isScrolled ? 'bg-white/80 dark:bg-slate-900/80 shadow-[0_4px_30px_rgba(0,0,0,0.05)] dark:shadow-[0_4px_30px_rgba(0,0,0,0.3)] border-b border-slate-200 dark:border-slate-800' : 'bg-transparent border-b border-transparent py-2'
-        }`}>
-          <div className={`max-w-6xl mx-auto px-4 lg:px-8 flex items-center justify-between transition-all duration-300 ease-out ${isScrolled ? 'h-14 md:h-16' : 'h-16 md:h-20'}`}>
-            <div className="flex items-center gap-4">
-              {currentView !== 'home' && (
-                <button onClick={() => navigateTo('home')} className="p-2 -ml-2 rounded-full bg-white/50 dark:bg-slate-800/50 hover:bg-slate-200 dark:hover:bg-slate-700 active:scale-90 transition-all duration-200 shadow-sm border border-slate-200/50 dark:border-slate-700/50" aria-label="Kembali ke laman utama">
-                  <ChevronLeft size={20} />
-                </button>
-              )}
-              <button onClick={() => navigateTo('home')} className="flex items-center gap-2.5 md:gap-3 text-left focus:outline-none hover:opacity-80 transition-opacity active:scale-95" aria-label="Laman utama">
-                <img src="Logo ADTEC JTM 2025 Kampus Sandakan.png" alt="Logo ADTEC" className={`w-auto object-contain bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-slate-100 dark:border-slate-700 transition-all duration-300 ${isScrolled ? 'h-8 md:h-10 p-1' : 'h-10 md:h-12 p-1.5'}`} />
-                <div>
-                  <h1 className="font-extrabold tracking-tight text-base md:text-xl bg-clip-text text-transparent bg-gradient-to-r from-cyan-600 to-blue-600 dark:from-cyan-400 dark:to-blue-400">iMSR ADTEC JTM</h1>
-                  <span className="text-[9px] md:text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-[0.2em] hidden sm:block transition-all">KAMPUS Sandakan</span>
-                </div>
-              </button>
-            </div>
-            
-            <div className="flex items-center gap-2 md:gap-4">
-              <div className="hidden sm:flex items-center gap-2 border-r border-slate-200 dark:border-slate-700 pr-4 mr-2">
-                <a href="https://www.jtm.gov.my/etatatertib/" target="_blank" rel="noopener noreferrer" className="p-2 rounded-full text-slate-500 dark:text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-slate-800 transition-all" title="eTATATERTIB" aria-label="eTATATERTIB"><Shield size={18} /></a>
-                <a href="https://jims.jtm.gov.my/" target="_blank" rel="noopener noreferrer" className="p-2 rounded-full text-slate-500 dark:text-slate-400 hover:text-cyan-600 hover:bg-cyan-50 dark:hover:bg-slate-800 transition-all" title="Sistem JIMS" aria-label="Sistem JIMS"><Monitor size={18} /></a>
-                <a href="https://www.facebook.com/ilpsdk" target="_blank" rel="noopener noreferrer" className="p-2 rounded-full text-slate-500 dark:text-slate-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-slate-800 transition-all" title="Facebook ILP Sandakan" aria-label="Facebook ILP Sandakan"><CustomFacebookIcon size={18} /></a>
-              </div>
-              {isAdmin && <span className="hidden md:flex items-center gap-1.5 text-[10px] font-bold text-emerald-600 bg-emerald-50 dark:bg-emerald-900/30 px-3 py-1.5 rounded-full border border-emerald-200 dark:border-emerald-800/50 transition-all shadow-sm"><ShieldCheck size={14}/> Mod Admin</span>}
-              <button onClick={toggleTheme} className="p-2.5 rounded-full bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 transition-all active:scale-90 hover:bg-slate-100 dark:hover:bg-slate-700 shadow-sm border border-slate-200 dark:border-slate-700" aria-label="Tukar tema gelap/terang">{isDarkMode ? <Sun size={18} /> : <Moon size={18} />}</button>
-            </div>
-          </div>
-        </header>
-
-        {/* --- LOGIN MODAL --- */}
-        {showLogin && (
-          <div className="fixed inset-0 bg-slate-900/60 dark:bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-            <div className="bg-white dark:bg-slate-900 rounded-[2rem] shadow-2xl p-6 md:p-8 w-full max-w-sm border border-slate-200 dark:border-slate-700 animate-in zoom-in-[0.95] fade-in duration-300 ease-out">
-              <div className="flex justify-between items-center mb-6">
-                <h2 className="text-xl font-extrabold flex items-center gap-2"><Lock size={20} className="text-cyan-600" /> Akses Admin</h2>
-                <button onClick={() => setShowLogin(false)} className="text-slate-400 hover:text-slate-600 bg-slate-100 dark:bg-slate-800 rounded-full p-1.5 transition-all active:scale-90" aria-label="Tutup dialog log masuk"><X size={18}/></button>
-              </div>
-              {isLockedOut ? (
-                <div className="bg-red-50 text-red-600 p-3 rounded-xl flex items-center gap-2 mb-4"><AlertTriangle size={20} /><p className="text-xs font-bold">Akaun dikunci 30 saat.</p></div>
-              ) : (
-                <form onSubmit={handleLogin} className="space-y-4">
-                  <input type="text" required value={loginForm.username} onChange={(e) => setLoginForm({...loginForm, username: e.target.value})} className="w-full bg-slate-50 dark:bg-slate-800 border px-4 py-2.5 rounded-xl text-sm font-semibold text-slate-800 dark:text-white transition-all focus:ring-2 focus:ring-cyan-500 outline-none" placeholder="Nama Pengguna" aria-label="Nama pengguna" />
-                  <div className="relative">
-                    <input type={showPassword ? "text" : "password"} required value={loginForm.password} onChange={(e) => setLoginForm({...loginForm, password: e.target.value})} className="w-full bg-slate-50 dark:bg-slate-800 border pl-4 pr-10 py-2.5 rounded-xl text-sm font-semibold text-slate-800 dark:text-white transition-all focus:ring-2 focus:ring-cyan-500 outline-none" placeholder="Kata Laluan" aria-label="Kata laluan" />
-                    <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600" aria-label={showPassword ? "Sembunyikan kata laluan" : "Papar kata laluan"}>{showPassword ? <EyeOff size={18} /> : <Eye size={18} />}</button>
-                  </div>
-                  <button type="submit" className="w-full bg-gradient-to-r from-cyan-600 to-blue-600 text-white font-bold py-3 rounded-xl text-sm shadow-lg active:scale-95 transition-transform duration-200" aria-label="Log masuk">Sahkan Log Masuk</button>
-                </form>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* --- MAIN CONTENT AREA --- */}
+        
+        <Header currentView={currentView} navigateTo={navigateTo} isAdmin={isAdmin} toggleTheme={toggleTheme} isDarkMode={isDarkMode} isScrolled={isScrolled} />
+        
         <main className="flex-grow w-full">
-          <div key={currentView} className="animate-in fade-in slide-in-from-bottom-2 duration-300 ease-out">
-            
-            {/* VIEW: HOME */}
-            {currentView === 'home' && (
-              <div className="px-4 lg:px-8 max-w-6xl mx-auto pb-32 pt-4">
-                
-                {/* HERO SECTION TECH THEME */}
-                <div className="relative rounded-[2.5rem] bg-gradient-to-br from-slate-900 via-[#0a192f] to-[#020c1b] overflow-hidden shadow-2xl border border-cyan-900/30 mb-8">
-                  <NetworkAnimation />
-                  <div className="absolute top-[-20%] left-[-10%] w-[50%] h-[50%] bg-cyan-600/20 rounded-full blur-[120px] animate-float pointer-events-none"></div>
-                  <div className="absolute bottom-[-20%] right-[-10%] w-[50%] h-[50%] bg-blue-600/20 rounded-full blur-[120px] animate-float-delayed pointer-events-none"></div>
-
-                  <div className="relative z-20 px-6 py-10 md:px-12 md:py-20 flex flex-col lg:flex-row items-center justify-between gap-10">
-                    <div className="w-full lg:w-3/5 space-y-6 text-center lg:text-left">
-                      
-                      <div className="flex flex-col md:flex-row items-start md:items-center gap-3 px-5 py-3 md:py-2.5 rounded-2xl md:rounded-full bg-white/5 border border-white/10 backdrop-blur-xl text-amber-300 text-sm font-medium w-full text-left shadow-sm hover:bg-white/10 transition-colors duration-300">
-                        <Bell className="animate-bounce shrink-0 mt-0.5 md:mt-0" size={18}/>
-                        {isAdmin ? (
-                          <div className="flex-1 flex items-center gap-2 w-full">
-                            <input value={announcement} onChange={e => setAnnouncement(e.target.value)} onBlur={() => saveToFirebaseWithOffline({ announcement, latestUpdate: { view: 'home', text: 'Teks pengumuman portal telah dikemas kini.' } })} className="w-full bg-transparent border-b border-amber-500/50 outline-none text-white focus:border-amber-400 px-1 py-0.5" placeholder="Tulis pengumuman..." aria-label="Teks pengumuman" />
-                          </div>
-                        ) : (
-                          <span className="flex-1 whitespace-normal break-words leading-relaxed">{announcement || "Selamat Datang ke iMSR ADTEC Sandakan"}</span>
-                        )}
-                      </div>
-
-                      <div className="space-y-3">
-                        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-cyan-500/20 border border-cyan-400/30 text-cyan-200 text-[10px] md:text-xs font-black tracking-[0.2em] uppercase shadow-inner">
-                          <Cpu size={12} className="text-cyan-400"/>
-                          {isAdmin ? (
-                            <div className="flex items-center gap-2">
-                              <span>Sesi:</span>
-                              <ModernDropdown value={sesiKemasukan.sesi} options={[{ label: '1', value: '1' }, { label: '2', value: '2' }]} onChange={(val) => { const updated = { ...sesiKemasukan, sesi: val }; setSesiKemasukan(updated); saveToFirebaseWithOffline({ sesiKemasukan: updated, latestUpdate: { view: 'home', text: 'Sesi kemasukan terkini telah ditukar.' } }); }} />
-                              <ModernDropdown value={sesiKemasukan.tahun} options={[...Array(10)].map((_, i) => { const year = (2025 + i).toString(); return { label: year, value: year }; })} onChange={(val) => { const updated = { ...sesiKemasukan, tahun: val }; setSesiKemasukan(updated); saveToFirebaseWithOffline({ sesiKemasukan: updated, latestUpdate: { view: 'home', text: 'Tahun kemasukan terkini telah ditukar.' } }); }} />
-                            </div>
-                          ) : (
-                            <span>Kemasukan {sesiKemasukan.sesi} / {sesiKemasukan.tahun}</span>
-                          )}
-                        </div>
-
-                        <h1 className="text-4xl md:text-5xl lg:text-[4rem] font-black text-white tracking-tight leading-[1.1] drop-shadow-lg">
-                          Minggu<br/>
-                          <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-500">Silaturahim</span>
-                        </h1>
-                        <p className="text-sm md:text-base text-slate-300/90 font-medium max-w-lg mx-auto lg:mx-0 leading-relaxed">
-                          Portal rasmi Pendaftaran dan Minggu Silaturahim Pelajar (MSR) baharu ADTEC JTM Kampus Sandakan.
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="w-full lg:w-2/5 flex justify-center lg:justify-end">
-                      <div className="relative w-full max-w-[18rem]">
-                          <div className="absolute inset-0 bg-gradient-to-r from-cyan-600 to-blue-600 rounded-[2rem] blur-2xl opacity-40 animate-pulse"></div>
-                        <div className="relative bg-white/10 backdrop-blur-2xl border border-white/20 p-6 md:p-8 rounded-[2rem] shadow-xl text-center transform hover:scale-[1.02] transition-transform duration-500">
-                           <p className="text-cyan-200/80 text-[10px] font-bold uppercase tracking-[0.3em] mb-2">Waktu Semasa</p>
-                           <LiveClock />
-                           <div className="mt-6 pt-4 border-t border-white/10">
-                             <p className="text-xs md:text-sm font-semibold text-white tracking-wide">{formatTarikh(new Date().toISOString().split('T')[0])}</p>
-                           </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 md:gap-5">
-                  {[
-                    { id: 'memo', icon: FileSignature, title: 'Memo Lantikan', desc: 'Rujukan surat rasmi', color: 'blue' },
-                    { id: 'ajk', icon: UserCog, title: 'Senarai AJK', desc: 'Jawatankuasa & biro', color: 'emerald' },
-                    { id: 'jadual', icon: CalendarClock, title: 'Jadual MSR', desc: 'Tentatif terperinci', color: 'cyan' },
-                    { id: 'penutup', icon: GraduationCap, title: 'Majlis Penutup', desc: 'Atur cara majlis', color: 'indigo' },
-                    { id: 'layout', icon: MapPinned, title: 'Pelan Daftar', desc: 'Susun atur dewan', color: 'sky' },
-                    { id: 'lagu', icon: AudioLines, title: 'Lagu Korporat', desc: 'Lirik nyanyian JTM', color: 'violet' }
-                  ].map((item) => (
-                    <button 
-                      key={item.id} 
-                      onClick={() => navigateTo(item.id)} 
-                      className={`relative group overflow-hidden bg-white/80 dark:bg-[#0a1526]/80 backdrop-blur-xl p-6 md:p-8 rounded-[2rem] border border-slate-200/80 dark:border-slate-800/80 shadow-lg hover:-translate-y-2 ${cardStyles[item.color].glow} ${cardStyles[item.color].hoverBg} transition-all duration-500 text-left flex flex-col justify-between min-h-[190px] focus:outline-none`}
-                      aria-label={`Buka bahagian ${item.title}`}
-                    >
-                      <div className={`absolute top-0 left-0 w-full h-[2px] bg-gradient-to-r ${cardStyles[item.color].topLine} opacity-0 group-hover:opacity-100 transition-opacity duration-500`}></div>
-
-                      <div className="flex justify-between items-start relative z-10 w-full">
-                        <div className={`p-4 rounded-2xl bg-white dark:bg-slate-900 border ${cardStyles[item.color].iconBorder} shadow-sm group-hover:scale-110 transition-transform duration-500 ease-out`}>
-                          <item.icon size={28} strokeWidth={1.5} className={cardStyles[item.color].iconText} />
-                        </div>
-                        
-                        <div className={`p-2 rounded-full bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700 shadow-sm opacity-0 group-hover:opacity-100 transform translate-x-2 group-hover:translate-x-0 transition-all duration-300`}>
-                          <ChevronRight size={16} className={cardStyles[item.color].iconText} />
-                        </div>
-                      </div>
-
-                      <div className="relative z-10 mt-8">
-                        <h3 className={`text-lg md:text-xl font-bold text-slate-800 dark:text-slate-100 mb-1 tracking-tight group-hover:${cardStyles[item.color].iconText} transition-colors duration-300`}>
-                          {item.title}
-                        </h3>
-                        <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">
-                          {item.desc}
-                        </p>
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* VIEW: MEMO */}
-            {currentView === 'memo' && (
-              <div className="p-4 max-w-4xl mx-auto pb-32 space-y-6">
-                <div className="bg-white dark:bg-slate-800 rounded-[2rem] border border-slate-200 dark:border-slate-700 p-6 shadow-xl">
-                  <div className="flex items-center gap-3 mb-6">
-                    <div className="p-2.5 bg-blue-100 dark:bg-blue-900/50 rounded-xl text-blue-600 dark:text-blue-400">
-                      <FileSignature size={24} strokeWidth={2.5}/>
-                    </div>
-                    <h3 className="text-xl md:text-2xl font-black tracking-tight text-slate-800 dark:text-white">Dokumen & Surat</h3>
-                  </div>
-
-                  {isAdmin && (
-                    <div className="mb-6 p-6 border-2 border-dashed border-blue-200 dark:border-blue-800 rounded-2xl text-center bg-blue-50/50 dark:bg-blue-900/10 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors">
-                      <label className="cursor-pointer flex flex-col items-center">
-                        <UploadCloud size={32} className="text-blue-500 mb-2 animate-pulse" />
-                        <span className="text-sm font-bold text-slate-700 dark:text-slate-200">Muat Naik Fail Memo Baharu</span>
-                        <span className="text-[10px] font-medium text-slate-500 mt-1.5 bg-white dark:bg-slate-800 px-2 py-0.5 rounded-full border border-slate-200 dark:border-slate-700 shadow-sm">Sokongan: PDF / Imej</span>
-                        <input type="file" accept="application/pdf, image/*" className="hidden" onChange={handleDocumentUpload} aria-label="Muat naik fail memo" />
-                      </label>
-                    </div>
-                  )}
-
-                  {memoList.length === 0 ? (
-                    <div className="text-center py-12 bg-slate-50 dark:bg-slate-900/50 rounded-[1.5rem] border border-slate-100 dark:border-slate-800">
-                      <FileSignature size={48} className="mx-auto mb-3 text-slate-300 dark:text-slate-600" />
-                      <p className="text-base font-bold text-slate-500 dark:text-slate-400">Tiada dokumen dijumpai.</p>
-                    </div>
-                  ) : (
-                    <div className="space-y-3">
-                      {memoList.map((memo, index) => (
-                        <div key={memo.id} className="border border-slate-200 dark:border-slate-700 rounded-2xl p-4 bg-slate-50 dark:bg-slate-900/50 hover:bg-white dark:hover:bg-slate-800 transition-all duration-300 shadow-sm hover:shadow-md group">
-                          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                            
-                            <div className="flex items-start gap-3 w-full">
-                              <span className="bg-gradient-to-br from-blue-500 to-indigo-600 text-white text-xs font-black px-3 py-1.5 rounded-xl shadow-md mt-0.5 shrink-0">{index + 1}</span>
-                              <div className="flex-1 min-w-0">
-                                <p className="text-sm md:text-base font-bold text-slate-800 dark:text-slate-200 break-words leading-tight">{memo.name}</p>
-                                <div className="flex flex-wrap items-center gap-2 mt-1.5">
-                                  <span className="text-[9px] font-black text-blue-600 bg-blue-100 dark:text-blue-300 dark:bg-blue-900/40 px-1.5 py-0.5 rounded uppercase tracking-wider">{memo.type === 'pdf' ? 'Dokumen PDF' : 'Fail Imej'}</span>
-                                  {memo.uploadDate && (
-                                    <span className="text-[9px] font-bold text-slate-500 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 px-1.5 py-0.5 rounded flex items-center gap-1 shadow-sm">
-                                      <Clock size={10}/> {formatDateTime(memo.uploadDate)}
-                                    </span>
-                                  )}
-                                </div>
-                              </div>
-                            </div>
-                            
-                            <div className="flex items-center gap-2 w-full sm:w-auto justify-end mt-2 sm:mt-0 pt-2 sm:pt-0">
-                              <button 
-                                onClick={() => setViewingMemo(memo)} 
-                                className="hidden sm:inline-flex items-center justify-center gap-1.5 text-[11px] font-bold text-blue-700 bg-blue-100 hover:bg-blue-200 dark:bg-blue-900/40 dark:text-blue-300 dark:hover:bg-blue-800/60 px-4 py-2 rounded-xl transition-all active:scale-95"
-                                aria-label="Lihat dokumen"
-                              >
-                                <ExternalLink size={14} /> Lihat
-                              </button>
-
-                              <button 
-                                onClick={() => handleDownloadBlob(memo.url, memo.name)}
-                                className="inline-flex flex-1 sm:flex-none items-center justify-center gap-1.5 text-[11px] font-bold text-white bg-cyan-600 hover:bg-cyan-700 px-4 py-2 rounded-xl transition-all active:scale-95 shadow-md"
-                                aria-label="Muat turun dokumen"
-                              >
-                                <Download size={14} /> Muat Turun
-                              </button>
-
-                              {isAdmin && (
-                                <button 
-                                  onClick={async () => {
-                                    if(window.confirm("Adakah anda pasti mahu memadam dokumen ini?")) {
-                                      try {
-                                        await deleteDoc(doc(db, "msr_memos", memo.id));
-                                        saveToFirebaseWithOffline({ latestUpdate: { view: 'memo', text: `Satu dokumen memo telah dipadam.` } });
-                                      } catch(err) {
-                                        console.error(err);
-                                        alert("Gagal memadam dokumen.");
-                                      }
-                                    }
-                                  }} 
-                                  className="text-red-500 bg-red-50 hover:bg-red-100 dark:bg-red-900/20 dark:hover:bg-red-900/40 p-2 rounded-xl transition-colors shrink-0 active:scale-90"
-                                  aria-label="Padam dokumen"
-                                >
-                                  <Trash2 size={16}/>
-                                </button>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
-                  {memoList.length === 0 && !isAdmin && memoText && (
-                    <div className="bg-slate-50 dark:bg-slate-900 rounded-2xl p-6 mt-6 border border-slate-200 dark:border-slate-700 shadow-inner">
-                      <p className="whitespace-pre-wrap text-xs leading-relaxed text-slate-700 dark:text-slate-300 font-medium">{memoText}</p>
-                    </div>
-                  )}
-
-                  {isAdmin && memoList.length === 0 && (
-                    <div className="mt-6 animate-in fade-in">
-                      <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2 flex items-center gap-1.5"><Edit3 size={12}/> Teks Manual (Jika tiada fail)</label>
-                      <textarea value={memoText} onChange={e => setMemoText(e.target.value)} onBlur={() => saveToFirebaseWithOffline({ memoText, latestUpdate: { view: 'memo', text: 'Teks rasmi dokumen memo telah dikemas kini.' } })} className="w-full p-4 border border-slate-200 dark:border-slate-700 rounded-xl bg-slate-50 dark:bg-slate-900 text-xs focus:border-cyan-500 outline-none transition-colors leading-relaxed" rows={6} aria-label="Teks manual memo"/>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* VIEW: AJK */}
-            {currentView === 'ajk' && (
-              <div className="p-4 max-w-4xl mx-auto pb-32 space-y-6">
-                <div className="bg-white dark:bg-slate-800 rounded-[2rem] border border-slate-200 dark:border-slate-700 p-6 shadow-xl mb-6">
-                  <div className="flex justify-between items-center mb-6">
-                    <div className="flex items-center gap-3">
-                      <div className="p-2.5 bg-emerald-100 dark:bg-emerald-900/50 rounded-xl text-emerald-600 dark:text-emerald-400">
-                        <UserCog size={24} strokeWidth={2.5}/>
-                      </div>
-                      <h3 className="text-xl md:text-2xl font-black tracking-tight text-slate-800 dark:text-white">Jawatankuasa Induk</h3>
-                    </div>
-                    {isAdmin && (
-                      <button onClick={() => { const newAjk = [...ajkInduk, { peranan: "Peranan Baru", nama: "Nama Baru" }]; setAjkInduk(newAjk); saveToFirebaseWithOffline({ ajkInduk: newAjk, latestUpdate: { view: 'ajk', text: 'Senarai Jawatankuasa Induk MSR telah dikemas kini.' } }); }} className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl font-bold text-xs transition-colors active:scale-95 shadow-sm flex items-center gap-1.5" aria-label="Tambah jawatankuasa induk"><Plus size={14}/> <span className="hidden sm:inline">Tambah Induk</span></button>
-                    )}
-                  </div>
-                  
-                  <div className="space-y-3">
-                    {ajkInduk.map((ajk, idx) => (
-                      <div key={idx} className="flex flex-col sm:flex-row gap-3 border border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 p-4 rounded-xl items-start shadow-sm">
-                        {isAdmin ? (
-                          <>
-                            <input 
-                              value={ajk.peranan} 
-                              onChange={e => { 
-                                const newAjk = [...ajkInduk]; 
-                                newAjk[idx].peranan = e.target.value; 
-                                setAjkInduk(newAjk); 
-                              }} 
-                              onBlur={() => saveToFirebaseWithOffline({ ajkInduk, latestUpdate: { view: 'ajk', text: 'Senarai Jawatankuasa Induk MSR telah dikemas kini.' } })} 
-                              className="border border-slate-200 dark:border-slate-700 p-2 rounded-lg text-xs w-full sm:w-1/3 bg-white dark:bg-slate-900 transition-colors font-bold uppercase focus:ring-2 focus:ring-emerald-500 outline-none" 
-                              placeholder="Jawatan"
-                              aria-label="Peranan jawatankuasa"
-                            />
-                            <div className="w-full flex flex-col gap-1.5 relative">
-                              {ajk.nama.split('\n').map((n, nIdx, arr) => (
-                                <div key={nIdx} className="flex items-center gap-1.5 group">
-                                  {arr.length > 1 && nIdx === 0 && (
-                                    <span className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-300 text-[10px] px-1.5 py-1 rounded-md font-black shrink-0 shadow-sm" title="Ketua">K</span>
-                                  )}
-                                  <input 
-                                    list="senarai-staf"
-                                    value={n} 
-                                    onChange={e => { 
-                                      const names = ajk.nama.split('\n');
-                                      names[nIdx] = e.target.value;
-                                      const newAjk = [...ajkInduk];
-                                      newAjk[idx].nama = names.join('\n');
-                                      setAjkInduk(newAjk); 
-                                    }} 
-                                    onBlur={() => saveToFirebaseWithOffline({ ajkInduk, latestUpdate: { view: 'ajk', text: 'Senarai Jawatankuasa Induk MSR telah dikemas kini.' } })} 
-                                    className="border border-slate-200 dark:border-slate-700 p-2 rounded-lg text-xs w-full bg-white dark:bg-slate-900 transition-colors focus:ring-2 focus:ring-emerald-500 outline-none" 
-                                    placeholder={arr.length > 1 && nIdx === 0 ? "Cari Nama Ketua" : "Cari Nama Pembantu"}
-                                    aria-label="Nama staf"
-                                  />
-                                  {arr.length > 1 && (
-                                     <button onClick={() => {
-                                         const names = ajk.nama.split('\n');
-                                         names.splice(nIdx, 1);
-                                         const newAjk = [...ajkInduk];
-                                         newAjk[idx].nama = names.join('\n');
-                                         setAjkInduk(newAjk);
-                                         saveToFirebaseWithOffline({ ajkInduk: newAjk, latestUpdate: { view: 'ajk', text: 'Senarai Jawatankuasa Induk MSR telah dikemas kini.' } });
-                                     }} className="text-red-400 hover:text-red-600 bg-red-50 dark:bg-red-900/20 p-1.5 rounded-md transition-colors" aria-label="Padam pembantu">
-                                       <X size={14}/>
-                                     </button>
-                                  )}
-                                </div>
-                              ))}
-                              <button 
-                                onClick={() => {
-                                   const newAjk = [...ajkInduk];
-                                   newAjk[idx].nama += '\n';
-                                   setAjkInduk(newAjk);
-                                }}
-                                className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold self-start mt-0.5 hover:underline flex items-center gap-1 bg-emerald-50 dark:bg-emerald-900/20 px-2 py-1 rounded-md transition-colors"
-                                aria-label="Tambah pembantu"
-                              >
-                                <Plus size={12}/> Tambah Pembantu
-                              </button>
-                            </div>
-                            <button 
-                              onClick={() => { const newAjk = ajkInduk.filter((_, i) => i !== idx); setAjkInduk(newAjk); saveToFirebaseWithOffline({ ajkInduk: newAjk, latestUpdate: { view: 'ajk', text: 'Senarai Jawatankuasa Induk MSR telah dikemas kini.' } }); }} 
-                              className="text-red-500 bg-red-50 hover:bg-red-100 dark:bg-red-900/20 p-2 rounded-lg transition-colors shrink-0 self-start sm:self-auto"
-                              aria-label="Padam jawatankuasa induk"
-                            >
-                              <Trash2 size={16}/>
-                            </button>
-                          </>
-                        ) : (
-                          <>
-                            <span className="text-[11px] md:text-xs font-black text-emerald-700 dark:text-emerald-400 sm:w-1/3 uppercase pt-1 tracking-wide">{ajk.peranan}</span>
-                            <div className="w-full sm:w-2/3 flex flex-col gap-1.5">
-                              {ajk.nama.split('\n').map((nama, nIdx, arr) => {
-                                const text = nama.trim();
-                                if (!text) return null;
-                                const cleanName = text.replace(/\(K\)/gi, '').trim();
-                                const validNamesCount = arr.filter(n => n.trim() !== '').length;
-                                const isKetua = validNamesCount > 1 && nIdx === 0;
-                                return (
-                                  <div key={nIdx} className="bg-white dark:bg-slate-800 p-2.5 rounded-lg border border-slate-100 dark:border-slate-700 flex items-center gap-2 shadow-sm">
-                                    {isKetua && <span className="bg-gradient-to-br from-emerald-400 to-teal-600 text-white text-[9px] px-1.5 py-0.5 rounded font-black shrink-0 shadow-sm">KETUA</span>}
-                                    <span className="text-xs md:text-sm font-bold text-slate-800 dark:text-slate-100 leading-snug">{cleanName}</span>
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          </>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="bg-white dark:bg-slate-800 rounded-[2rem] border border-slate-200 dark:border-slate-700 p-6 shadow-xl">
-                  <div className="flex justify-between items-center mb-6">
-                    <h3 className="text-xl md:text-2xl font-black tracking-tight text-slate-800 dark:text-white">Biro Pelaksana</h3>
-                    {isAdmin && (
-                      <button onClick={() => { const newBiro = [...biroList, { nama: "Biro Baru", ketua: "", ahli: [] }]; setBiroList(newBiro); saveToFirebaseWithOffline({ biroList: newBiro, latestUpdate: { view: 'ajk', text: 'Senarai Biro Pelaksana MSR telah dikemas kini.' } }); }} className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl font-bold text-xs transition-colors active:scale-95 shadow-sm flex items-center gap-1.5" aria-label="Tambah biro"><Plus size={14}/> <span className="hidden sm:inline">Tambah Biro</span></button>
-                    )}
-                  </div>
-                  
-                  <div className="space-y-3">
-                    {biroList.map((biro, idx) => (
-                      isAdmin ? (
-                        <div key={idx} className="bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 p-4 rounded-2xl relative space-y-2.5 shadow-sm animate-in fade-in">
-                          <button onClick={() => { const newBiro = biroList.filter((_, i) => i !== idx); setBiroList(newBiro); saveToFirebaseWithOffline({ biroList: newBiro, latestUpdate: { view: 'ajk', text: 'Senarai Biro Pelaksana MSR telah dikemas kini.' } }); }} className="absolute top-4 right-4 text-red-500 bg-red-50 hover:bg-red-100 dark:bg-red-900/20 p-1.5 rounded-lg transition-colors" aria-label="Padam biro"><Trash2 size={16}/></button>
-                          <div>
-                            <label className="text-[9px] font-bold text-slate-500 uppercase tracking-widest ml-1 mb-1 block">Nama Biro</label>
-                            <input 
-                              value={biro.nama} 
-                              onChange={e => { const newBiro = [...biroList]; newBiro[idx].nama = e.target.value; setBiroList(newBiro); }} 
-                              onBlur={() => saveToFirebaseWithOffline({ biroList, latestUpdate: { view: 'ajk', text: 'Senarai Biro Pelaksana MSR telah dikemas kini.' } })} 
-                              className="border border-slate-200 dark:border-slate-700 p-2.5 rounded-lg text-sm w-[85%] font-bold text-slate-800 dark:text-white bg-white dark:bg-slate-900 transition-colors focus:ring-2 focus:ring-emerald-500 outline-none" 
-                              placeholder="Masukkan nama biro..." 
-                              aria-label="Nama biro" 
-                            />
-                          </div>
-                          <div>
-                            <label className="text-[9px] font-bold text-slate-500 uppercase tracking-widest ml-1 mb-1 block">Ketua Biro</label>
-                            <input 
-                              list="senarai-staf" 
-                              value={biro.ketua} 
-                              onChange={e => { const newBiro = [...biroList]; newBiro[idx].ketua = e.target.value; setBiroList(newBiro); }} 
-                              onBlur={() => saveToFirebaseWithOffline({ biroList, latestUpdate: { view: 'ajk', text: 'Senarai Biro Pelaksana MSR telah dikemas kini.' } })} 
-                              className="border border-slate-200 dark:border-slate-700 p-2.5 rounded-lg text-xs w-full font-bold bg-white dark:bg-slate-900 transition-colors focus:ring-2 focus:ring-emerald-500 outline-none" 
-                              placeholder="Cari / Masukkan Nama Ketua Biro" 
-                              aria-label="Ketua biro" 
-                            />
-                          </div>
-                          <div className="bg-white dark:bg-slate-800 p-3 rounded-xl mt-3 border border-slate-100 dark:border-slate-700">
-                            <div className="flex justify-between items-center mb-2">
-                              <span className="text-[10px] font-black text-slate-700 dark:text-slate-300 uppercase tracking-wider">Senarai Ahli</span>
-                              <button onClick={() => { const newBiro = [...biroList]; if(!newBiro[idx].ahli) newBiro[idx].ahli=[]; newBiro[idx].ahli.push(""); setBiroList(newBiro); }} className="text-emerald-600 hover:text-white bg-emerald-50 hover:bg-emerald-600 px-2 py-1 rounded-md text-[10px] font-bold transition-colors flex items-center gap-1" aria-label="Tambah ahli biro"><Plus size={12}/> Tambah Ahli</button>
-                            </div>
-                            <div className="space-y-1.5">
-                              {biro.ahli && biro.ahli.map((ahli, aIdx) => (
-                                <div key={aIdx} className="flex gap-2 items-center">
-                                  <span className="text-[10px] font-bold text-slate-400 w-3">{aIdx + 1}.</span>
-                                  <input 
-                                    list="senarai-staf" 
-                                    value={ahli} 
-                                    onChange={e => { const newBiro = [...biroList]; newBiro[idx].ahli[aIdx] = e.target.value; setBiroList(newBiro); }} 
-                                    onBlur={() => saveToFirebaseWithOffline({ biroList, latestUpdate: { view: 'ajk', text: 'Senarai Biro Pelaksana MSR telah dikemas kini.' } })} 
-                                    className="border border-slate-200 dark:border-slate-700 p-2 rounded-md text-xs w-full bg-slate-50 dark:bg-slate-900 transition-colors focus:ring-2 focus:ring-emerald-500 outline-none" 
-                                    placeholder="Cari / Masukkan Nama Ahli" 
-                                    aria-label="Nama ahli" 
-                                  />
-                                  <button onClick={() => { const newBiro = [...biroList]; newBiro[idx].ahli = newBiro[idx].ahli.filter((_, i) => i !== aIdx); setBiroList(newBiro); saveToFirebaseWithOffline({ biroList: newBiro, latestUpdate: { view: 'ajk', text: 'Senarai Biro Pelaksana MSR telah dikemas kini.' } }); }} className="text-red-500 bg-red-50 hover:bg-red-100 dark:bg-red-900/20 p-2 rounded-md transition-colors" aria-label="Padam ahli"><X size={14}/></button>
-                                </div>
-                              ))}
-                              {(!biro.ahli || biro.ahli.length === 0) && <p className="text-[10px] text-slate-400 font-medium italic text-center py-1">Tiada ahli ditambah.</p>}
-                            </div>
-                          </div>
-                        </div>
-                      ) : (
-                        <AccordionBiro 
-                          key={idx} 
-                          biro={biro} 
-                          isOpen={openBiroIndex === idx} 
-                          onToggle={() => setOpenBiroIndex(openBiroIndex === idx ? null : idx)} 
-                        />
-                      )
-                    ))}
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* VIEW: JADUAL */}
-            {currentView === 'jadual' && (
-              <div className="p-4 max-w-4xl mx-auto pb-32">
-                <div className="bg-white dark:bg-slate-800 rounded-[2rem] border border-slate-200 dark:border-slate-700 p-6 shadow-xl">
-                  <div className="flex items-center justify-between mb-6">
-                    <div className="flex items-center gap-3">
-                      <div className="p-2.5 bg-cyan-100 dark:bg-cyan-900/50 rounded-xl text-cyan-600 dark:text-cyan-400">
-                        <CalendarClock size={24} strokeWidth={2.5}/>
-                      </div>
-                      <h3 className="text-xl md:text-2xl font-black tracking-tight text-slate-800 dark:text-white">Tentatif Program</h3>
-                    </div>
-                    {isAdmin && (
-                      <button onClick={() => { const newId = 'd' + Date.now(); const today = new Date().toISOString().split('T')[0]; const updated = [...jadualData, { id: newId, tarikh: today, slots: [] }]; setJadualData(updated); setActiveJadualTab(newId); saveToFirebaseWithOffline({ jadualData: updated, latestUpdate: { view: 'jadual', text: 'Jadual Tentatif Program telah dikemas kini.' } }); }} className="bg-cyan-500 hover:bg-cyan-600 text-white px-4 py-2 rounded-xl font-bold text-xs transition-colors active:scale-95 shadow-sm flex items-center gap-1.5" aria-label="Tambah hari jadual"><Plus size={14}/> <span className="hidden sm:inline">Tambah Hari</span></button>
-                    )}
-                  </div>
-
-                  {/* --- TAMBAHAN UI: UPLOAD & PAPAR FAIL JADUAL PENUH --- */}
-                  {isAdmin && !jadualFile && (
-                    <div className="mb-6 p-6 border-2 border-dashed border-cyan-200 dark:border-cyan-800/50 rounded-2xl bg-cyan-50/50 dark:bg-cyan-900/10 hover:bg-cyan-50 dark:hover:bg-cyan-900/20 transition-colors">
-                      <label className="cursor-pointer flex flex-col items-center">
-                        <UploadCloud size={32} className="text-cyan-500 mb-2 animate-pulse" />
-                        <span className="text-sm font-bold text-slate-700 dark:text-slate-200">Muat Naik Fail Tentatif Penuh</span>
-                        <span className="text-[10px] font-medium text-slate-500 mt-1 bg-white dark:bg-slate-800 px-2 py-0.5 rounded-md shadow-sm">Sokongan: PDF / Imej</span>
-                        <input type="file" accept="application/pdf, image/*" className="hidden" onChange={handleJadualFileUpload} />
-                      </label>
-                    </div>
-                  )}
-
-                  {jadualFile && (
-                    <div className="mb-6 w-full flex flex-col gap-4">
-                      {/* MOBILE VIEW */}
-                      <div className="block sm:hidden w-full bg-slate-50 dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm flex flex-col items-center gap-4">
-                         {jadualFile.includes('application/pdf') ? (
-                           <FileText size={48} className="text-cyan-500" />
-                         ) : (
-                           <div 
-                             className="w-full relative cursor-pointer group overflow-hidden rounded-xl h-48 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 flex items-center justify-center"
-                             onClick={() => setViewingMemo({ url: jadualFile, name: "Tentatif_Penuh", type: "image", uploadDate: jadualFileDate })}
-                           >
-                             <img 
-                               src={jadualFile} 
-                               alt="Thumbnail Tentatif" 
-                               className="w-full h-full object-cover group-active:scale-105 transition-transform duration-300" 
-                             />
-                             <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-active:opacity-100 transition-opacity">
-                                <span className="text-white text-xs font-bold flex items-center gap-1"><Eye size={16}/> Lihat Penuh</span>
-                             </div>
-                           </div>
-                         )}
-
-                         <div className="space-y-1 text-center w-full mt-2">
-                           <p className="text-sm font-black text-slate-800 dark:text-slate-200">Jadual Keseluruhan Program</p>
-                           <div className="flex flex-col items-center gap-1.5">
-                             <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">{jadualFile.includes('application/pdf') ? 'Format PDF' : 'Format Imej'}</p>
-                             {jadualFileDate && <p className="text-[9px] font-bold text-slate-400"><Clock size={10} className="inline mr-1"/>{formatDateTime(jadualFileDate)}</p>}
-                           </div>
-                         </div>
-
-                         <div className="flex w-full gap-2 mt-1">
-                           <button 
-                             onClick={() => setViewingMemo({ url: jadualFile, name: "Tentatif_Penuh", type: jadualFile.includes('application/pdf') ? 'pdf' : 'image', uploadDate: jadualFileDate })}
-                             className="flex-1 inline-flex items-center justify-center gap-2 text-xs font-bold text-cyan-700 bg-cyan-100 hover:bg-cyan-200 dark:bg-cyan-900/40 dark:text-cyan-300 dark:hover:bg-cyan-800/60 px-2 py-3 rounded-xl shadow-sm transition-all active:scale-95"
-                           >
-                             <ExternalLink size={16} /> Lihat
-                           </button>
-                           
-                           <button 
-                             onClick={() => handleDownloadBlob(jadualFile, jadualFile.includes('application/pdf') ? 'Tentatif_Program.pdf' : 'Tentatif_Program.jpg')}
-                             className="flex-[2] inline-flex items-center justify-center gap-2 text-xs font-bold text-white bg-cyan-600 hover:bg-cyan-700 px-2 py-3 rounded-xl shadow-md transition-all active:scale-95"
-                           >
-                             <Download size={16} /> Muat Turun
-                           </button>
-                         </div>
-                         
-                         {isAdmin && (
-                          <button 
-                            onClick={async () => { if(window.confirm("Padam fail tentatif ini?")) { setJadualFile(null); try { await setDoc(doc(db, "msr", "data_jadual_file"), { fileData: null, uploadDate: null }); saveToFirebaseWithOffline({ latestUpdate: { view: 'jadual', text: 'Fail Tentatif Program penuh telah dipadam.' } }); } catch(err){} } }}
-                            className="w-full inline-flex items-center justify-center gap-2 text-xs font-bold text-red-600 bg-red-50 hover:bg-red-100 dark:bg-red-900/20 px-4 py-3 rounded-xl transition-all active:scale-95"
-                          >
-                            <Trash2 size={16} /> Padam Rekod
-                          </button>
-                         )}
-                      </div>
-
-                      {/* DESKTOP/TABLET VIEW */}
-                      <div className="hidden sm:flex p-4 bg-slate-50 dark:bg-slate-900/50 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm flex-row items-center justify-between gap-4">
-                         <div className="flex items-center gap-3 w-full">
-                            <div className="p-2.5 bg-cyan-100 dark:bg-cyan-900/40 rounded-xl cursor-pointer hover:scale-105 transition-transform" onClick={() => setViewingMemo({ url: jadualFile, name: "Tentatif_Penuh", type: jadualFile.includes('application/pdf') ? 'pdf' : 'image', uploadDate: jadualFileDate })}>
-                               {jadualFile.includes('application/pdf') ? <FileText size={24} className="text-cyan-600 dark:text-cyan-400" /> : <ImageIcon size={24} className="text-cyan-600 dark:text-cyan-400" />}
-                            </div>
-                            <div>
-                               <p className="text-sm font-bold text-slate-800 dark:text-slate-200 cursor-pointer hover:underline" onClick={() => setViewingMemo({ url: jadualFile, name: "Tentatif_Penuh", type: jadualFile.includes('application/pdf') ? 'pdf' : 'image', uploadDate: jadualFileDate })}>Jadual Keseluruhan Program</p>
-                               {jadualFileDate && <p className="text-[9px] font-bold text-slate-500 mt-0.5"><Clock size={10} className="inline mr-1"/>{formatDateTime(jadualFileDate)}</p>}
-                            </div>
-                         </div>
-                         <div className="flex items-center gap-2 w-auto justify-end">
-                            <button onClick={() => setViewingMemo({ url: jadualFile, name: "Tentatif_Penuh", type: jadualFile.includes('application/pdf') ? 'pdf' : 'image', uploadDate: jadualFileDate })} className="flex-none flex items-center justify-center gap-1.5 text-[11px] font-bold text-cyan-700 bg-cyan-100 hover:bg-cyan-200 dark:bg-cyan-900/40 dark:text-cyan-300 dark:hover:bg-cyan-800/60 px-4 py-2 rounded-xl transition-all active:scale-95">
-                               <ExternalLink size={14}/> Lihat
-                            </button>
-                            <button onClick={() => handleDownloadBlob(jadualFile, jadualFile.includes('application/pdf') ? 'Tentatif_Program.pdf' : 'Tentatif_Program.jpg')} className="flex-none flex items-center justify-center gap-1.5 text-[11px] font-bold text-white bg-cyan-600 hover:bg-cyan-700 px-4 py-2 rounded-xl transition-all active:scale-95 shadow-sm">
-                               <Download size={14}/> Muat Turun
-                            </button>
-                            {isAdmin && (
-                               <button onClick={async () => { if(window.confirm("Padam fail tentatif ini?")) { setJadualFile(null); try { await setDoc(doc(db, "msr", "data_jadual_file"), { fileData: null, uploadDate: null }); saveToFirebaseWithOffline({ latestUpdate: { view: 'jadual', text: 'Fail Tentatif Program penuh telah dipadam.' } }); } catch(err){} } }} className="text-red-500 bg-red-50 hover:bg-red-100 dark:bg-red-900/20 p-2 rounded-xl transition-colors shrink-0 active:scale-90">
-                                  <Trash2 size={16}/>
-                               </button>
-                            )}
-                         </div>
-                      </div>
-                    </div>
-                  )}
-                  
-                  <div className="flex gap-2.5 overflow-x-auto pb-3 mb-6 border-b border-slate-100 dark:border-slate-700 hide-scrollbar snap-x">
-                    {jadualData.map((hari) => (
-                      <button key={hari.id} onClick={() => setActiveJadualTab(hari.id)} className={`snap-start px-5 py-2.5 rounded-xl text-xs font-bold shrink-0 transition-all duration-300 ${activeJadualTab === hari.id ? 'bg-cyan-500 text-white shadow-md scale-105' : 'bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:bg-cyan-50 dark:hover:bg-slate-800'}`} aria-label={`Pilih jadual tarikh ${formatTarikh(hari.tarikh)}`}>
-                         {formatTarikh(hari.tarikh)}
-                      </button>
-                    ))}
-                  </div>
-                  
-                   {jadualData.map((hari) => {
-                    if (hari.id !== activeJadualTab) return null;
-                    return (
-                      <div key={hari.id} className="space-y-5 animate-in slide-in-from-right-4 duration-500 ease-out">
-                        {isAdmin && (
-                          <div className="bg-slate-50 dark:bg-slate-900/50 p-4 rounded-2xl border border-slate-200 dark:border-slate-700 flex flex-wrap gap-3 items-center shadow-sm">
-                            <div className="flex-1 min-w-[150px]">
-                              <label className="text-[9px] font-bold text-slate-500 uppercase tracking-widest ml-1 mb-1 block">Tarikh Hari Ini</label>
-                              <input type="date" value={hari.tarikh} onChange={e => { const updated = jadualData.map(d => d.id === hari.id ? { ...d, tarikh: e.target.value } : d); setJadualData(updated); saveToFirebaseWithOffline({ jadualData: updated, latestUpdate: { view: 'jadual', text: 'Tarikh jadual tentatif program telah ditukar.' } }); }} className="w-full border border-slate-200 dark:border-slate-700 p-2.5 rounded-lg text-xs font-bold bg-white dark:bg-slate-800 transition-colors focus:ring-2 focus:ring-cyan-500 outline-none" aria-label="Tarikh jadual" />
-                            </div>
-                             <button onClick={() => { const updated = jadualData.map(d => d.id === hari.id ? { ...d, slots: [...d.slots, { id: 's' + Date.now(), startTime: "08:00", endTime: "09:00", aktiviti: "Aktiviti Baru" }] } : d); setJadualData(updated); saveToFirebaseWithOffline({ jadualData: updated, latestUpdate: { view: 'jadual', text: 'Satu slot masa baharu telah ditambah ke dalam jadual.' } }); }} className="bg-cyan-100 hover:bg-cyan-200 text-cyan-700 dark:bg-cyan-900/40 dark:text-cyan-300 px-4 py-2.5 rounded-lg text-xs font-bold transition-colors mt-4 shadow-sm flex items-center gap-1.5" aria-label="Tambah slot jadual"><Plus size={14}/> Tambah Slot</button>
-                            <button onClick={() => { if(window.confirm("Padam keseluruhan jadual hari ini?")) { const updated = jadualData.filter(h => h.id !== hari.id); setJadualData(updated); if(updated.length > 0) setActiveJadualTab(updated[0].id); saveToFirebaseWithOffline({ jadualData: updated, latestUpdate: { view: 'jadual', text: 'Jadual Tentatif Program telah dikemas kini.' } }); } }} className="text-red-600 bg-red-50 hover:bg-red-100 dark:bg-red-900/20 px-3 py-2.5 rounded-lg text-xs font-bold transition-colors mt-4 ml-auto flex items-center gap-1.5 shadow-sm" aria-label="Padam hari jadual"><Trash2 size={14}/> Padam</button>
-                          </div>
-                        )}
-                        
-                        {(!hari.slots || hari.slots.length === 0) ? (
-                          <div className="text-center py-10 text-slate-400 font-medium bg-slate-50 dark:bg-slate-900/50 rounded-[2rem] border border-dashed border-slate-200 dark:border-slate-700">
-                            <CalendarClock size={40} className="mx-auto mb-2 opacity-30" />
-                            <p className="text-sm font-bold text-slate-500">Tiada aktiviti dijadualkan.</p>
-                          </div>
-                        ) : (
-                          <div className="relative border-l-[3px] border-cyan-200 dark:border-cyan-800/50 ml-3 md:ml-6 space-y-6 mt-6">
-                            {hari.slots.map((slot) => (
-                              <div key={slot.id} className="relative pl-6 md:pl-8 group">
-                                <div className="absolute -left-[11px] top-4 h-5 w-5 rounded-full border-[4px] border-white dark:border-slate-800 bg-cyan-500 shadow-sm z-10 group-hover:scale-125 transition-transform duration-300"></div>
-                                
-                                {isAdmin ? (
-                                  <div className="bg-slate-50 dark:bg-slate-900/50 p-4 rounded-[1.5rem] border border-slate-200 dark:border-slate-700 relative shadow-sm transition-shadow">
-                                    <button onClick={() => { const updated = jadualData.map(d => d.id === hari.id ? { ...d, slots: d.slots.filter(s => s.id !== slot.id) } : d); setJadualData(updated); saveToFirebaseWithOffline({ jadualData: updated, latestUpdate: { view: 'jadual', text: 'Satu slot masa telah dibuang dari jadual.' } }); }} className="absolute top-4 right-4 text-red-400 hover:text-red-600 bg-red-50 dark:bg-red-900/20 p-1.5 rounded-lg transition-colors" aria-label="Padam slot"><Trash2 size={16}/></button>
-                                    <div className="flex gap-3 mb-3 pr-10">
-                                      <div className="flex-1">
-                                        <label className="text-[9px] font-bold text-slate-500 uppercase tracking-widest ml-1 mb-1 block">Mula</label>
-                                        <input type="time" value={slot.startTime} onChange={e => { const updated = jadualData.map(d => d.id === hari.id ? { ...d, slots: d.slots.map(s => s.id === slot.id ? { ...s, startTime: e.target.value } : s) } : d); setJadualData(updated); }} onBlur={() => saveToFirebaseWithOffline({ jadualData, latestUpdate: { view: 'jadual', text: 'Masa jadual tentatif program telah diubah.' } })} className="w-full border border-slate-200 dark:border-slate-700 p-2.5 rounded-lg text-xs font-black text-cyan-600 dark:text-cyan-400 bg-white dark:bg-slate-800 transition-colors focus:ring-2 focus:ring-cyan-500 outline-none" aria-label="Waktu mula" />
-                                      </div>
-                                      <div className="flex-1">
-                                        <label className="text-[9px] font-bold text-slate-500 uppercase tracking-widest ml-1 mb-1 block">Tamat</label>
-                                        <input type="time" value={slot.endTime} onChange={e => { const updated = jadualData.map(d => d.id === hari.id ? { ...d, slots: d.slots.map(s => s.id === slot.id ? { ...s, endTime: e.target.value } : s) } : d); setJadualData(updated); }} onBlur={() => saveToFirebaseWithOffline({ jadualData, latestUpdate: { view: 'jadual', text: 'Masa jadual tentatif program telah diubah.' } })} className="w-full border border-slate-200 dark:border-slate-700 p-2.5 rounded-lg text-xs font-black text-cyan-600 dark:text-cyan-400 bg-white dark:bg-slate-800 transition-colors focus:ring-2 focus:ring-cyan-500 outline-none" aria-label="Waktu tamat" />
-                                      </div>
-                                    </div>
-                                    <textarea value={slot.aktiviti} onChange={e => { const updated = jadualData.map(d => d.id === hari.id ? { ...d, slots: d.slots.map(s => s.id === slot.id ? { ...s, aktiviti: e.target.value } : s) } : d); setJadualData(updated); }} onBlur={() => saveToFirebaseWithOffline({ jadualData, latestUpdate: { view: 'jadual', text: 'Satu aktiviti dalam jadual tentatif program telah dikemas kini.' } })} className="w-full border border-slate-200 dark:border-slate-700 p-3 rounded-xl text-sm font-bold bg-white dark:bg-slate-800 text-slate-800 dark:text-white transition-colors outline-none focus:ring-2 focus:ring-cyan-500 custom-scrollbar" rows={2} placeholder="Keterangan Aktiviti..." aria-label="Keterangan aktiviti" />
-                                  </div>
-                                ) : (
-                                  <div className="bg-white dark:bg-slate-800/80 p-4 md:p-5 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-sm hover:shadow-md transition-all duration-300 hover:-translate-y-1">
-                                    <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-gradient-to-r from-cyan-500 to-blue-500 text-white text-[10px] md:text-xs font-black tracking-wider shadow-sm mb-2">
-                                      <Clock size={12}/>
-                                      {formatTime(slot.startTime)} {slot.endTime && <span><span className="opacity-60 mx-1">➜</span> {formatTime(slot.endTime)}</span>}
-                                    </div>
-                                    <h4 className="text-sm md:text-base font-bold text-slate-800 dark:text-slate-100 leading-snug">{slot.aktiviti}</h4>
-                                  </div>
-                                )}
-                              </div>
-                            ))}
-                           </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-
-            {/* VIEW: PENUTUP */}
-            {currentView === 'penutup' && (
-              <div className="p-4 max-w-4xl mx-auto pb-32">
-                <div className="bg-white dark:bg-slate-800 rounded-[2rem] border border-slate-200 dark:border-slate-700 p-6 shadow-xl">
-                  <div className="flex items-center justify-between mb-6">
-                    <div className="flex items-center gap-3">
-                      <div className="p-2.5 bg-indigo-100 dark:bg-indigo-900/50 rounded-xl text-indigo-600 dark:text-indigo-400">
-                        <GraduationCap size={24} strokeWidth={2.5}/>
-                      </div>
-                      <h3 className="text-xl md:text-2xl font-black tracking-tight text-slate-800 dark:text-white">Majlis Penutup</h3>
-                    </div>
-                    {isAdmin && (
-                      <button onClick={() => { const updated = [...penutupData, { id: 'p' + Date.now(), time: "08:00", aktiviti: "Aktiviti Baru" }]; setPenutupData(updated); saveToFirebaseWithOffline({ penutupData: updated, latestUpdate: { view: 'penutup', text: 'Atur cara Majlis Penutup MSR telah dikemas kini.' } }); }} className="bg-indigo-500 hover:bg-indigo-600 text-white px-4 py-2 rounded-xl font-bold text-xs transition-colors active:scale-95 shadow-sm flex items-center gap-1.5" aria-label="Tambah slot majlis penutup"><Plus size={14}/> <span className="hidden sm:inline">Tambah Slot</span></button>
-                    )}
-                  </div>
-
-                  {/* --- TAMBAHAN UI: UPLOAD & PAPAR FAIL PENUTUP PENUH --- */}
-                  {isAdmin && !penutupFile && (
-                    <div className="mb-6 p-6 border-2 border-dashed border-indigo-200 dark:border-indigo-800/50 rounded-2xl bg-indigo-50/50 dark:bg-indigo-900/10 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-colors">
-                      <label className="cursor-pointer flex flex-col items-center">
-                        <UploadCloud size={32} className="text-indigo-500 mb-2 animate-pulse" />
-                        <span className="text-sm font-bold text-slate-700 dark:text-slate-200">Muat Naik Fail Majlis Penutup</span>
-                        <span className="text-[10px] font-medium text-slate-500 mt-1 bg-white dark:bg-slate-800 px-2 py-0.5 rounded-md shadow-sm">Sokongan: PDF / Imej</span>
-                        <input type="file" accept="application/pdf, image/*" className="hidden" onChange={handlePenutupFileUpload} />
-                      </label>
-                    </div>
-                  )}
-
-                  {penutupFile && (
-                    <div className="mb-6 w-full flex flex-col gap-4">
-                      {/* MOBILE VIEW */}
-                      <div className="block sm:hidden w-full bg-slate-50 dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm flex flex-col items-center gap-4">
-                         {penutupFile.includes('application/pdf') ? (
-                           <FileText size={48} className="text-indigo-500" />
-                         ) : (
-                           <div 
-                             className="w-full relative cursor-pointer group overflow-hidden rounded-xl h-48 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 flex items-center justify-center"
-                             onClick={() => setViewingMemo({ url: penutupFile, name: "Majlis_Penutup", type: "image", uploadDate: penutupFileDate })}
-                           >
-                             <img 
-                               src={penutupFile} 
-                               alt="Thumbnail Majlis Penutup" 
-                               className="w-full h-full object-cover group-active:scale-105 transition-transform duration-300" 
-                             />
-                             <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-active:opacity-100 transition-opacity">
-                                <span className="text-white text-xs font-bold flex items-center gap-1"><Eye size={16}/> Lihat Penuh</span>
-                             </div>
-                           </div>
-                         )}
-
-                         <div className="space-y-1 text-center w-full mt-2">
-                           <p className="text-sm font-black text-slate-800 dark:text-slate-200">Dokumen Atur Cara Majlis Penutup</p>
-                           <div className="flex flex-col items-center gap-1.5">
-                             <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">{penutupFile.includes('application/pdf') ? 'Format PDF' : 'Format Imej'}</p>
-                             {penutupFileDate && <p className="text-[9px] font-bold text-slate-400"><Clock size={10} className="inline mr-1"/>{formatDateTime(penutupFileDate)}</p>}
-                           </div>
-                         </div>
-
-                         <div className="flex w-full gap-2 mt-1">
-                           <button 
-                             onClick={() => setViewingMemo({ url: penutupFile, name: "Majlis_Penutup", type: penutupFile.includes('application/pdf') ? 'pdf' : 'image', uploadDate: penutupFileDate })}
-                             className="flex-1 inline-flex items-center justify-center gap-2 text-xs font-bold text-indigo-700 bg-indigo-100 hover:bg-indigo-200 dark:bg-indigo-900/40 dark:text-indigo-300 dark:hover:bg-indigo-800/60 px-2 py-3 rounded-xl shadow-sm transition-all active:scale-95"
-                           >
-                             <ExternalLink size={16} /> Lihat
-                           </button>
-                           
-                           <button 
-                             onClick={() => handleDownloadBlob(penutupFile, penutupFile.includes('application/pdf') ? 'Majlis_Penutup.pdf' : 'Majlis_Penutup.jpg')}
-                             className="flex-[2] inline-flex items-center justify-center gap-2 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 px-2 py-3 rounded-xl shadow-md transition-all active:scale-95"
-                           >
-                             <Download size={16} /> Muat Turun
-                           </button>
-                         </div>
-                         
-                         {isAdmin && (
-                          <button 
-                            onClick={async () => { if(window.confirm("Padam fail penutup ini?")) { setPenutupFile(null); try { await setDoc(doc(db, "msr", "data_penutup_file"), { fileData: null, uploadDate: null }); saveToFirebaseWithOffline({ latestUpdate: { view: 'penutup', text: 'Fail Majlis Penutup penuh telah dipadam.' } }); } catch(err){} } }}
-                            className="w-full inline-flex items-center justify-center gap-2 text-xs font-bold text-red-600 bg-red-50 hover:bg-red-100 dark:bg-red-900/20 px-4 py-3 rounded-xl transition-all active:scale-95"
-                          >
-                            <Trash2 size={16} /> Padam Rekod
-                          </button>
-                         )}
-                      </div>
-
-                      {/* DESKTOP/TABLET VIEW */}
-                      <div className="hidden sm:flex p-4 bg-slate-50 dark:bg-slate-900/50 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm flex-row items-center justify-between gap-4">
-                         <div className="flex items-center gap-3 w-full">
-                            <div className="p-2.5 bg-indigo-100 dark:bg-indigo-900/40 rounded-xl cursor-pointer hover:scale-105 transition-transform" onClick={() => setViewingMemo({ url: penutupFile, name: "Majlis_Penutup", type: penutupFile.includes('application/pdf') ? 'pdf' : 'image', uploadDate: penutupFileDate })}>
-                               {penutupFile.includes('application/pdf') ? <FileText size={24} className="text-indigo-600 dark:text-indigo-400" /> : <ImageIcon size={24} className="text-indigo-600 dark:text-indigo-400" />}
-                            </div>
-                            <div>
-                               <p className="text-sm font-bold text-slate-800 dark:text-slate-200 cursor-pointer hover:underline" onClick={() => setViewingMemo({ url: penutupFile, name: "Majlis_Penutup", type: penutupFile.includes('application/pdf') ? 'pdf' : 'image', uploadDate: penutupFileDate })}>Dokumen Atur Cara Majlis Penutup</p>
-                               {penutupFileDate && <p className="text-[9px] font-bold text-slate-500 mt-0.5"><Clock size={10} className="inline mr-1"/>{formatDateTime(penutupFileDate)}</p>}
-                            </div>
-                         </div>
-                         <div className="flex items-center gap-2 w-auto justify-end">
-                            <button onClick={() => setViewingMemo({ url: penutupFile, name: "Majlis_Penutup", type: penutupFile.includes('application/pdf') ? 'pdf' : 'image', uploadDate: penutupFileDate })} className="flex-none flex items-center justify-center gap-1.5 text-[11px] font-bold text-indigo-700 bg-indigo-100 hover:bg-indigo-200 dark:bg-indigo-900/40 dark:text-indigo-300 dark:hover:bg-indigo-800/60 px-4 py-2 rounded-xl transition-all active:scale-95">
-                               <ExternalLink size={14}/> Lihat
-                            </button>
-                            <button onClick={() => handleDownloadBlob(penutupFile, penutupFile.includes('application/pdf') ? 'Majlis_Penutup.pdf' : 'Majlis_Penutup.jpg')} className="flex-none flex items-center justify-center gap-1.5 text-[11px] font-bold text-white bg-indigo-600 hover:bg-indigo-700 px-4 py-2 rounded-xl transition-all active:scale-95 shadow-sm">
-                               <Download size={14}/> Muat Turun
-                            </button>
-                            {isAdmin && (
-                               <button onClick={async () => { if(window.confirm("Padam fail penutup ini?")) { setPenutupFile(null); try { await setDoc(doc(db, "msr", "data_penutup_file"), { fileData: null, uploadDate: null }); saveToFirebaseWithOffline({ latestUpdate: { view: 'penutup', text: 'Fail Majlis Penutup penuh telah dipadam.' } }); } catch(err){} } }} className="text-red-500 bg-red-50 hover:bg-red-100 dark:bg-red-900/20 p-2 rounded-xl transition-colors shrink-0 active:scale-90">
-                                  <Trash2 size={16}/>
-                               </button>
-                            )}
-                         </div>
-                      </div>
-                    </div>
-                  )}
-                  
-                  {(!penutupData || penutupData.length === 0) ? (
-                    <div className="text-center py-12 text-slate-400 font-medium bg-slate-50 dark:bg-slate-900/50 rounded-[2rem] border border-dashed border-slate-200 dark:border-slate-700">
-                      <GraduationCap size={40} className="mx-auto mb-2 opacity-30" />
-                      <p className="text-sm font-bold text-slate-500">Tiada atur cara majlis buat masa ini.</p>
-                    </div>
-                  ) : (
-                    <div className="relative border-l-[3px] border-indigo-200 dark:border-indigo-800/50 ml-3 md:ml-6 space-y-5 mt-6">
-                      {penutupData.map((slot) => (
-                        <div key={slot.id} className="relative pl-6 md:pl-8 group">
-                          <div className="absolute -left-[11px] top-4 h-5 w-5 rounded-full border-[4px] border-white dark:border-slate-800 bg-indigo-500 shadow-md z-10 group-hover:scale-125 transition-transform duration-300"></div>
-                          
-                          {isAdmin ? (
-                            <div className="bg-slate-50 dark:bg-slate-900/50 p-4 rounded-2xl border border-slate-200 dark:border-slate-700 relative shadow-sm transition-shadow">
-                              <button onClick={() => { const updated = penutupData.filter(s => s.id !== slot.id); setPenutupData(updated); saveToFirebaseWithOffline({ penutupData: updated, latestUpdate: { view: 'penutup', text: 'Satu slot masa telah dipadam dari atur cara majlis penutup.' } }); }} className="absolute top-4 right-4 text-red-400 hover:text-red-600 bg-red-50 dark:bg-red-900/20 p-1.5 rounded-lg transition-colors" aria-label="Padam slot"><Trash2 size={16}/></button>
-                              <div className="mb-3 pr-10 w-1/2">
-                                <label className="text-[9px] font-bold text-slate-500 uppercase tracking-widest ml-1 mb-1 block">Masa</label>
-                                <input type="time" value={slot.time} onChange={e => { const updated = penutupData.map(s => s.id === slot.id ? { ...s, time: e.target.value } : s); setPenutupData(updated); }} onBlur={() => saveToFirebaseWithOffline({ penutupData, latestUpdate: { view: 'penutup', text: 'Masa atur cara majlis penutup telah dikemas kini.' } })} className="w-full border border-slate-200 dark:border-slate-700 p-2.5 rounded-lg text-xs font-black text-indigo-600 dark:text-indigo-400 bg-white dark:bg-slate-800 transition-colors focus:ring-2 focus:ring-indigo-500 outline-none" aria-label="Waktu slot" />
-                              </div>
-                              <textarea value={slot.aktiviti} onChange={e => { const updated = penutupData.map(s => s.id === slot.id ? { ...s, aktiviti: e.target.value } : s); setPenutupData(updated); }} onBlur={() => saveToFirebaseWithOffline({ penutupData, latestUpdate: { view: 'penutup', text: 'Maklumat aktiviti pada majlis penutup telah dikemas kini.' } })} className="w-full border border-slate-200 dark:border-slate-700 p-3 rounded-xl text-sm font-bold bg-white dark:bg-slate-800 text-slate-800 dark:text-white transition-colors outline-none focus:ring-2 focus:ring-indigo-500 custom-scrollbar" rows={2} placeholder="Keterangan Aktiviti..." aria-label="Keterangan aktiviti" />
-                            </div>
-                          ) : (
-                            <div className="bg-white dark:bg-slate-800/80 p-4 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-sm hover:shadow-md transition-all duration-300 hover:-translate-y-1">
-                              <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 text-[10px] md:text-xs font-black tracking-wider shadow-sm mb-2">
-                                <Clock size={12}/> {formatTime(slot.time)}
-                              </div>
-                              <h4 className="text-sm md:text-base font-bold text-slate-800 dark:text-slate-100 leading-snug">{slot.aktiviti}</h4>
-                            </div>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* VIEW: LAYOUT (GALERI PELAN) */}
-            {currentView === 'layout' && (
-              <div className="p-4 max-w-4xl mx-auto pb-32 text-center">
-                <div className="bg-white dark:bg-slate-800 rounded-[2rem] border border-slate-200 dark:border-slate-700 p-6 md:p-10 shadow-xl text-center">
-                  <div className="bg-sky-100 dark:bg-sky-900/50 w-16 h-16 md:w-20 md:h-20 mx-auto rounded-[1.5rem] flex items-center justify-center mb-5 transform rotate-3 shadow-inner border border-sky-200 dark:border-sky-800/50">
-                    <MapPinned size={36} className="text-sky-600 dark:text-sky-400 -rotate-3" />
-                  </div>
-                  <h3 className="text-2xl md:text-3xl font-black text-slate-800 dark:text-white mb-2 tracking-tight">Pelan Pendaftaran</h3>
-                  <p className="text-slate-500 dark:text-slate-400 mb-8 text-sm md:text-base font-medium">Panduan susun atur dewan bagi melancarkan pergerakan.</p>
-                  
-                  {isAdmin && (
-                    <div className="mb-6 p-6 border-2 border-dashed border-sky-200 dark:border-sky-800/50 rounded-2xl bg-sky-50/50 dark:bg-sky-900/10 hover:bg-sky-50 dark:hover:bg-sky-900/20 transition-colors">
-                      <label className="cursor-pointer flex flex-col items-center">
-                        <UploadCloud size={32} className="text-sky-500 mb-2 animate-pulse" />
-                        <span className="text-sm font-bold text-slate-700 dark:text-slate-200">Muat Naik Fail Pelan Baharu</span>
-                        <span className="text-[10px] font-medium text-slate-500 mt-1 bg-white dark:bg-slate-800 px-2 py-0.5 rounded-md shadow-sm">Sokongan: PDF / Imej</span>
-                        <input type="file" accept="application/pdf, image/*" className="hidden" onChange={handleLayoutUpload} aria-label="Muat naik pelan" />
-                      </label>
-                    </div>
-                  )}
-
-                  {layoutList.length === 0 ? (
-                    <div className="border-2 border-dashed border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 rounded-[1.5rem] min-h-[200px] flex flex-col items-center justify-center p-4">
-                      <ImageIcon size={48} className="text-slate-300 dark:text-slate-600 mb-3" />
-                      <p className="text-sm font-bold text-slate-500">Tiada fail pelan dimuat naik.</p>
-                    </div>
-                  ) : (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 md:gap-5 mt-6 w-full text-left">
-                      {layoutList.map(layout => (
-                        <div key={layout.id} className="bg-slate-50 dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm flex flex-col group hover:shadow-md transition-all">
-                           {/* Thumbnail */}
-                           <div 
-                              className="w-full relative cursor-pointer overflow-hidden rounded-xl h-48 mb-4 border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-800 flex items-center justify-center"
-                              onClick={() => setViewingMemo({ url: layout.url, name: layout.name, type: layout.type, uploadDate: layout.uploadDate })}
-                           >
-                              {layout.type === 'pdf' ? (
-                                <FileText size={64} className="text-sky-500 opacity-80 group-hover:scale-110 transition-transform duration-300" />
-                              ) : (
-                                <img src={layout.url} alt={layout.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
-                              )}
-                              <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                                 <span className="text-white text-sm font-bold flex items-center gap-2"><Eye size={18}/> Lihat Penuh</span>
-                              </div>
-                           </div>
-
-                           {/* Info */}
-                           <div className="flex-1 px-1">
-                              <p className="text-sm font-bold text-slate-800 dark:text-slate-200 line-clamp-1" title={layout.name}>{layout.name}</p>
-                              <div className="flex items-center gap-2 mt-1.5">
-                                <span className="text-[9px] font-black text-sky-600 bg-sky-100 dark:text-sky-300 dark:bg-sky-900/40 px-1.5 py-0.5 rounded uppercase">{layout.type === 'pdf' ? 'PDF' : 'IMEJ'}</span>
-                                {layout.uploadDate && <span className="text-[9px] font-bold text-slate-500"><Clock size={10} className="inline mr-1"/>{formatDateTime(layout.uploadDate)}</span>}
-                              </div>
-                           </div>
-
-                           {/* Buttons */}
-                           <div className="flex w-full gap-2 mt-4 pt-3 border-t border-slate-200 dark:border-slate-700/50">
-                              <button 
-                                onClick={() => setViewingMemo({ url: layout.url, name: layout.name, type: layout.type, uploadDate: layout.uploadDate })}
-                                className="flex-1 inline-flex items-center justify-center gap-1.5 text-[11px] font-bold text-sky-700 bg-sky-100 hover:bg-sky-200 dark:bg-sky-900/40 dark:text-sky-300 dark:hover:bg-sky-800/60 px-2 py-2.5 rounded-xl transition-all active:scale-95"
-                              >
-                                <ExternalLink size={14}/> Lihat
-                              </button>
-                              <button 
-                                onClick={() => handleDownloadBlob(layout.url, layout.name)}
-                                className="flex-[1.5] inline-flex items-center justify-center gap-1.5 text-[11px] font-bold text-white bg-emerald-600 hover:bg-emerald-700 px-2 py-2.5 rounded-xl shadow-sm transition-all active:scale-95"
-                              >
-                                <Download size={14}/> Muat Turun
-                              </button>
-                              {isAdmin && (
-                                 <button onClick={() => handleDeleteLayout(layout.id)} className="bg-red-50 text-red-600 hover:bg-red-100 dark:bg-red-900/20 p-2.5 rounded-xl transition-colors active:scale-90" aria-label="Padam pelan"><Trash2 size={16}/></button>
-                              )}
-                           </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* VIEW: LAGU */}
-            {currentView === 'lagu' && (
-              <div className="p-4 max-w-2xl mx-auto pb-32 text-center">
-                <div className="bg-white dark:bg-slate-800 rounded-[2.5rem] border border-slate-200 dark:border-slate-700 p-6 md:p-12 space-y-6 shadow-xl relative overflow-hidden">
-                  <div className="absolute -top-16 -right-16 w-48 h-48 bg-violet-500/20 rounded-full blur-[60px] pointer-events-none"></div>
-                  <div className="absolute -bottom-16 -left-16 w-48 h-48 bg-cyan-500/20 rounded-full blur-[60px] pointer-events-none"></div>
-                  
-                  <div className="relative z-10 bg-violet-100 dark:bg-violet-900/50 w-20 h-20 mx-auto rounded-2xl flex items-center justify-center mb-6 shadow-inner border border-violet-200 dark:border-violet-800/50">
-                    <AudioLines size={40} className="text-violet-500 dark:text-violet-400 animate-pulse duration-[3000ms]" />
-                  </div>
-                  
-                  <h3 className="text-2xl md:text-4xl font-black relative z-10 tracking-tight text-slate-800 dark:text-white">LAGU KORPORAT JTM</h3>
-                  
-                  <div className="space-y-5 text-sm md:text-lg leading-loose md:leading-loose italic text-slate-600 dark:text-slate-300 font-bold relative z-10 px-2 md:px-8 py-4">
-                    <p className="hover:text-violet-600 dark:hover:text-violet-400 transition-colors">Peneraju Pembangun<br/>Tenaga Mahir Negara<br/>Jabatan Tenaga Manusia</p>
-                    <p className="hover:text-violet-600 dark:hover:text-violet-400 transition-colors">Kami Cekal Berhemah<br/>Khidmat Cekal Berkualiti<br/>Menjadi Amanat Semua</p>
-                    
-                    <div className="bg-gradient-to-br from-violet-50 to-slate-50 dark:from-slate-900 dark:to-violet-950/30 p-6 rounded-[1.5rem] not-italic font-black border border-violet-200/50 shadow-sm mt-6 transform hover:scale-105 transition-transform duration-500">
-                      <span className="text-[9px] md:text-[10px] uppercase tracking-[0.3em] text-violet-500 block mb-3">Korus</span>
-                      <p className="text-slate-800 dark:text-violet-100 text-base md:text-xl leading-relaxed">
-                        Mendukung Misi Bersama<br/>Membangun Sumber Manusia<br/>Itulah Janji Pada Negara<br/><span className="text-violet-600 dark:text-violet-400 text-lg md:text-2xl mt-1.5 block">Malaysia Berjaya</span>
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-
-          </div>
+           {renderView()}
         </main>
 
-        {/* --- IN-APP MODAL UNTUK PAPARAN MEMO PENUH (Mobile & Desktop) --- */}
-        {viewingMemo && (
-          <div className="fixed inset-0 z-[100] bg-slate-900/95 backdrop-blur-xl flex flex-col animate-in fade-in zoom-in-[0.98] duration-300">
-             <div className="flex justify-between items-center p-3 md:p-4 bg-[#020817] border-b border-slate-800 text-white shadow-lg z-10">
-              <div className="flex items-center gap-3 overflow-hidden">
-                <div className="bg-cyan-500/20 p-2 rounded-lg text-cyan-400 shrink-0">
-                  <FileText size={20} />
-                </div>
-                 <div>
-                  <h3 className="font-bold text-sm md:text-base truncate max-w-[180px] md:max-w-xl">{viewingMemo.name}</h3>
-                  <div className="flex items-center gap-2">
-                    <span className="text-[9px] font-black tracking-widest text-slate-400 uppercase">{viewingMemo.type === 'pdf' ? 'Dokumen PDF' : 'Fail Imej'}</span>
-                    {viewingMemo.uploadDate && <span className="text-[9px] font-bold text-slate-500">| {formatDateTime(viewingMemo.uploadDate)}</span>}
-                  </div>
-                </div>
-              </div>
-              <div className="flex items-center gap-2 shrink-0 ml-4">
-                <button 
-                  onClick={() => handleDownloadBlob(viewingMemo.url, viewingMemo.name)} 
-                  className="inline-flex items-center gap-1.5 px-3 py-2 bg-emerald-600 hover:bg-emerald-500 rounded-lg font-bold text-xs transition-colors shadow-sm active:scale-95"
-                  title="Muat Turun Dokumen"
-                  aria-label="Muat turun dokumen"
-                >
-                  <Download size={16} /> Muat Turun
-                </button>
-                <button 
-                  onClick={() => setViewingMemo(null)} 
-                  className="p-2 bg-slate-800 hover:bg-red-500 hover:text-white text-slate-300 rounded-lg transition-all shadow-sm active:scale-90 ml-1"
-                  title="Tutup Paparan"
-                  aria-label="Tutup paparan dokumen"
-                >
-                  <X size={18} />
-                </button>
-              </div>
-            </div>
-            
-            <div className="flex-1 w-full h-full p-4 md:p-6 overflow-hidden flex justify-center items-center">
-              {blobUrl ? (
-                viewingMemo.type === 'pdf' ? (
-                  <iframe src={blobUrl} className="w-full h-full bg-white rounded-xl shadow-2xl border border-slate-700" title={viewingMemo.name} />
-                ) : (
-                  <img src={blobUrl} alt={viewingMemo.name} className="max-w-full max-h-full object-contain rounded-xl shadow-2xl border border-slate-700 bg-slate-800" />
-                )
-              ) : (
-                <div className="flex flex-col items-center gap-3 text-white animate-pulse">
-                  <div className="w-10 h-10 border-[3px] border-cyan-500 border-t-transparent rounded-full animate-spin"></div>
-                  <span className="font-bold tracking-widest uppercase text-[10px] text-slate-400">Memproses Dokumen...</span>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* --- FOOTER --- */}
-        <footer className="bg-[#f8fafc] dark:bg-[#020817] text-slate-400 py-6 text-center mt-auto pb-24 md:pb-6 border-t border-slate-200 dark:border-slate-800/50 relative z-30">
-          <p className="text-[10px] md:text-xs text-slate-500 font-bold tracking-wide">
-            Hak Cipta Terpelihara &copy; 2026 Kolej Teknologi Termaju (ADTEC) Jabatan Tenaga Manusia Kampus Sandakan.
-          </p>
-        </footer>
-
-        {/* --- BOTTOM NAV (MOBILE) DENGAN 4 BUTANG UTAMA --- */}
-        <nav className="md:hidden fixed bottom-0 w-full bg-white/95 dark:bg-[#020817]/95 backdrop-blur-xl border-t border-slate-200 dark:border-slate-800 flex items-center pt-1.5 pb-safe-bottom pb-3 z-40 shadow-[0_-10px_40px_rgba(0,0,0,0.05)] dark:shadow-[0_-10px_40px_rgba(0,0,0,0.5)]">
-          <div className="flex justify-around w-full px-2 gap-1">
-            {[
-              { id: 'home', icon: Home, label: 'Utama', ariaLabel: 'Laman utama' },
-              { id: 'jadual', icon: CalendarClock, label: 'Jadual', ariaLabel: 'Jadual program' },
-              { id: 'layout', icon: MapPinned, label: 'Pelan', ariaLabel: 'Pelan pendaftaran' },
-              { id: 'memo', icon: FileSignature, label: 'Memo', ariaLabel: 'Dokumen memo' }
-            ].map((item) => (
-              <button 
-                key={item.id} 
-                onClick={() => navigateTo(item.id)} 
-                className={`flex-1 flex flex-col items-center gap-0.5 p-1.5 text-[9px] font-black transition-all active:scale-90 ${currentView === item.id ? 'text-cyan-600 dark:text-cyan-400 -translate-y-1' : 'text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300'}`}
-                aria-label={item.ariaLabel}
-              >
-                <div className={`${currentView === item.id ? 'bg-cyan-100 dark:bg-cyan-900/40 p-1.5 rounded-xl shadow-sm border border-cyan-200 dark:border-cyan-800/50 mb-0.5' : 'p-0.5'}`}>
-                  <item.icon size={20} strokeWidth={currentView === item.id ? 2.5 : 2} />
-                </div>
-                <span className={`tracking-wide text-[10px] ${currentView === item.id ? 'opacity-100 font-black' : 'opacity-80'}`}>{item.label}</span>
-              </button>
-            ))}
-          </div>
-        </nav>
-
-        {/* --- FAB QUICK ACTION BUTTON --- */}
-        <div className="fixed bottom-28 md:bottom-8 right-4 md:right-6 z-50 flex flex-col items-end gap-2">
-           {showFabMenu && (
-             <div className="bg-white/85 dark:bg-slate-800/85 backdrop-blur-2xl border border-slate-200/50 dark:border-slate-700/50 shadow-2xl flex flex-col gap-1.5 text-xs font-bold w-44 animate-in slide-in-from-bottom-4 zoom-in-90 duration-200 ease-out origin-bottom-right rounded-2xl p-2 mb-2">
-                <a href="https://www.jtm.gov.my/etatatertib" target="_blank" rel="noopener noreferrer" className="p-3 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-xl transition-colors flex items-center gap-2" aria-label="eTATATERTIB">
-                  <Shield size={14} className="text-slate-400"/> eTATATERTIB
-                </a>
-                <a href="https://jims.jtm.gov.my/" target="_blank" rel="noopener noreferrer" className="p-3 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-xl transition-colors flex items-center gap-2" aria-label="Sistem JIMS">
-                  <Monitor size={14} className="text-slate-400"/> Sistem JIMS
-                </a>
-                <button onClick={toggleTheme} className="p-3 text-left hover:bg-slate-100 dark:hover:bg-slate-700 rounded-xl transition-colors flex items-center gap-2" aria-label="Tukar tema">
-                  {isDarkMode ? <Sun size={14} className="text-slate-400"/> : <Moon size={14} className="text-slate-400"/>} 
-                  Tema: {isDarkMode ? 'Cerah' : 'Gelap'}
-                </button>
-                <div className="h-px bg-slate-200/50 dark:bg-slate-700/50 my-1 mx-2"></div>
-                {isAdmin ? (
-                  <button onClick={() => { setIsAdmin(false); setShowFabMenu(false); }} className="flex items-center gap-2 p-3 text-left text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-xl transition-colors" aria-label="Log keluar"><LogOut size={16} /> Log Keluar Sesi</button>
-                ) : (
-                  <button onClick={() => { setShowLogin(true); setShowFabMenu(false); }} className="flex items-center gap-2 p-3 text-left text-cyan-600 hover:bg-cyan-50 dark:hover:bg-cyan-900/30 rounded-xl transition-colors" aria-label="Log masuk admin"><Lock size={16} /> Log Masuk Admin</button>
-                )}
-             </div>
-           )}
-           <button onClick={() => setShowFabMenu(!showFabMenu)} className="bg-slate-800 dark:bg-cyan-600 text-white p-3.5 md:p-4 rounded-full shadow-[0_8px_24px_rgba(0,0,0,0.3)] hover:scale-105 active:scale-90 transition-all duration-300 focus:outline-none flex items-center justify-center border border-slate-700 dark:border-cyan-500 relative group" aria-label="Menu tindakan pantas">
-             <div className="absolute inset-0 bg-white/20 rounded-full scale-0 group-hover:scale-100 transition-transform duration-300"></div>
-             <div className="relative w-5 h-5 flex items-center justify-center">
-               <Command size={20} className={`absolute transition-all duration-300 ease-out ${showFabMenu ? '-rotate-90 opacity-0 scale-50' : 'rotate-0 opacity-100 scale-100'}`} />
-               <X size={20} className={`absolute transition-all duration-300 ease-out ${showFabMenu ? 'rotate-0 opacity-100 scale-100' : 'rotate-90 opacity-0 scale-50'}`} />
-             </div>
-           </button>
-        </div>
-
+        <Footer />
+        <BottomNav currentView={currentView} navigateTo={navigateTo} />
+        <FabMenu showFabMenu={showFabMenu} setShowFabMenu={setShowFabMenu} isAdmin={isAdmin} setIsAdmin={setIsAdmin} toggleTheme={toggleTheme} isDarkMode={isDarkMode} setShowLogin={setShowLogin} />
       </div>
+
+      {viewingMemo && (
+        <ImageModal viewingMemo={viewingMemo} setViewingMemo={setViewingMemo} blobUrl={blobUrl} handleDownloadBlob={handleDownloadBlob} />
+      )}
     </div>
   );
 }
