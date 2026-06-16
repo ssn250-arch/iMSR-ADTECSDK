@@ -69,7 +69,7 @@ export default function HomeView({ isAdmin, announcements, setAnnouncements, sav
               
               <span className="flex items-center gap-1.5 bg-amber-500 text-slate-950 px-2 py-0.5 rounded-md text-[10px] font-black tracking-wider shrink-0 uppercase relative z-10">
                 <Bell size={12} className="shrink-0 animate-bounce" />
-                INFO KILAT {isAdmin && `(${announcements.length})`}
+                INFO {isAdmin && `(${announcements.length})`}
               </span>
               
               <div className="flex-1 overflow-hidden relative w-full flex items-center">
