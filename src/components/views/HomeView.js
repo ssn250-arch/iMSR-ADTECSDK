@@ -1,5 +1,5 @@
 import React from 'react';
-import { Bell, Zap, ChevronRight, FileSignature, UserCog, CalendarClock, GraduationCap, MapPinned, AudioLines } from 'lucide-react';
+import { Bell, Zap, ChevronRight, FileSignature, UserCog, CalendarClock, GraduationCap, MapPinned, AudioLines, Cpu } from 'lucide-react';
 import NetworkAnimation from '../ui/NetworkAnimation';
 import LiveClock from '../ui/LiveClock';
 import { formatTarikh } from '../../utils/helpers';
