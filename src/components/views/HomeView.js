@@ -1,10 +1,9 @@
 import React from 'react';
-import { Bell, Zap, ChevronRight, FileSignature, UserCog, CalendarClock, GraduationCap, MapPinned, AudioLines, Cpu } from 'lucide-react';
+import { Bell, Zap, ChevronRight, FileSignature, UserCog, CalendarClock, GraduationCap, MapPinned, AudioLines, Cpu, Plus, X } from 'lucide-react';
 import NetworkAnimation from '../ui/NetworkAnimation';
 import LiveClock from '../ui/LiveClock';
 import { formatTarikh } from '../../utils/helpers';
 
-// Skema Warna Kad Menu Utama
 const cardStyles = {
   blue: { iconText: 'text-blue-600 dark:text-blue-400', iconBorder: 'border-blue-200 dark:border-blue-500/20', glow: 'group-hover:shadow-[0_8px_30px_rgba(59,130,246,0.15)] dark:group-hover:shadow-[0_8px_30px_rgba(59,130,246,0.2)]', topLine: 'from-transparent via-blue-500 to-transparent', hoverBg: 'group-hover:bg-blue-50/50 dark:group-hover:bg-blue-900/10' },
   emerald: { iconText: 'text-emerald-600 dark:text-emerald-400', iconBorder: 'border-emerald-200 dark:border-emerald-500/20', glow: 'group-hover:shadow-[0_8px_30px_rgba(16,185,129,0.15)] dark:group-hover:shadow-[0_8px_30px_rgba(16,185,129,0.2)]', topLine: 'from-transparent via-emerald-500 to-transparent', hoverBg: 'group-hover:bg-emerald-50/50 dark:group-hover:bg-emerald-900/10' },
@@ -14,15 +13,17 @@ const cardStyles = {
   violet: { iconText: 'text-violet-600 dark:text-violet-400', iconBorder: 'border-violet-200 dark:border-violet-500/20', glow: 'group-hover:shadow-[0_8px_30px_rgba(139,92,246,0.15)] dark:group-hover:shadow-[0_8px_30px_rgba(139,92,246,0.2)]', topLine: 'from-transparent via-violet-500 to-transparent', hoverBg: 'group-hover:bg-violet-50/50 dark:group-hover:bg-violet-900/10' }
 };
 
-export default function HomeView({ isAdmin, announcement, setAnnouncement, saveToFirebaseWithOffline, sesiKemasukan, setSesiKemasukan, navigateTo }) {
+export default function HomeView({ isAdmin, announcements, setAnnouncements, saveToFirebaseWithOffline, sesiKemasukan, setSesiKemasukan, navigateTo }) {
   
-  // Teks Pengumuman Utama (Default jika kosong)
-  const announcementText = announcement || "Selamat Datang ke Portal iMSR ADTEC JTM Kampus Sandakan. Sila rujuk dokumen jadual dan pelan pendaftaran.";
+  // Satukan semua ayat array pengumuman menjadi satu baris teks panjang (Dipisahkan oleh tanda •)
+  const compiledText = announcements && announcements.length > 0
+    ? announcements.map(a => a.text.trim()).filter(Boolean).join("   •   ")
+    : "Selamat Datang ke Portal iMSR ADTEC JTM Kampus Sandakan. Sila rujuk dokumen jadual dan pelan pendaftaran.";
 
   return (
     <div className="px-4 lg:px-8 max-w-6xl mx-auto pb-32 pt-4">
       
-      {/* CSS Mengawal Putaran Marquee Infiniti (Kelajuan Ditingkatkan ke 12s) */}
+      {/* Pengawal Kelajuan Responsif Pintar Mengikut Lebar Skrin Peranti */}
       <style>{`
         @keyframes seamlessMarquee {
           0% { transform: translate3d(0, 0, 0); }
@@ -31,9 +32,24 @@ export default function HomeView({ isAdmin, announcement, setAnnouncement, saveT
         .tech-marquee-track {
           display: flex;
           width: max-content;
-          animation: seamlessMarquee 12s linear infinite;
+          animation: seamlessMarquee 7s linear infinite; /* Laju Asal Skrin Mobile (7s) */
           will-change: transform;
         }
+        
+        /* Skrin Tablet (Sederhana Lebar) */
+        @media (min-width: 768px) {
+          .tech-marquee-track {
+            animation-duration: 11s; 
+          }
+        }
+        
+        /* Skrin Desktop / Laptop (Sangat Lebar) */
+        @media (min-width: 1024px) {
+          .tech-marquee-track {
+            animation-duration: 14s;
+          }
+        }
+
         .tech-marquee-track:hover {
           animation-play-state: paused;
         }
@@ -48,34 +64,65 @@ export default function HomeView({ isAdmin, announcement, setAnnouncement, saveT
         <div className="relative z-20 px-6 py-8 md:px-12 md:py-16 flex flex-col lg:flex-row items-center justify-between gap-8 md:gap-10">
           <div className="w-full lg:w-3/5 space-y-5 text-center lg:text-left">
             
-            {/* BOARD INFO KILAT DENGAN STRUKTUR SEAMLESS MARQUEE (LAJU) */}
-            <div className="flex items-center gap-3 px-4 py-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 backdrop-blur-md text-amber-400 text-xs md:text-sm font-semibold w-full overflow-hidden shadow-inner">
+            {/* BOARD INFO KILAT SEAMLESS ADAPTIVE SPEED */}
+            <div className={`flex ${isAdmin ? 'flex-col items-start gap-4' : 'items-center gap-3'} px-4 py-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 backdrop-blur-md text-amber-400 text-xs md:text-sm font-semibold w-full overflow-hidden shadow-inner`}>
+              
               <span className="flex items-center gap-1.5 bg-amber-500 text-slate-950 px-2 py-0.5 rounded-md text-[10px] font-black tracking-wider shrink-0 uppercase relative z-10">
                 <Bell size={12} className="shrink-0 animate-bounce" />
-                INFO KILAT
+                INFO KILAT {isAdmin && `(${announcements.length})`}
               </span>
               
-              <div className="flex-1 overflow-hidden relative w-full h-5 flex items-center">
+              <div className="flex-1 overflow-hidden relative w-full flex items-center">
                 {isAdmin ? (
-                  <div className="flex-1 flex items-center gap-2 w-full">
-                    <input 
-                      value={announcement} 
-                      onChange={e => setAnnouncement(e.target.value)} 
-                      onBlur={() => saveToFirebaseWithOffline({ announcement, latestUpdate: { view: 'home', text: 'Teks pengumuman portal telah dikemas kini.' } })} 
-                      className="w-full bg-transparent border-b border-amber-500/50 scale-95 outline-none text-white focus:border-amber-400 px-1" 
-                      placeholder="Masukkan pengumuman di sini..." 
-                      aria-label="Teks pengumuman" 
-                    />
+                  /* PANEL EDIT UNTUK ADMIN */
+                  <div className="w-full flex flex-col gap-2 animate-in fade-in duration-200">
+                    {announcements.map((item, index) => (
+                      <div key={item.id || index} className="flex items-center gap-2 bg-slate-950/40 border border-slate-800 p-1.5 rounded-lg w-full">
+                        <span className="text-[10px] font-mono text-slate-500 px-1.5">{index + 1}</span>
+                        <input 
+                          type="text"
+                          value={item.text} 
+                          onChange={e => {
+                            const updated = [...announcements];
+                            updated[index].text = e.target.value;
+                            setAnnouncements(updated);
+                          }} 
+                          onBlur={() => saveToFirebaseWithOffline({ announcements, latestUpdate: { view: 'home', text: 'Senarai maklumat hebahan utama telah dikemas kini.' } })}
+                          className="flex-1 bg-transparent border-none outline-none text-white text-xs md:text-sm" 
+                          placeholder="Tulis pengumuman kilat di sini..." 
+                        />
+                        <button 
+                          onClick={() => {
+                            const updated = announcements.filter((_, i) => i !== index);
+                            setAnnouncements(updated);
+                            saveToFirebaseWithOffline({ announcements: updated, latestUpdate: { view: 'home', text: 'Satu rekod maklumat hebahan telah dipadam.' } });
+                          }}
+                          className="text-red-400 hover:text-red-500 p-1 bg-red-500/10 hover:bg-red-500/20 rounded"
+                          title="Padam Hebahan"
+                        >
+                          <X size={13} />
+                        </button>
+                      </div>
+                    ))}
+                    <button 
+                      onClick={() => {
+                        const updated = [...announcements, { id: 'ann_' + Date.now(), text: '' }];
+                        setAnnouncements(updated);
+                      }}
+                      className="text-[11px] bg-amber-500 hover:bg-amber-600 text-slate-950 px-3 py-1.5 rounded-lg font-black tracking-wide mt-1 self-start flex items-center gap-1 shadow transition-colors"
+                    >
+                      <Plus size={12} /> Tambah Hebahan Baru
+                    </button>
                   </div>
                 ) : (
-                  /* Trek Marquee Infiniti - Memaparkan 2 blok teks serentak (Laju) */
+                  /* MARQUEE RUNNING TEXT DENGAN ADAPTIVE RESPONSIVE SPEED */
                   <div className="tech-marquee-track font-bold text-amber-300/90 tracking-wide gap-12">
                     <div className="flex items-center gap-3 shrink-0">
-                      <span>{announcementText}</span>
+                      <span>{compiledText}</span>
                       <span className="text-amber-500/60 font-black shrink-0 ml-4">•</span>
                     </div>
                     <div className="flex items-center gap-3 shrink-0" aria-hidden="true">
-                      <span>{announcementText}</span>
+                      <span>{compiledText}</span>
                       <span className="text-amber-500/60 font-black shrink-0 ml-4">•</span>
                     </div>
                   </div>
