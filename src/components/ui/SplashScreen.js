@@ -40,7 +40,7 @@ export default function SplashScreen({ isAppReady }) {
         {/* Logo Glassmorphism */}
         <div className="bg-white/5 p-5 rounded-[2rem] backdrop-blur-md border border-white/10 shadow-[0_0_40px_rgba(6,182,212,0.15)] mb-8 transform transition-transform hover:scale-105">
           <img 
-            src="/logo.png" 
+            src="/Logo ADTEC JTM 2025 Kampus Sandakan.png" 
             alt="Logo ADTEC" 
             className="w-24 h-24 md:w-28 md:h-28 object-contain drop-shadow-[0_0_15px_rgba(255,255,255,0.2)] animate-float"
           />
