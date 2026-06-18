@@ -36,6 +36,36 @@ const GlobalStyles = React.memo(() => (
   </style>
 ));
 
+// --- ENJIN INDEXED_DB (SIMPAN FAIL BERAT DALAM TELEFON) ---
+const initDB = () => {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open('imsrFilesDB', 1);
+    request.onupgradeneeded = (e) => e.target.result.createObjectStore('filesStore');
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+};
+
+const saveToLocalDB = async (key, val) => {
+  if(!val) return;
+  try {
+    const db = await initDB();
+    db.transaction('filesStore', 'readwrite').objectStore('filesStore').put(val, key);
+  } catch(e) {}
+};
+
+const getFromLocalDB = async (key) => {
+  try {
+    const db = await initDB();
+    return new Promise(resolve => {
+      const req = db.transaction('filesStore', 'readonly').objectStore('filesStore').get(key);
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => resolve(null);
+    });
+  } catch(e) { return null; }
+};
+// -----------------------------------------------------------
+
 export default function App() {
   const [currentView, setCurrentView] = useState('home');
   const [isPending, startTransition] = useTransition(); 
@@ -65,6 +95,7 @@ export default function App() {
   const [sesiKemasukan, setSesiKemasukan] = useState({ sesi: '2', tahun: '2026' });
   const [tarikhPenutup, setTarikhPenutup] = useState(''); 
   const [memoText, setMemoText] = useState('');
+  
   const [memoList, setMemoList] = useState([]); 
   const [ajkInduk, setAjkInduk] = useState([]);
   const [biroList, setBiroList] = useState([]);
@@ -72,14 +103,16 @@ export default function App() {
   const [penutupData, setPenutupData] = useState([]);
   const [layoutList, setLayoutList] = useState([]);
   const [activeJadualTab, setActiveJadualTab] = useState('');
+  
+  // State untuk fail-fail berat
   const [jadualFile, setJadualFile] = useState(null);
   const [jadualFileDate, setJadualFileDate] = useState(null);
   const [penutupFile, setPenutupFile] = useState(null);
   const [penutupFileDate, setPenutupFileDate] = useState(null);
   const [ikrarFile, setIkrarFile] = useState(null);
+  
   const [showOfflineBanner, setShowOfflineBanner] = useState(false);
 
-  // AUTO SCROLL KE ATAS BILA TUKAR KAD
   useEffect(() => {
     window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
   }, [currentView]);
@@ -92,8 +125,6 @@ export default function App() {
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
     return () => window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
   }, []);
-
-  const handleInstallPwaClick = async () => { if (!deferredPrompt) return; deferredPrompt.prompt(); await deferredPrompt.userChoice; setDeferredPrompt(null); setShowPwaBanner(false); };
 
   useEffect(() => { document.body.style.overflow = isAppReady ? 'unset' : 'hidden'; }, [isAppReady]);
 
@@ -120,14 +151,18 @@ export default function App() {
     else { const newAttempts = loginAttempts + 1; setLoginAttempts(newAttempts); if (newAttempts >= 3) { setIsLockedOut(true); setTimeout(() => { setIsLockedOut(false); setLoginAttempts(0); }, 30000); } else alert(`Log Masuk Gagal. Baki cubaan: ${3 - newAttempts}`); }
   };
 
-  // --- LOGIK MEMUAT DATA TERPANTAS ---
   useEffect(() => {
-    // 1. SAFETY TIMER: Paksa buka app lepas 2 saat walau apa terjadi
-    const safetyTimer = setTimeout(() => {
-      setIsAppReady(true);
-    }, 2000);
+    // 1. SAFETY TIMER 
+    const safetyTimer = setTimeout(() => { setIsAppReady(true); }, 2000);
 
-    // 2. Baca Cache Tempatan untuk Instant Loading
+    // 2. MUAT TURUN FAIL BERAT DARI MEMORI TELEFON SEGERA (0.1 Saat)
+    getFromLocalDB('jadualFile').then(res => { if(res) setJadualFile(res); });
+    getFromLocalDB('penutupFile').then(res => { if(res) setPenutupFile(res); });
+    getFromLocalDB('ikrarFile').then(res => { if(res) setIkrarFile(res); });
+    getFromLocalDB('layoutList').then(res => { if(res) setLayoutList(res); });
+    getFromLocalDB('memoList').then(res => { if(res) setMemoList(res); });
+
+    // 3. BACA CACHE TEKS TEMPATAN
     const cachedData = localStorage.getItem('imsr_cached_data');
     if (cachedData) {
       try {
@@ -141,7 +176,7 @@ export default function App() {
       } catch(e) {}
     }
 
-    // 3. Tarik Data Teks Ringan Dulu
+    // 4. TERIMA DATA BARU DARI FIREBASE
     const unsubscribeUtama = onSnapshot(doc(db, "msr", "data_utama"), (docSnap) => {
       if (docSnap.exists()) {
         const data = docSnap.data();
@@ -158,18 +193,49 @@ export default function App() {
         if (data.penutupData) setPenutupData(data.penutupData);
         if (data.jadualData) { setJadualData(data.jadualData); setActiveJadualTab(prev => prev || (data.jadualData.length > 0 ? data.jadualData[0].id : '')); }
         
-        // Buang Splash Screen segera bila teks dah sampai
         setIsAppReady(true);
         clearTimeout(safetyTimer);
       }
     });
 
-    // 4. Tarik Fail-Fail PDF Berat Secara Senyap Di Belakang Tabir
-    const unsubscribeMemos = onSnapshot(collection(db, "msr_memos"), (snapshot) => { const memosArray = []; snapshot.forEach((doc) => memosArray.push(doc.data())); memosArray.sort((a, b) => a.id.localeCompare(b.id)); setMemoList(memosArray); });
-    const unsubscribeLayout = onSnapshot(doc(db, "msr", "data_layout"), (docSnap) => { if (docSnap.exists() && docSnap.data().layouts) setLayoutList(docSnap.data().layouts); else setLayoutList([]); });
-    const unsubscribeJadualFile = onSnapshot(doc(db, "msr", "data_jadual_file"), (docSnap) => { if (docSnap.exists() && docSnap.data().fileData) { setJadualFile(docSnap.data().fileData); setJadualFileDate(docSnap.data().uploadDate); } else { setJadualFile(null); setJadualFileDate(null); } });
-    const unsubscribePenutupFile = onSnapshot(doc(db, "msr", "data_penutup_file"), (docSnap) => { if (docSnap.exists() && docSnap.data().fileData) { setPenutupFile(docSnap.data().fileData); setPenutupFileDate(docSnap.data().uploadDate); } else { setPenutupFile(null); setPenutupFileDate(null); } });
-    const unsubscribeIkrarFile = onSnapshot(doc(db, "msr", "data_ikrar_file"), (docSnap) => { if (docSnap.exists() && docSnap.data().fileData) { setIkrarFile(docSnap.data().fileData); } else { setIkrarFile(null); } });
+    // 5. UPDATE FAIL BERAT JIKA ADA KEMAS KINI (Simpan terus ke dalam IndexedDB telefon)
+    const unsubscribeMemos = onSnapshot(collection(db, "msr_memos"), (snapshot) => { 
+      const memosArray = []; 
+      snapshot.forEach((doc) => memosArray.push(doc.data())); 
+      memosArray.sort((a, b) => a.id.localeCompare(b.id)); 
+      setMemoList(memosArray); 
+      saveToLocalDB('memoList', memosArray);
+    });
+    
+    const unsubscribeLayout = onSnapshot(doc(db, "msr", "data_layout"), (docSnap) => { 
+      if (docSnap.exists() && docSnap.data().layouts) {
+        setLayoutList(docSnap.data().layouts); 
+        saveToLocalDB('layoutList', docSnap.data().layouts);
+      } else setLayoutList([]); 
+    });
+    
+    const unsubscribeJadualFile = onSnapshot(doc(db, "msr", "data_jadual_file"), (docSnap) => { 
+      if (docSnap.exists() && docSnap.data().fileData) { 
+        setJadualFile(docSnap.data().fileData); 
+        setJadualFileDate(docSnap.data().uploadDate); 
+        saveToLocalDB('jadualFile', docSnap.data().fileData);
+      } else { setJadualFile(null); setJadualFileDate(null); } 
+    });
+    
+    const unsubscribePenutupFile = onSnapshot(doc(db, "msr", "data_penutup_file"), (docSnap) => { 
+      if (docSnap.exists() && docSnap.data().fileData) { 
+        setPenutupFile(docSnap.data().fileData); 
+        setPenutupFileDate(docSnap.data().uploadDate); 
+        saveToLocalDB('penutupFile', docSnap.data().fileData);
+      } else { setPenutupFile(null); setPenutupFileDate(null); } 
+    });
+    
+    const unsubscribeIkrarFile = onSnapshot(doc(db, "msr", "data_ikrar_file"), (docSnap) => { 
+      if (docSnap.exists() && docSnap.data().fileData) { 
+        setIkrarFile(docSnap.data().fileData); 
+        saveToLocalDB('ikrarFile', docSnap.data().fileData);
+      } else { setIkrarFile(null); } 
+    });
 
     return () => { 
       unsubscribeUtama(); unsubscribeMemos(); unsubscribeLayout(); unsubscribeJadualFile(); unsubscribePenutupFile(); unsubscribeIkrarFile(); clearTimeout(safetyTimer); 
