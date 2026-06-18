@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useTransition } from 'react';
 import { doc, onSnapshot, setDoc, collection } from 'firebase/firestore';
 import { db } from './firebase';
 import { handleDownloadBlob, senaraiStaf } from './utils/helpers';
@@ -32,17 +32,15 @@ const GlobalStyles = React.memo(() => (
       .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
       .hide-scrollbar::-webkit-scrollbar { display: none; }
       .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-      .tech-grid { background-image: linear-gradient(to right, rgba(148, 163, 184, 0.15) 1px, transparent 1px), linear-gradient(to bottom, rgba(148, 163, 184, 0.15) 1px, transparent 1px); background-size: 30px 30px; }
-      .dark .tech-grid { background-image: linear-gradient(to right, rgba(34, 211, 238, 0.07) 1px, transparent 1px), linear-gradient(to bottom, rgba(34, 211, 238, 0.07) 1px, transparent 1px); }
-      @keyframes float { 0%, 100% { transform: translateY(0px) scale(1); } 50% { transform: translateY(-8px) scale(1.02); } }
-      .animate-float { animation: float 6s ease-in-out infinite; }
-      .animate-float-delayed { animation: float 6s ease-in-out 3s infinite; }
     `}
   </style>
 ));
 
 export default function App() {
   const [currentView, setCurrentView] = useState('home');
+  // KOD BARU: Guna Concurrent Mode React 18 untuk hilangkan lag
+  const [isPending, startTransition] = useTransition(); 
+
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [isAppReady, setIsAppReady] = useState(false);
   const [showFabMenu, setShowFabMenu] = useState(false);
@@ -67,7 +65,6 @@ export default function App() {
   const [announcements, setAnnouncements] = useState([]); 
   const [sesiKemasukan, setSesiKemasukan] = useState({ sesi: '2', tahun: '2026' });
   const [tarikhPenutup, setTarikhPenutup] = useState(''); 
-  
   const [memoText, setMemoText] = useState('');
   const [memoList, setMemoList] = useState([]); 
   const [ajkInduk, setAjkInduk] = useState([]);
@@ -80,38 +77,21 @@ export default function App() {
   const [jadualFileDate, setJadualFileDate] = useState(null);
   const [penutupFile, setPenutupFile] = useState(null);
   const [penutupFileDate, setPenutupFileDate] = useState(null);
-  
-  // State untuk PDF Ikrar
   const [ikrarFile, setIkrarFile] = useState(null);
-
   const [showOfflineBanner, setShowOfflineBanner] = useState(false);
 
   useEffect(() => {
-    const handleBeforeInstallPrompt = (e) => {
-      e.preventDefault();
-      setDeferredPrompt(e);
-      if (/Android/i.test(navigator.userAgent)) setShowPwaBanner(true);
-    };
+    const handleBeforeInstallPrompt = (e) => { e.preventDefault(); setDeferredPrompt(e); if (/Android/i.test(navigator.userAgent)) setShowPwaBanner(true); };
     const isIos = /iPhone|iPad|iPod/i.test(navigator.userAgent);
     const isStandalone = window.navigator.standalone === true;
-    if (isIos && !isStandalone) {
-      if (!sessionStorage.getItem('imsr_ios_banner_dismissed')) setShowIosBanner(true);
-    }
+    if (isIos && !isStandalone) { if (!sessionStorage.getItem('imsr_ios_banner_dismissed')) setShowIosBanner(true); }
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
     return () => window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
   }, []);
 
-  const handleInstallPwaClick = async () => {
-    if (!deferredPrompt) return;
-    deferredPrompt.prompt();
-    await deferredPrompt.userChoice;
-    setDeferredPrompt(null);
-    setShowPwaBanner(false);
-  };
+  const handleInstallPwaClick = async () => { if (!deferredPrompt) return; deferredPrompt.prompt(); await deferredPrompt.userChoice; setDeferredPrompt(null); setShowPwaBanner(false); };
 
-  useEffect(() => {
-    document.body.style.overflow = isAppReady ? 'unset' : 'hidden';
-  }, [isAppReady]);
+  useEffect(() => { document.body.style.overflow = isAppReady ? 'unset' : 'hidden'; }, [isAppReady]);
 
   useEffect(() => {
     if (localStorage.theme === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) setIsDarkMode(true);
@@ -120,28 +100,23 @@ export default function App() {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
+  // Navigate dengan efek transition blur dan tanpa lag
   const navigateTo = useCallback((view) => {
     setShowFabMenu(false);
-    setCurrentView(view);
-    requestAnimationFrame(() => window.scrollTo({ top: 0, left: 0, behavior: 'instant' }));
+    startTransition(() => {
+      setCurrentView(view);
+    });
+    // Scroll ke atas secara 'smooth' bila tukar paparan
+    requestAnimationFrame(() => window.scrollTo({ top: 0, left: 0, behavior: 'smooth' }));
   }, []);
 
-  const toggleTheme = useCallback(() => {
-    setIsDarkMode(prev => { const nextMode = !prev; localStorage.theme = nextMode ? 'dark' : 'light'; return nextMode; });
-  }, []);
+  const toggleTheme = useCallback(() => { setIsDarkMode(prev => { const nextMode = !prev; localStorage.theme = nextMode ? 'dark' : 'light'; return nextMode; }); }, []);
 
   const handleLogin = (e) => {
     e.preventDefault();
     if (isLockedOut) return;
-    if (loginForm.username === 'admin' && loginForm.password === 'abc@12345') {
-      setIsAdmin(true); setShowLogin(false); setLoginForm({ username: '', password: '' }); setLoginAttempts(0);
-    } else {
-      const newAttempts = loginAttempts + 1;
-      setLoginAttempts(newAttempts);
-      if (newAttempts >= 3) {
-        setIsLockedOut(true); setTimeout(() => { setIsLockedOut(false); setLoginAttempts(0); }, 30000);
-      } else alert(`Log Masuk Gagal. Baki cubaan: ${3 - newAttempts}`);
-    }
+    if (loginForm.username === 'admin' && loginForm.password === 'abc@12345') { setIsAdmin(true); setShowLogin(false); setLoginForm({ username: '', password: '' }); setLoginAttempts(0); } 
+    else { const newAttempts = loginAttempts + 1; setLoginAttempts(newAttempts); if (newAttempts >= 3) { setIsLockedOut(true); setTimeout(() => { setIsLockedOut(false); setLoginAttempts(0); }, 30000); } else alert(`Log Masuk Gagal. Baki cubaan: ${3 - newAttempts}`); }
   };
 
   useEffect(() => {
@@ -176,34 +151,11 @@ export default function App() {
       }
     });
 
-    const unsubscribeMemos = onSnapshot(collection(db, "msr_memos"), (snapshot) => {
-      const memosArray = [];
-      snapshot.forEach((doc) => memosArray.push(doc.data()));
-      memosArray.sort((a, b) => a.id.localeCompare(b.id));
-      setMemoList(memosArray);
-    });
-
-    const unsubscribeLayout = onSnapshot(doc(db, "msr", "data_layout"), (docSnap) => {
-      if (docSnap.exists() && docSnap.data().layouts) setLayoutList(docSnap.data().layouts);
-      else setLayoutList([]);
-      setTimeout(() => setIsAppReady(true), 1500);
-    });
-
-    const unsubscribeJadualFile = onSnapshot(doc(db, "msr", "data_jadual_file"), (docSnap) => {
-      if (docSnap.exists() && docSnap.data().fileData) { setJadualFile(docSnap.data().fileData); setJadualFileDate(docSnap.data().uploadDate); }
-      else { setJadualFile(null); setJadualFileDate(null); }
-    });
-
-    const unsubscribePenutupFile = onSnapshot(doc(db, "msr", "data_penutup_file"), (docSnap) => {
-      if (docSnap.exists() && docSnap.data().fileData) { setPenutupFile(docSnap.data().fileData); setPenutupFileDate(docSnap.data().uploadDate); }
-      else { setPenutupFile(null); setPenutupFileDate(null); }
-    });
-
-    // Fetch Ikrar PDF
-    const unsubscribeIkrarFile = onSnapshot(doc(db, "msr", "data_ikrar_file"), (docSnap) => {
-      if (docSnap.exists() && docSnap.data().fileData) { setIkrarFile(docSnap.data().fileData); }
-      else { setIkrarFile(null); }
-    });
+    const unsubscribeMemos = onSnapshot(collection(db, "msr_memos"), (snapshot) => { const memosArray = []; snapshot.forEach((doc) => memosArray.push(doc.data())); memosArray.sort((a, b) => a.id.localeCompare(b.id)); setMemoList(memosArray); });
+    const unsubscribeLayout = onSnapshot(doc(db, "msr", "data_layout"), (docSnap) => { if (docSnap.exists() && docSnap.data().layouts) setLayoutList(docSnap.data().layouts); else setLayoutList([]); setTimeout(() => setIsAppReady(true), 1500); });
+    const unsubscribeJadualFile = onSnapshot(doc(db, "msr", "data_jadual_file"), (docSnap) => { if (docSnap.exists() && docSnap.data().fileData) { setJadualFile(docSnap.data().fileData); setJadualFileDate(docSnap.data().uploadDate); } else { setJadualFile(null); setJadualFileDate(null); } });
+    const unsubscribePenutupFile = onSnapshot(doc(db, "msr", "data_penutup_file"), (docSnap) => { if (docSnap.exists() && docSnap.data().fileData) { setPenutupFile(docSnap.data().fileData); setPenutupFileDate(docSnap.data().uploadDate); } else { setPenutupFile(null); setPenutupFileDate(null); } });
+    const unsubscribeIkrarFile = onSnapshot(doc(db, "msr", "data_ikrar_file"), (docSnap) => { if (docSnap.exists() && docSnap.data().fileData) { setIkrarFile(docSnap.data().fileData); } else { setIkrarFile(null); } });
 
     return () => { unsubscribeUtama(); unsubscribeMemos(); unsubscribeLayout(); unsubscribeJadualFile(); unsubscribePenutupFile(); unsubscribeIkrarFile(); };
   }, []);
@@ -211,63 +163,17 @@ export default function App() {
   const saveToFirebaseWithOffline = useCallback(async (fieldsToUpdate) => {
     const payload = { ...fieldsToUpdate, lastUpdated: new Date().toISOString() };
     if (!navigator.onLine) {
-      const pending = JSON.parse(localStorage.getItem('imsr_pending_updates') || '[]');
-      pending.push({ timestamp: Date.now(), payload });
-      localStorage.setItem('imsr_pending_updates', JSON.stringify(pending));
-      setShowOfflineBanner(true); setTimeout(() => setShowOfflineBanner(false), 6000); return;
+      const pending = JSON.parse(localStorage.getItem('imsr_pending_updates') || '[]'); pending.push({ timestamp: Date.now(), payload }); localStorage.setItem('imsr_pending_updates', JSON.stringify(pending)); setShowOfflineBanner(true); setTimeout(() => setShowOfflineBanner(false), 6000); return;
     }
     try { await setDoc(doc(db, "msr", "data_utama"), payload, { merge: true }); } catch (error) { console.error(error); }
   }, []);
 
-  const handleDocumentUpload = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = async (ev) => {
-        const newMemo = { id: 'memo_' + Date.now(), name: file.name, url: ev.target.result, type: file.type.includes('pdf') ? 'pdf' : 'image', uploadDate: new Date().toISOString() };
-        try { await setDoc(doc(db, "msr_memos", newMemo.id), newMemo); saveToFirebaseWithOffline({ latestUpdate: { view: 'memo', text: `Dokumen baharu dimuat naik.` } });
-        } catch (error) { alert("RALAT: Gagal muat naik."); }
-      }; reader.readAsDataURL(file);
-    }
-  };
-
-  const handleLayoutUpload = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = async (ev) => {
-        let customName = window.prompt("Nama Pelan:", file.name.split('.')[0]);
-        const newLayout = { id: 'layout_' + Date.now(), url: ev.target.result, name: customName || `Pelan_${Date.now()}`, type: file.type.includes('pdf') ? 'pdf' : 'image', uploadDate: new Date().toISOString() };
-        try { await setDoc(doc(db, "msr", "data_layout"), { layouts: [...layoutList, newLayout] }); saveToFirebaseWithOffline({ latestUpdate: { view: 'layout', text: `Pelan baharu ditambah.` } });
-        } catch (error) { alert("Gagal muat naik pelan."); }
-      }; reader.readAsDataURL(file);
-    }
-  };
-
+  const handleDocumentUpload = (e) => { const file = e.target.files[0]; if (file) { const reader = new FileReader(); reader.onload = async (ev) => { const newMemo = { id: 'memo_' + Date.now(), name: file.name, url: ev.target.result, type: file.type.includes('pdf') ? 'pdf' : 'image', uploadDate: new Date().toISOString() }; try { await setDoc(doc(db, "msr_memos", newMemo.id), newMemo); saveToFirebaseWithOffline({ latestUpdate: { view: 'memo', text: `Dokumen baharu dimuat naik.` } }); } catch (error) { alert("RALAT: Gagal muat naik."); } }; reader.readAsDataURL(file); } };
+  const handleLayoutUpload = (e) => { const file = e.target.files[0]; if (file) { const reader = new FileReader(); reader.onload = async (ev) => { let customName = window.prompt("Nama Pelan:", file.name.split('.')[0]); const newLayout = { id: 'layout_' + Date.now(), url: ev.target.result, name: customName || `Pelan_${Date.now()}`, type: file.type.includes('pdf') ? 'pdf' : 'image', uploadDate: new Date().toISOString() }; try { await setDoc(doc(db, "msr", "data_layout"), { layouts: [...layoutList, newLayout] }); saveToFirebaseWithOffline({ latestUpdate: { view: 'layout', text: `Pelan baharu ditambah.` } }); } catch (error) { alert("Gagal muat naik pelan."); } }; reader.readAsDataURL(file); } };
   const handleDeleteLayout = async (idToDel) => { if(window.confirm("Padam pelan ini?")) { await setDoc(doc(db, "msr", "data_layout"), { layouts: layoutList.filter(l => l.id !== idToDel) }); } };
-
-  const handleJadualFileUpload = (e) => {
-    const file = e.target.files[0];
-    if (file) { const reader = new FileReader(); reader.onload = async (ev) => { await setDoc(doc(db, "msr", "data_jadual_file"), { fileData: ev.target.result, uploadDate: new Date().toISOString() }); saveToFirebaseWithOffline({ latestUpdate: { view: 'jadual', text: 'Tentatif Penuh dimuat naik.' } }); }; reader.readAsDataURL(file); }
-  };
-
-  const handlePenutupFileUpload = (e) => {
-    const file = e.target.files[0];
-    if (file) { const reader = new FileReader(); reader.onload = async (ev) => { await setDoc(doc(db, "msr", "data_penutup_file"), { fileData: ev.target.result, uploadDate: new Date().toISOString() }); saveToFirebaseWithOffline({ latestUpdate: { view: 'penutup', text: 'Majlis Penutup penuh dimuat naik.' } }); }; reader.readAsDataURL(file); }
-  };
-
-  // Fungsi Muat Naik PDF Ikrar Pelajar
-  const handleIkrarFileUpload = (e) => {
-    const file = e.target.files[0];
-    if (file) { 
-      const reader = new FileReader(); 
-      reader.onload = async (ev) => { 
-        await setDoc(doc(db, "msr", "data_ikrar_file"), { fileData: ev.target.result, uploadDate: new Date().toISOString() }); 
-        saveToFirebaseWithOffline({ latestUpdate: { view: 'ikrar', text: 'Dokumen Ikrar (PDF) dimuat naik.' } }); 
-      }; 
-      reader.readAsDataURL(file); 
-    }
-  };
+  const handleJadualFileUpload = (e) => { const file = e.target.files[0]; if (file) { const reader = new FileReader(); reader.onload = async (ev) => { await setDoc(doc(db, "msr", "data_jadual_file"), { fileData: ev.target.result, uploadDate: new Date().toISOString() }); saveToFirebaseWithOffline({ latestUpdate: { view: 'jadual', text: 'Tentatif Penuh dimuat naik.' } }); }; reader.readAsDataURL(file); } };
+  const handlePenutupFileUpload = (e) => { const file = e.target.files[0]; if (file) { const reader = new FileReader(); reader.onload = async (ev) => { await setDoc(doc(db, "msr", "data_penutup_file"), { fileData: ev.target.result, uploadDate: new Date().toISOString() }); saveToFirebaseWithOffline({ latestUpdate: { view: 'penutup', text: 'Majlis Penutup penuh dimuat naik.' } }); }; reader.readAsDataURL(file); } };
+  const handleIkrarFileUpload = (e) => { const file = e.target.files[0]; if (file) { const reader = new FileReader(); reader.onload = async (ev) => { await setDoc(doc(db, "msr", "data_ikrar_file"), { fileData: ev.target.result, uploadDate: new Date().toISOString() }); saveToFirebaseWithOffline({ latestUpdate: { view: 'ikrar', text: 'Dokumen Ikrar dimuat naik.' } }); }; reader.readAsDataURL(file); } };
 
   const renderView = () => {
     switch(currentView) {
@@ -278,15 +184,14 @@ export default function App() {
       case 'penutup': return <PenutupView isAdmin={isAdmin} penutupData={penutupData} setPenutupData={setPenutupData} penutupFile={penutupFile} penutupFileDate={penutupFileDate} setPenutupFile={setPenutupFile} handlePenutupFileUpload={handlePenutupFileUpload} setViewingMemo={setViewingMemo} handleDownloadBlob={handleDownloadBlob} saveToFirebaseWithOffline={saveToFirebaseWithOffline} />;
       case 'layout': return <LayoutView isAdmin={isAdmin} layoutList={layoutList} handleLayoutUpload={handleLayoutUpload} handleDeleteLayout={handleDeleteLayout} setViewingMemo={setViewingMemo} handleDownloadBlob={handleDownloadBlob} />;
       case 'lagu': return <LaguView />;
-      case 'ikrar': return <IkrarView isAdmin={isAdmin} ikrarFile={ikrarFile} handleIkrarFileUpload={handleIkrarFileUpload} setViewingMemo={setViewingMemo} />; // <-- Pass Props
+      case 'ikrar': return <IkrarView isAdmin={isAdmin} ikrarFile={ikrarFile} handleIkrarFileUpload={handleIkrarFileUpload} setViewingMemo={setViewingMemo} />;
       default: return <HomeView navigateTo={navigateTo} />;
     }
   };
 
   useEffect(() => {
-    if (viewingMemo) {
-      try { const parts = viewingMemo.url.split(';'); const mime = parts[0].split(':')[1]; const raw = window.atob(parts[1].split(',')[1]); const rawLength = raw.length; const uInt8Array = new Uint8Array(rawLength); for (let i = 0; i < rawLength; ++i) { uInt8Array[i] = raw.charCodeAt(i); } const blob = new Blob([uInt8Array], { type: mime }); setBlobUrl(window.URL.createObjectURL(blob)); } catch (e) { setBlobUrl(viewingMemo.url); }
-    } else { if (blobUrl) { window.URL.revokeObjectURL(blobUrl); setBlobUrl(null); } }
+    if (viewingMemo) { try { const parts = viewingMemo.url.split(';'); const mime = parts[0].split(':')[1]; const raw = window.atob(parts[1].split(',')[1]); const rawLength = raw.length; const uInt8Array = new Uint8Array(rawLength); for (let i = 0; i < rawLength; ++i) { uInt8Array[i] = raw.charCodeAt(i); } const blob = new Blob([uInt8Array], { type: mime }); setBlobUrl(window.URL.createObjectURL(blob)); } catch (e) { setBlobUrl(viewingMemo.url); } } 
+    else { if (blobUrl) { window.URL.revokeObjectURL(blobUrl); setBlobUrl(null); } }
   }, [viewingMemo]);
 
   return (
@@ -298,7 +203,12 @@ export default function App() {
       
       <div className="min-h-screen bg-[#f8fafc] dark:bg-[#020817] font-sans text-slate-900 dark:text-slate-100 flex flex-col relative selection:bg-cyan-200 dark:selection:bg-cyan-900 overflow-x-hidden transition-colors duration-500">
         <Header currentView={currentView} navigateTo={navigateTo} isAdmin={isAdmin} toggleTheme={toggleTheme} isDarkMode={isDarkMode} isScrolled={isScrolled} />
-        <main className="flex-grow w-full">{renderView()}</main>
+        
+        {/* Wrapper <main> dengan efek transisi blur & fade sewaktu navigating */}
+        <main className={`flex-grow w-full transition-all duration-300 ease-in-out ${isPending ? 'opacity-40 blur-sm scale-[0.98]' : 'opacity-100 blur-0 scale-100'}`}>
+          {renderView()}
+        </main>
+
         <Footer />
         <BottomNav currentView={currentView} navigateTo={navigateTo} />
         <FabMenu showFabMenu={showFabMenu} setShowFabMenu={setShowFabMenu} isAdmin={isAdmin} setIsAdmin={setIsAdmin} toggleTheme={toggleTheme} isDarkMode={isDarkMode} setShowLogin={setShowLogin} />

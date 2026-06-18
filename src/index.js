@@ -10,24 +10,28 @@ root.render(
   </React.StrictMode>
 );
 
-// --- KONFIGURASI PWA SERVICE WORKER ---
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('/sw.js')
       .then((reg) => {
-        console.log('PWA Service Worker Berjaya Didaftarkan: ', reg.scope);
+        console.log('PWA Service Worker Berjaya Didaftarkan');
+        
+        // KOD BARU: Cek update secara automatik bila pengguna masuk semula ke aplikasi
+        document.addEventListener('visibilitychange', () => {
+          if (document.visibilityState === 'visible') {
+            console.log('[PWA] Aplikasi aktif semula, menyemak kemas kini...');
+            reg.update(); // Minta SW semak dengan server GitHub
+          }
+        });
       })
-      .catch((err) => {
-        console.log('PWA Registration Gagal: ', err);
-      });
+      .catch((err) => console.log('PWA Registration Gagal: ', err));
   });
 
-  // --- KOD BARU: FUNGSI AUTO-UPDATE SEMASA APP TERBUKA ---
   let refreshing = false;
   navigator.serviceWorker.addEventListener('controllerchange', () => {
     if (!refreshing) {
-      console.log('[PWA] Kemas kini sistem dikesan! Memuat semula aplikasi secara automatik...');
-      window.location.reload(); // Paksa app refresh sendiri bila dapat kod baru dari pelayan
+      console.log('[PWA] Kemas kini dipasang! Memuat semula...');
+      window.location.reload(); 
       refreshing = true;
     }
   });
