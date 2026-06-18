@@ -104,7 +104,6 @@ export default function App() {
   const [layoutList, setLayoutList] = useState([]);
   const [activeJadualTab, setActiveJadualTab] = useState('');
   
-  // State untuk fail-fail berat
   const [jadualFile, setJadualFile] = useState(null);
   const [jadualFileDate, setJadualFileDate] = useState(null);
   const [penutupFile, setPenutupFile] = useState(null);
@@ -125,6 +124,15 @@ export default function App() {
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
     return () => window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
   }, []);
+
+  // FUNGSI YANG TERCICIR TADI DITAMBAH SEMULA DI SINI
+  const handleInstallPwaClick = async () => { 
+    if (!deferredPrompt) return; 
+    deferredPrompt.prompt(); 
+    await deferredPrompt.userChoice; 
+    setDeferredPrompt(null); 
+    setShowPwaBanner(false); 
+  };
 
   useEffect(() => { document.body.style.overflow = isAppReady ? 'unset' : 'hidden'; }, [isAppReady]);
 
@@ -152,17 +160,14 @@ export default function App() {
   };
 
   useEffect(() => {
-    // 1. SAFETY TIMER 
     const safetyTimer = setTimeout(() => { setIsAppReady(true); }, 2000);
 
-    // 2. MUAT TURUN FAIL BERAT DARI MEMORI TELEFON SEGERA (0.1 Saat)
     getFromLocalDB('jadualFile').then(res => { if(res) setJadualFile(res); });
     getFromLocalDB('penutupFile').then(res => { if(res) setPenutupFile(res); });
     getFromLocalDB('ikrarFile').then(res => { if(res) setIkrarFile(res); });
     getFromLocalDB('layoutList').then(res => { if(res) setLayoutList(res); });
     getFromLocalDB('memoList').then(res => { if(res) setMemoList(res); });
 
-    // 3. BACA CACHE TEKS TEMPATAN
     const cachedData = localStorage.getItem('imsr_cached_data');
     if (cachedData) {
       try {
@@ -176,7 +181,6 @@ export default function App() {
       } catch(e) {}
     }
 
-    // 4. TERIMA DATA BARU DARI FIREBASE
     const unsubscribeUtama = onSnapshot(doc(db, "msr", "data_utama"), (docSnap) => {
       if (docSnap.exists()) {
         const data = docSnap.data();
@@ -198,7 +202,6 @@ export default function App() {
       }
     });
 
-    // 5. UPDATE FAIL BERAT JIKA ADA KEMAS KINI (Simpan terus ke dalam IndexedDB telefon)
     const unsubscribeMemos = onSnapshot(collection(db, "msr_memos"), (snapshot) => { 
       const memosArray = []; 
       snapshot.forEach((doc) => memosArray.push(doc.data())); 
