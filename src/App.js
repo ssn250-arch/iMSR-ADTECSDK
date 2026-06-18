@@ -79,7 +79,7 @@ export default function App() {
   const [ikrarFile, setIkrarFile] = useState(null);
   const [showOfflineBanner, setShowOfflineBanner] = useState(false);
 
-  // --- KOD BARU PENTING: AUTO SCROLL KE ATAS BILA TUKAR KAD ---
+  // AUTO SCROLL KE ATAS BILA TUKAR KAD
   useEffect(() => {
     window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
   }, [currentView]);
@@ -120,7 +120,14 @@ export default function App() {
     else { const newAttempts = loginAttempts + 1; setLoginAttempts(newAttempts); if (newAttempts >= 3) { setIsLockedOut(true); setTimeout(() => { setIsLockedOut(false); setLoginAttempts(0); }, 30000); } else alert(`Log Masuk Gagal. Baki cubaan: ${3 - newAttempts}`); }
   };
 
+  // --- LOGIK MEMUAT DATA TERPANTAS ---
   useEffect(() => {
+    // 1. SAFETY TIMER: Paksa buka app lepas 2 saat walau apa terjadi
+    const safetyTimer = setTimeout(() => {
+      setIsAppReady(true);
+    }, 2000);
+
+    // 2. Baca Cache Tempatan untuk Instant Loading
     const cachedData = localStorage.getItem('imsr_cached_data');
     if (cachedData) {
       try {
@@ -134,6 +141,7 @@ export default function App() {
       } catch(e) {}
     }
 
+    // 3. Tarik Data Teks Ringan Dulu
     const unsubscribeUtama = onSnapshot(doc(db, "msr", "data_utama"), (docSnap) => {
       if (docSnap.exists()) {
         const data = docSnap.data();
@@ -149,16 +157,23 @@ export default function App() {
         if (data.biroList) setBiroList(data.biroList);
         if (data.penutupData) setPenutupData(data.penutupData);
         if (data.jadualData) { setJadualData(data.jadualData); setActiveJadualTab(prev => prev || (data.jadualData.length > 0 ? data.jadualData[0].id : '')); }
+        
+        // Buang Splash Screen segera bila teks dah sampai
+        setIsAppReady(true);
+        clearTimeout(safetyTimer);
       }
     });
 
+    // 4. Tarik Fail-Fail PDF Berat Secara Senyap Di Belakang Tabir
     const unsubscribeMemos = onSnapshot(collection(db, "msr_memos"), (snapshot) => { const memosArray = []; snapshot.forEach((doc) => memosArray.push(doc.data())); memosArray.sort((a, b) => a.id.localeCompare(b.id)); setMemoList(memosArray); });
-    const unsubscribeLayout = onSnapshot(doc(db, "msr", "data_layout"), (docSnap) => { if (docSnap.exists() && docSnap.data().layouts) setLayoutList(docSnap.data().layouts); else setLayoutList([]); setTimeout(() => setIsAppReady(true), 1500); });
+    const unsubscribeLayout = onSnapshot(doc(db, "msr", "data_layout"), (docSnap) => { if (docSnap.exists() && docSnap.data().layouts) setLayoutList(docSnap.data().layouts); else setLayoutList([]); });
     const unsubscribeJadualFile = onSnapshot(doc(db, "msr", "data_jadual_file"), (docSnap) => { if (docSnap.exists() && docSnap.data().fileData) { setJadualFile(docSnap.data().fileData); setJadualFileDate(docSnap.data().uploadDate); } else { setJadualFile(null); setJadualFileDate(null); } });
     const unsubscribePenutupFile = onSnapshot(doc(db, "msr", "data_penutup_file"), (docSnap) => { if (docSnap.exists() && docSnap.data().fileData) { setPenutupFile(docSnap.data().fileData); setPenutupFileDate(docSnap.data().uploadDate); } else { setPenutupFile(null); setPenutupFileDate(null); } });
     const unsubscribeIkrarFile = onSnapshot(doc(db, "msr", "data_ikrar_file"), (docSnap) => { if (docSnap.exists() && docSnap.data().fileData) { setIkrarFile(docSnap.data().fileData); } else { setIkrarFile(null); } });
 
-    return () => { unsubscribeUtama(); unsubscribeMemos(); unsubscribeLayout(); unsubscribeJadualFile(); unsubscribePenutupFile(); unsubscribeIkrarFile(); };
+    return () => { 
+      unsubscribeUtama(); unsubscribeMemos(); unsubscribeLayout(); unsubscribeJadualFile(); unsubscribePenutupFile(); unsubscribeIkrarFile(); clearTimeout(safetyTimer); 
+    };
   }, []);
 
   const saveToFirebaseWithOffline = useCallback(async (fieldsToUpdate) => {
