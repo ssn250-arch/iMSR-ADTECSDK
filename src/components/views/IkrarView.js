@@ -36,7 +36,7 @@ export default function IkrarView({ isAdmin, ikrarFile, handleIkrarFileUpload, s
           <ScrollText size={40} strokeWidth={1.5} />
         </div>
         <h2 className="text-xs md:text-sm font-black tracking-[0.3em] text-slate-500 dark:text-slate-400 uppercase mb-2">
-          Kampus Sandakan
+          ADTEC JTM Kampus Sandakan
         </h2>
         <h1 className="text-3xl md:text-5xl font-black text-slate-800 dark:text-white tracking-tight drop-shadow-md">
           Lafaz <span className="text-transparent bg-clip-text bg-gradient-to-r from-rose-500 to-orange-500">Ikrar Pelajar</span>

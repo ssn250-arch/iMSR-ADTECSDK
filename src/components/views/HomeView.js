@@ -20,22 +20,39 @@ export default function HomeView({ isAdmin, announcements, setAnnouncements, sav
 
   return (
     <div className="px-4 lg:px-8 max-w-6xl mx-auto pb-32 pt-4">
+      {/* --- CSS KHAS UNTUK ANIMASI MODEN --- */}
       <style>{`
         @keyframes seamlessMarquee { 0% { transform: translate3d(0, 0, 0); } 100% { transform: translate3d(-50%, 0, 0); } }
         .tech-marquee-track { display: flex; width: max-content; animation: seamlessMarquee 14s linear infinite; will-change: transform; }
         @media (min-width: 768px) { .tech-marquee-track { animation-duration: 20s; } }
         @media (min-width: 1024px) { .tech-marquee-track { animation-duration: 25s; } }
         .tech-marquee-track:hover { animation-play-state: paused; }
+        
+        /* Animasi Gradient Bernafas pada Tajuk */
+        @keyframes gradient-x {
+          0%, 100% { background-position: 0% 50%; }
+          50% { background-position: 100% 50%; }
+        }
+        .animate-gradient-x {
+          background-size: 200% 200%;
+          animation: gradient-x 4s ease infinite;
+        }
+
+        /* Animasi Cahaya Melintas (Shimmer) */
+        @keyframes shimmer {
+          100% { transform: translateX(100%); }
+        }
       `}</style>
 
-      {/* HERO SECTION TECH THEME */}
-      <div className="relative rounded-[2.5rem] bg-gradient-to-br from-slate-900 via-[#0a192f] to-[#020c1b] overflow-hidden shadow-2xl border border-cyan-900/30 mb-8 py-2 md:py-6">
+      {/* HERO SECTION TECH THEME (Dengan animasi Slide-in yang Lembut) */}
+      <div className="relative rounded-[2.5rem] bg-gradient-to-br from-slate-900 via-[#0a192f] to-[#020c1b] overflow-hidden shadow-2xl border border-cyan-900/30 mb-8 py-2 md:py-6 animate-in slide-in-from-bottom-6 duration-1000 fade-in">
         <NetworkAnimation />
         <div className="absolute top-[-20%] left-[-10%] w-[50%] h-[50%] bg-cyan-600/20 rounded-full blur-[120px] pointer-events-none animate-float"></div>
         <div className="absolute bottom-[-20%] right-[-10%] w-[50%] h-[50%] bg-blue-600/20 rounded-full blur-[120px] pointer-events-none animate-float-delayed"></div>
 
         <div className="relative z-20 px-6 py-8 md:px-12 md:py-16 flex flex-col lg:flex-row items-center justify-between gap-8 md:gap-10">
           <div className="w-full lg:w-3/5 space-y-5 text-center lg:text-left">
+            
             <div className={`flex ${isAdmin ? 'flex-col items-start gap-4' : 'items-center gap-3'} px-4 py-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 backdrop-blur-md text-amber-400 text-xs md:text-sm font-semibold w-full overflow-hidden shadow-inner`}>
               <span className="flex items-center gap-1.5 bg-amber-500 text-slate-950 px-2 py-0.5 rounded-md text-[10px] font-black tracking-wider shrink-0 uppercase relative z-10"><Bell size={12} className="shrink-0 animate-bounce" /> INFO {isAdmin && `(${announcements.length})`}</span>
               <div className="flex-1 overflow-hidden relative w-full flex items-center">
@@ -69,7 +86,14 @@ export default function HomeView({ isAdmin, announcements, setAnnouncements, sav
                   </div>
                 ) : ( <span>Kemasukan {sesiKemasukan.sesi} / {sesiKemasukan.tahun}</span> )}
               </div>
-              <h1 className="text-4xl md:text-5xl lg:text-[4rem] font-black text-white tracking-tight leading-[1.1] drop-shadow-lg">Minggu<br/><span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-500">Silaturahim</span></h1>
+              
+              <h1 className="text-4xl md:text-5xl lg:text-[4rem] font-black text-white tracking-tight leading-[1.1] drop-shadow-lg">
+                Minggu<br/>
+                {/* Teks dengan animasi warna bernafas */}
+                <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-blue-500 to-cyan-400 animate-gradient-x inline-block">
+                  Silaturahim
+                </span>
+              </h1>
               <p className="text-sm md:text-base text-slate-300/90 font-medium max-w-lg mx-auto lg:mx-0 leading-relaxed">Portal rasmi Pendaftaran dan Minggu Silaturahim Pelajar (MSR) baharu ADTEC JTM Kampus Sandakan.</p>
             </div>
           </div>
@@ -87,7 +111,7 @@ export default function HomeView({ isAdmin, announcements, setAnnouncements, sav
         </div>
       </div>
 
-      {/* GRID KAD MENU */}
+      {/* GRID KAD MENU - Animasi Staggered (Masuk Bertingkat) & Shimmer Sweep */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
         {[
           { id: 'memo', icon: FileSignature, title: 'Memo Lantikan', desc: 'Rujukan surat pelantikan rasmi', color: 'blue' },
@@ -97,21 +121,31 @@ export default function HomeView({ isAdmin, announcements, setAnnouncements, sav
           { id: 'layout', icon: MapPinned, title: 'Pelan Daftar', desc: 'Panduan susun atur kaunter & pelan dewan', color: 'sky' },
           { id: 'lagu', icon: AudioLines, title: 'Lirik Nyanyian', desc: 'Nyanyian lagu korporat & aspirasi JTM', color: 'violet' },
           { id: 'ikrar', icon: HandHeart, title: 'Ikrar Pelajar', desc: 'Lafaz ikrar rasmi pelajar baharu', color: 'rose' } 
-        ].map((item) => {
+        ].map((item, index) => {
           const style = cardStyles[item.color];
           return (
-            <button key={item.id} onClick={() => navigateTo(item.id)} className={`relative group overflow-hidden bg-white/90 dark:bg-slate-900/80 backdrop-blur-md p-6 rounded-[2rem] border border-slate-200/70 dark:border-slate-800/80 shadow-[0_4px_20px_rgba(0,0,0,0.02)] hover:-translate-y-1.5 ${style.glow} transition-all duration-300 text-left flex flex-col justify-between min-h-[175px] focus:outline-none`} aria-label={`Buka bahagian ${item.title}`}>
+            <button 
+              key={item.id} 
+              onClick={() => navigateTo(item.id)} 
+              // Tambah stail inline untuk delay animasi (staggered effect)
+              style={{ animationFillMode: 'both', animationDelay: `${index * 120}ms` }}
+              className={`relative group overflow-hidden bg-white/90 dark:bg-slate-900/80 backdrop-blur-md p-6 rounded-[2rem] border border-slate-200/70 dark:border-slate-800/80 shadow-[0_4px_20px_rgba(0,0,0,0.02)] hover:-translate-y-2 ${style.glow} transition-all duration-500 text-left flex flex-col justify-between min-h-[175px] focus:outline-none animate-in fade-in slide-in-from-bottom-8`} 
+              aria-label={`Buka bahagian ${item.title}`}
+            >
               
-              <div className={`absolute -right-6 -bottom-10 pointer-events-none transform rotate-12 transition-all duration-500 group-hover:rotate-6 group-hover:scale-110 ${style.watermark}`}>
+              {/* SHIMMER EFFECT (Cahaya Kilat melintas bila Hover) */}
+              <div className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/40 dark:via-white/10 to-transparent group-hover:animate-[shimmer_1.2s_ease-in-out_infinite] pointer-events-none z-20"></div>
+
+              <div className={`absolute -right-6 -bottom-10 pointer-events-none transform rotate-12 transition-all duration-700 ease-out group-hover:rotate-6 group-hover:scale-110 ${style.watermark}`}>
                 <item.icon size={150} strokeWidth={1} />
               </div>
 
               <div className="flex justify-between items-center relative z-10 w-full">
-                <div className={`p-3.5 rounded-2xl border ${style.iconBg} ${style.iconBorder} shadow-sm group-hover:scale-105 transition-transform duration-300`}><item.icon size={22} strokeWidth={2} className={style.iconText} /></div>
-                <div className={`p-2 rounded-xl bg-slate-50 dark:bg-slate-800/80 border border-slate-100 dark:border-slate-700/50 shadow-sm opacity-60 group-hover:opacity-100 group-hover:translate-x-1 transition-all duration-300`}><ChevronRight size={14} className={style.iconText} /></div>
+                <div className={`p-3.5 rounded-2xl border ${style.iconBg} ${style.iconBorder} shadow-sm group-hover:scale-110 group-hover:rotate-3 transition-transform duration-500`}><item.icon size={22} strokeWidth={2} className={style.iconText} /></div>
+                <div className={`p-2 rounded-xl bg-slate-50 dark:bg-slate-800/80 border border-slate-100 dark:border-slate-700/50 shadow-sm opacity-60 group-hover:opacity-100 group-hover:translate-x-1 group-hover:bg-white dark:group-hover:bg-slate-700 transition-all duration-300`}><ChevronRight size={14} className={style.iconText} /></div>
               </div>
 
-              <div className="relative z-10 mt-6 w-full">
+              <div className="relative z-10 mt-6 w-full transform transition-transform duration-500 group-hover:translate-x-1">
                 <h3 className="text-base md:text-lg font-black text-slate-800 dark:text-slate-100 tracking-tight transition-colors duration-300">{item.title}</h3>
                 
                 {/* TARIKH MAJLIS PENUTUP (Boleh Select Oleh Admin) */}
