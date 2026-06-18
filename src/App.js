@@ -20,7 +20,7 @@ import JadualView from './components/views/JadualView';
 import PenutupView from './components/views/PenutupView';
 import LayoutView from './components/views/LayoutView';
 import LaguView from './components/views/LaguView';
-import IkrarView from './components/views/IkrarView'; // <-- Import Fail Ikrar
+import IkrarView from './components/views/IkrarView'; 
 
 const GlobalStyles = React.memo(() => (
   <style>
@@ -63,11 +63,10 @@ export default function App() {
   const [loginAttempts, setLoginAttempts] = useState(0);
   const [isLockedOut, setIsLockedOut] = useState(false);
 
-  // --- State Tarikh Penutup ---
   const [lastUpdated, setLastUpdated] = useState(null);
   const [announcements, setAnnouncements] = useState([]); 
   const [sesiKemasukan, setSesiKemasukan] = useState({ sesi: '2', tahun: '2026' });
-  const [tarikhPenutup, setTarikhPenutup] = useState(''); // <-- State Tarikh Baru
+  const [tarikhPenutup, setTarikhPenutup] = useState(''); 
   
   const [memoText, setMemoText] = useState('');
   const [memoList, setMemoList] = useState([]); 
@@ -81,6 +80,9 @@ export default function App() {
   const [jadualFileDate, setJadualFileDate] = useState(null);
   const [penutupFile, setPenutupFile] = useState(null);
   const [penutupFileDate, setPenutupFileDate] = useState(null);
+  
+  // State untuk PDF Ikrar
+  const [ikrarFile, setIkrarFile] = useState(null);
 
   const [showOfflineBanner, setShowOfflineBanner] = useState(false);
 
@@ -197,7 +199,13 @@ export default function App() {
       else { setPenutupFile(null); setPenutupFileDate(null); }
     });
 
-    return () => { unsubscribeUtama(); unsubscribeMemos(); unsubscribeLayout(); unsubscribeJadualFile(); unsubscribePenutupFile(); };
+    // Fetch Ikrar PDF
+    const unsubscribeIkrarFile = onSnapshot(doc(db, "msr", "data_ikrar_file"), (docSnap) => {
+      if (docSnap.exists() && docSnap.data().fileData) { setIkrarFile(docSnap.data().fileData); }
+      else { setIkrarFile(null); }
+    });
+
+    return () => { unsubscribeUtama(); unsubscribeMemos(); unsubscribeLayout(); unsubscribeJadualFile(); unsubscribePenutupFile(); unsubscribeIkrarFile(); };
   }, []);
 
   const saveToFirebaseWithOffline = useCallback(async (fieldsToUpdate) => {
@@ -248,6 +256,19 @@ export default function App() {
     if (file) { const reader = new FileReader(); reader.onload = async (ev) => { await setDoc(doc(db, "msr", "data_penutup_file"), { fileData: ev.target.result, uploadDate: new Date().toISOString() }); saveToFirebaseWithOffline({ latestUpdate: { view: 'penutup', text: 'Majlis Penutup penuh dimuat naik.' } }); }; reader.readAsDataURL(file); }
   };
 
+  // Fungsi Muat Naik PDF Ikrar Pelajar
+  const handleIkrarFileUpload = (e) => {
+    const file = e.target.files[0];
+    if (file) { 
+      const reader = new FileReader(); 
+      reader.onload = async (ev) => { 
+        await setDoc(doc(db, "msr", "data_ikrar_file"), { fileData: ev.target.result, uploadDate: new Date().toISOString() }); 
+        saveToFirebaseWithOffline({ latestUpdate: { view: 'ikrar', text: 'Dokumen Ikrar (PDF) dimuat naik.' } }); 
+      }; 
+      reader.readAsDataURL(file); 
+    }
+  };
+
   const renderView = () => {
     switch(currentView) {
       case 'home': return <HomeView isAdmin={isAdmin} announcements={announcements} setAnnouncements={setAnnouncements} saveToFirebaseWithOffline={saveToFirebaseWithOffline} sesiKemasukan={sesiKemasukan} setSesiKemasukan={setSesiKemasukan} tarikhPenutup={tarikhPenutup} setTarikhPenutup={setTarikhPenutup} navigateTo={navigateTo} />;
@@ -257,7 +278,7 @@ export default function App() {
       case 'penutup': return <PenutupView isAdmin={isAdmin} penutupData={penutupData} setPenutupData={setPenutupData} penutupFile={penutupFile} penutupFileDate={penutupFileDate} setPenutupFile={setPenutupFile} handlePenutupFileUpload={handlePenutupFileUpload} setViewingMemo={setViewingMemo} handleDownloadBlob={handleDownloadBlob} saveToFirebaseWithOffline={saveToFirebaseWithOffline} />;
       case 'layout': return <LayoutView isAdmin={isAdmin} layoutList={layoutList} handleLayoutUpload={handleLayoutUpload} handleDeleteLayout={handleDeleteLayout} setViewingMemo={setViewingMemo} handleDownloadBlob={handleDownloadBlob} />;
       case 'lagu': return <LaguView />;
-      case 'ikrar': return <IkrarView />; // <-- Arah ke IkrarView bila diklik
+      case 'ikrar': return <IkrarView isAdmin={isAdmin} ikrarFile={ikrarFile} handleIkrarFileUpload={handleIkrarFileUpload} setViewingMemo={setViewingMemo} />; // <-- Pass Props
       default: return <HomeView navigateTo={navigateTo} />;
     }
   };

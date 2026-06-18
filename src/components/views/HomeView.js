@@ -87,7 +87,7 @@ export default function HomeView({ isAdmin, announcements, setAnnouncements, sav
         </div>
       </div>
 
-      {/* GRID KAD MENU - Kini Termasuk Ikrar Pelajar & Tarikh Animasi */}
+      {/* GRID KAD MENU */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
         {[
           { id: 'memo', icon: FileSignature, title: 'Memo Lantikan', desc: 'Rujukan surat pelantikan rasmi', color: 'blue' },
@@ -96,7 +96,7 @@ export default function HomeView({ isAdmin, announcements, setAnnouncements, sav
           { id: 'penutup', icon: GraduationCap, title: 'Majlis Penutup', desc: 'Atur cara & protokol majlis penutupan rasmi', color: 'indigo' },
           { id: 'layout', icon: MapPinned, title: 'Pelan Daftar', desc: 'Panduan susun atur kaunter & pelan dewan', color: 'sky' },
           { id: 'lagu', icon: AudioLines, title: 'Lirik Nyanyian', desc: 'Nyanyian lagu korporat & aspirasi JTM', color: 'violet' },
-          { id: 'ikrar', icon: HandHeart, title: 'Ikrar Pelajar', desc: 'Lafaz ikrar rasmi pelajar baharu', color: 'rose' } // <-- Tambah Kad Ikrar
+          { id: 'ikrar', icon: HandHeart, title: 'Ikrar Pelajar', desc: 'Lafaz ikrar rasmi pelajar baharu', color: 'rose' } 
         ].map((item) => {
           const style = cardStyles[item.color];
           return (
@@ -111,20 +111,26 @@ export default function HomeView({ isAdmin, announcements, setAnnouncements, sav
                 <div className={`p-2 rounded-xl bg-slate-50 dark:bg-slate-800/80 border border-slate-100 dark:border-slate-700/50 shadow-sm opacity-60 group-hover:opacity-100 group-hover:translate-x-1 transition-all duration-300`}><ChevronRight size={14} className={style.iconText} /></div>
               </div>
 
-              <div className="relative z-10 mt-6">
+              <div className="relative z-10 mt-6 w-full">
                 <h3 className="text-base md:text-lg font-black text-slate-800 dark:text-slate-100 tracking-tight transition-colors duration-300">{item.title}</h3>
                 
-                {/* BLOK KHAS UNTUK TARIKH MAJLIS PENUTUP */}
+                {/* TARIKH MAJLIS PENUTUP (Boleh Select Oleh Admin) */}
                 {item.id === 'penutup' && (isAdmin || tarikhPenutup) ? (
-                  <div className="mt-2.5" onClick={(e) => { if(isAdmin) { e.preventDefault(); e.stopPropagation(); } }}>
+                  <div className="mt-3 w-full" onClick={(e) => { if(isAdmin) { e.preventDefault(); e.stopPropagation(); } }}>
                     {isAdmin ? (
-                      <div className="flex flex-col gap-1.5 animate-in fade-in zoom-in duration-300">
-                        <label className="text-[10px] text-indigo-500 font-bold uppercase tracking-wider">Tetapkan Tarikh Majlis</label>
-                        <input type="date" value={tarikhPenutup} onChange={e => setTarikhPenutup(e.target.value)} onBlur={() => saveToFirebaseWithOffline({ tarikhPenutup, latestUpdate: { view: 'home', text: 'Tarikh Majlis Penutup dikemas kini.' } })} className="bg-indigo-50 dark:bg-indigo-900/30 border border-indigo-200 dark:border-indigo-500/30 text-slate-800 dark:text-indigo-100 text-xs px-3 py-1.5 rounded-lg outline-none focus:ring-2 focus:ring-indigo-400 w-full cursor-pointer" />
+                      <div className="flex flex-col gap-1 w-full bg-indigo-50/50 dark:bg-indigo-900/20 p-2 rounded-xl border border-indigo-200 dark:border-indigo-500/30">
+                        <label className="text-[10px] text-indigo-600 dark:text-indigo-400 font-bold uppercase tracking-widest pl-1">Pilih Tarikh:</label>
+                        <input 
+                          type="date" 
+                          value={tarikhPenutup || ''} 
+                          onChange={e => setTarikhPenutup(e.target.value)} 
+                          onBlur={() => saveToFirebaseWithOffline({ tarikhPenutup, latestUpdate: { view: 'home', text: 'Tarikh Majlis Penutup dikemas kini.' } })} 
+                          className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-white text-xs font-bold px-3 py-2 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 w-full cursor-pointer shadow-sm" 
+                        />
                       </div>
                     ) : (
-                      <div className="inline-flex items-center gap-1.5 bg-gradient-to-r from-indigo-500 to-purple-600 text-white px-3 py-1 rounded-full shadow-[0_0_15px_rgba(99,102,241,0.5)] border border-indigo-400/50 hover:scale-105 transition-transform duration-300">
-                        <CalendarClock size={12} className="animate-pulse" />
+                      <div className="inline-flex items-center gap-1.5 bg-gradient-to-r from-indigo-500 to-purple-600 text-white px-3 py-1.5 rounded-full shadow-[0_0_15px_rgba(99,102,241,0.4)] border border-indigo-400/50 hover:scale-105 transition-transform duration-300 mt-1">
+                        <CalendarClock size={14} className="animate-pulse" />
                         <span className="text-[11px] font-bold tracking-wide">{formatTarikh(tarikhPenutup)}</span>
                       </div>
                     )}

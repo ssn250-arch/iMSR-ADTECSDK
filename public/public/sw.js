@@ -1,5 +1,5 @@
 // --- NOTA ADMIN: Tukar nama versi cache di bawah (Cth: v1 -> v2 -> v3) setiap kali ada update besar pada GUI ---
-const CACHE_NAME = 'imsr-cache-v3.0'; 
+const CACHE_NAME = 'imsr-cache-v5'; 
 
 const urlsToCache = [
   '/',
