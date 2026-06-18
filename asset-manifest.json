@@ -1,13 +1,13 @@
 {
   "files": {
     "main.css": "/iMSR-ADTECSDK/static/css/main.79833bce.css",
-    "main.js": "/iMSR-ADTECSDK/static/js/main.aa38fd81.js",
+    "main.js": "/iMSR-ADTECSDK/static/js/main.b0021f97.js",
     "index.html": "/iMSR-ADTECSDK/index.html",
     "main.79833bce.css.map": "/iMSR-ADTECSDK/static/css/main.79833bce.css.map",
-    "main.aa38fd81.js.map": "/iMSR-ADTECSDK/static/js/main.aa38fd81.js.map"
+    "main.b0021f97.js.map": "/iMSR-ADTECSDK/static/js/main.b0021f97.js.map"
   },
   "entrypoints": [
     "static/css/main.79833bce.css",
-    "static/js/main.aa38fd81.js"
+    "static/js/main.b0021f97.js"
   ]
 }
