@@ -1,4 +1,4 @@
-const CACHE_NAME = 'imsr-pwa-cache-v3';
+const CACHE_NAME = 'imsr-pwa-cache-v4';
 const urlsToCache = [
   '/',
   '/index.html',
