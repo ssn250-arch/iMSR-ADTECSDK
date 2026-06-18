@@ -37,7 +37,7 @@ export default function HomeView({ isAdmin, announcements, setAnnouncements, sav
         <div className="relative z-20 px-6 py-8 md:px-12 md:py-16 flex flex-col lg:flex-row items-center justify-between gap-8 md:gap-10">
           <div className="w-full lg:w-3/5 space-y-5 text-center lg:text-left">
             <div className={`flex ${isAdmin ? 'flex-col items-start gap-4' : 'items-center gap-3'} px-4 py-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 backdrop-blur-md text-amber-400 text-xs md:text-sm font-semibold w-full overflow-hidden shadow-inner`}>
-              <span className="flex items-center gap-1.5 bg-amber-500 text-slate-950 px-2 py-0.5 rounded-md text-[10px] font-black tracking-wider shrink-0 uppercase relative z-10"><Bell size={12} className="shrink-0 animate-bounce" /> INFO KILAT {isAdmin && `(${announcements.length})`}</span>
+              <span className="flex items-center gap-1.5 bg-amber-500 text-slate-950 px-2 py-0.5 rounded-md text-[10px] font-black tracking-wider shrink-0 uppercase relative z-10"><Bell size={12} className="shrink-0 animate-bounce" /> INFO {isAdmin && `(${announcements.length})`}</span>
               <div className="flex-1 overflow-hidden relative w-full flex items-center">
                 {isAdmin ? (
                   <div className="w-full flex flex-col gap-2 animate-in fade-in duration-200">
