@@ -38,7 +38,6 @@ const GlobalStyles = React.memo(() => (
 
 export default function App() {
   const [currentView, setCurrentView] = useState('home');
-  // KOD BARU: Guna Concurrent Mode React 18 untuk hilangkan lag
   const [isPending, startTransition] = useTransition(); 
 
   const [isDarkMode, setIsDarkMode] = useState(false);
@@ -80,6 +79,11 @@ export default function App() {
   const [ikrarFile, setIkrarFile] = useState(null);
   const [showOfflineBanner, setShowOfflineBanner] = useState(false);
 
+  // --- KOD BARU PENTING: AUTO SCROLL KE ATAS BILA TUKAR KAD ---
+  useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+  }, [currentView]);
+
   useEffect(() => {
     const handleBeforeInstallPrompt = (e) => { e.preventDefault(); setDeferredPrompt(e); if (/Android/i.test(navigator.userAgent)) setShowPwaBanner(true); };
     const isIos = /iPhone|iPad|iPod/i.test(navigator.userAgent);
@@ -100,14 +104,11 @@ export default function App() {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  // Navigate dengan efek transition blur dan tanpa lag
   const navigateTo = useCallback((view) => {
     setShowFabMenu(false);
     startTransition(() => {
       setCurrentView(view);
     });
-    // Scroll ke atas secara 'smooth' bila tukar paparan
-    requestAnimationFrame(() => window.scrollTo({ top: 0, left: 0, behavior: 'smooth' }));
   }, []);
 
   const toggleTheme = useCallback(() => { setIsDarkMode(prev => { const nextMode = !prev; localStorage.theme = nextMode ? 'dark' : 'light'; return nextMode; }); }, []);
@@ -204,7 +205,6 @@ export default function App() {
       <div className="min-h-screen bg-[#f8fafc] dark:bg-[#020817] font-sans text-slate-900 dark:text-slate-100 flex flex-col relative selection:bg-cyan-200 dark:selection:bg-cyan-900 overflow-x-hidden transition-colors duration-500">
         <Header currentView={currentView} navigateTo={navigateTo} isAdmin={isAdmin} toggleTheme={toggleTheme} isDarkMode={isDarkMode} isScrolled={isScrolled} />
         
-        {/* Wrapper <main> dengan efek transisi blur & fade sewaktu navigating */}
         <main className={`flex-grow w-full transition-all duration-300 ease-in-out ${isPending ? 'opacity-40 blur-sm scale-[0.98]' : 'opacity-100 blur-0 scale-100'}`}>
           {renderView()}
         </main>
