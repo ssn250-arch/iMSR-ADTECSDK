@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { doc, onSnapshot, setDoc, collection } from 'firebase/firestore';
+import React, { useState, useEffect, useRef, useCallback, useTransition } from 'react';
+import { doc, onSnapshot, setDoc, collection, getDoc } from 'firebase/firestore';
 import { db } from './firebase';
 
 // --- IMPORT DARI UTILS ---
@@ -15,6 +15,7 @@ import ImageModal from './components/ui/ImageModal';
 import SplashScreen from './components/ui/SplashScreen';
 import LoginModal from './components/ui/LoginModal';
 import PwaInstallBanner from './components/ui/PwaInstallBanner';
+import IosInstallBanner from './components/ui/IosInstallBanner';
 
 // --- IMPORT KOMPONEN VIEWS (PAPARAN) ---
 import HomeView from './components/views/HomeView';
@@ -25,6 +26,71 @@ import PenutupView from './components/views/PenutupView';
 import LayoutView from './components/views/LayoutView';
 import LaguView from './components/views/LaguView';
 import IkrarView from './components/views/IkrarView';
+
+// --- HELPER KUNCI SESI ---
+const normalizeSession = (s) => ({
+  sesi: String(s?.sesi || '2').trim(),
+  tahun: String(s?.tahun || '2026').trim()
+});
+
+const getSessionKey = (s) => {
+  const norm = normalizeSession(s);
+  return `${norm.sesi}_${norm.tahun}`;
+};
+
+const sortSessionsDesc = (list = []) => {
+  const map = new Map();
+  list.forEach((item) => {
+    if (!item || !item.sesi || !item.tahun) return;
+    const norm = normalizeSession(item);
+    map.set(getSessionKey(norm), norm);
+  });
+  return Array.from(map.values()).sort((a, b) => {
+    const yearDiff = Number(b.tahun) - Number(a.tahun);
+    if (yearDiff !== 0) return yearDiff;
+    return Number(b.sesi) - Number(a.sesi);
+  });
+};
+
+// --- INDEXEDDB HELPER MENGIKUT SESI ---
+const DB_NAME = 'imsr_files_db_v2';
+const STORE_NAME = 'session_files';
+
+const openFilesDB = () =>
+  new Promise((resolve, reject) => {
+    if (!('indexedDB' in window)) return reject(new Error('IndexedDB tidak disokong'));
+    const req = indexedDB.open(DB_NAME, 1);
+    req.onupgradeneeded = (e) => {
+      const database = e.target.result;
+      if (!database.objectStoreNames.contains(STORE_NAME)) {
+        database.createObjectStore(STORE_NAME);
+      }
+    };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+
+const saveSessionFileToIDB = async (key, value) => {
+  try {
+    const database = await openFilesDB();
+    const tx = database.transaction(STORE_NAME, 'readwrite');
+    tx.objectStore(STORE_NAME).put(value, key);
+  } catch (e) {}
+};
+
+const getSessionFileFromIDB = async (key) => {
+  try {
+    const database = await openFilesDB();
+    return new Promise((resolve) => {
+      const tx = database.transaction(STORE_NAME, 'readonly');
+      const req = tx.objectStore(STORE_NAME).get(key);
+      req.onsuccess = () => resolve(req.result ?? null);
+      req.onerror = () => resolve(null);
+    });
+  } catch (e) {
+    return null;
+  }
+};
 
 const GlobalStyles = React.memo(() => (
   <style>
@@ -37,7 +103,6 @@ const GlobalStyles = React.memo(() => (
       .hide-scrollbar::-webkit-scrollbar { display: none; }
       .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 
-      /* 2026 Tech Grid + Radial Fade Mask */
       .tech-grid-2026 {
         background-image:
           linear-gradient(to right, rgba(148, 163, 184, 0.14) 1px, transparent 1px),
@@ -64,8 +129,9 @@ const GlobalStyles = React.memo(() => (
 ));
 
 export default function App() {
-  // --- STATES ---
+  // --- NAVIGATION & UI STATES ---
   const [currentView, setCurrentView] = useState('home');
+  const [isPending, startTransition] = useTransition();
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [isAppReady, setIsAppReady] = useState(false);
   const [showFabMenu, setShowFabMenu] = useState(false);
@@ -77,20 +143,27 @@ export default function App() {
   const [latestUpdateInfo, setLatestUpdateInfo] = useState(null);
   const [isScrolled, setIsScrolled] = useState(false);
 
-  // --- PWA ANDROID INSTALL STATES ---
+  // --- PWA ANDROID & IOS STATES ---
   const [deferredPrompt, setDeferredPrompt] = useState(null);
   const [showPwaBanner, setShowPwaBanner] = useState(false);
+  const [showIosBanner, setShowIosBanner] = useState(false);
 
-  // --- LOG IN SECURITY STATES ---
+  // --- LOGIN SECURITY STATES ---
   const [loginForm, setLoginForm] = useState({ username: '', password: '' });
   const [showPassword, setShowPassword] = useState(false);
   const [loginAttempts, setLoginAttempts] = useState(0);
   const [isLockedOut, setIsLockedOut] = useState(false);
 
-  // --- DATA STATES ---
+  // --- MULTI-SESI & ARKIB STATES ---
+  const [activeSession, setActiveSession] = useState({ sesi: '2', tahun: '2026' });
+  const [viewingSession, setViewingSession] = useState({ sesi: '2', tahun: '2026' });
+  const [sessionsList, setSessionsList] = useState([{ sesi: '2', tahun: '2026' }]);
+  const [isConfigLoaded, setIsConfigLoaded] = useState(false);
+  const [legacySessionKey, setLegacySessionKey] = useState('2_2026');
+
+  // --- DATA STATES MENGIKUT SESI YANG SEDANG DILIHAT ---
   const [lastUpdated, setLastUpdated] = useState(null);
   const [announcements, setAnnouncements] = useState([]);
-  const [sesiKemasukan, setSesiKemasukan] = useState({ sesi: '2', tahun: '2026' });
   const [tarikhPenutup, setTarikhPenutup] = useState('');
   const [memoText, setMemoText] = useState('');
   const [memoList, setMemoList] = useState([]);
@@ -110,7 +183,11 @@ export default function App() {
   const hasCheckedUpdates = useRef(false);
   const [showOfflineBanner, setShowOfflineBanner] = useState(false);
 
-  // --- PWA ANDROID PROMPT ---
+  const currentKey = getSessionKey(viewingSession);
+  const activeKey = getSessionKey(activeSession);
+  const isViewingArchive = currentKey !== activeKey;
+
+  // --- PWA DETECT ---
   useEffect(() => {
     const handleBeforeInstallPrompt = (e) => {
       e.preventDefault();
@@ -119,6 +196,13 @@ export default function App() {
         setShowPwaBanner(true);
       }
     };
+
+    const isIos = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+    const isStandalone = window.navigator.standalone === true;
+    if (isIos && !isStandalone && !sessionStorage.getItem('imsr_ios_banner_dismissed')) {
+      setShowIosBanner(true);
+    }
+
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
     return () => window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
   }, []);
@@ -150,9 +234,11 @@ export default function App() {
 
   const navigateTo = useCallback((view) => {
     setShowFabMenu(false);
-    setCurrentView(view);
+    startTransition(() => {
+      setCurrentView(view);
+    });
     requestAnimationFrame(() => {
-      window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+      window.scrollTo({ top: 0, left: 0, behavior: 'smooth' });
     });
   }, []);
 
@@ -187,114 +273,357 @@ export default function App() {
     }
   };
 
-  // --- 1. FAST CORE DATA SYNC ---
+  // --- 1. KONFIGURASI SESI AKTIF & SENARAI ARKIB (msr/config_sesi) ---
   useEffect(() => {
-    const cachedData = localStorage.getItem('imsr_cached_data');
-    if (cachedData) {
-      try {
-        const data = JSON.parse(cachedData);
-        if (data.lastUpdated) setLastUpdated(data.lastUpdated);
-        if (data.announcements) setAnnouncements(data.announcements);
-        if (data.sesiKemasukan) setSesiKemasukan(data.sesiKemasukan);
-        if (data.tarikhPenutup !== undefined) setTarikhPenutup(data.tarikhPenutup);
-        if (data.memoText !== undefined) setMemoText(data.memoText);
-        if (data.ajkInduk) setAjkInduk(data.ajkInduk);
-        if (data.biroList) setBiroList(data.biroList);
-        if (data.penutupData) setPenutupData(data.penutupData);
-        if (data.jadualData) {
-          setJadualData(data.jadualData);
-          setActiveJadualTab((prev) => prev || (data.jadualData.length > 0 ? data.jadualData[0].id : ''));
+    try {
+      const cachedMeta = localStorage.getItem('imsr_meta_config');
+      if (cachedMeta) {
+        const meta = JSON.parse(cachedMeta);
+        if (meta.activeSession) {
+          const normActive = normalizeSession(meta.activeSession);
+          setActiveSession(normActive);
+          setViewingSession(normActive);
         }
-        setTimeout(() => setIsAppReady(true), 350);
+        if (Array.isArray(meta.sessionsList) && meta.sessionsList.length > 0) {
+          setSessionsList(sortSessionsDesc(meta.sessionsList));
+        }
+      }
+    } catch (e) {}
+
+    const unsubConfig = onSnapshot(doc(db, 'msr', 'config_sesi'), async (snap) => {
+      if (snap.exists()) {
+        const cfg = snap.data();
+        const normActive = normalizeSession(cfg.activeSession || { sesi: '2', tahun: '2026' });
+        const sortedList = sortSessionsDesc([
+          normActive,
+          ...(Array.isArray(cfg.sessionsList) ? cfg.sessionsList : []),
+          { sesi: '2', tahun: '2026' }
+        ]);
+
+        setActiveSession(normActive);
+        setSessionsList(sortedList);
+        localStorage.setItem(
+          'imsr_meta_config',
+          JSON.stringify({ activeSession: normActive, sessionsList: sortedList })
+        );
+
+        setViewingSession((prev) => (!isConfigLoaded ? normActive : prev));
+        setIsConfigLoaded(true);
+      } else {
+        // Fallback kepada data_utama sedia ada jika config_sesi belum wujud
+        try {
+          const legacySnap = await getDoc(doc(db, 'msr', 'data_utama'));
+          const baseSession = legacySnap.exists() && legacySnap.data()?.sesiKemasukan
+            ? normalizeSession(legacySnap.data().sesiKemasukan)
+            : { sesi: '2', tahun: '2026' };
+          const baseKey = getSessionKey(baseSession);
+          setLegacySessionKey(baseKey);
+          setActiveSession(baseSession);
+          setViewingSession(baseSession);
+          setSessionsList(sortSessionsDesc([baseSession, { sesi: '2', tahun: '2026' }]));
+          if (navigator.onLine) {
+            await setDoc(
+              doc(db, 'msr', 'config_sesi'),
+              { activeSession: baseSession, sessionsList: sortSessionsDesc([baseSession, { sesi: '2', tahun: '2026' }]) },
+              { merge: true }
+            );
+          }
+        } catch (e) {}
+        setIsConfigLoaded(true);
+      }
+    });
+
+    return () => unsubConfig();
+  }, [isConfigLoaded]);
+
+  // --- FUNGSI ADMIN: TUKAR / BUKA SESI RASMI TERKINI ---
+  const handleSetOfficialSession = useCallback(
+    async (newSessionInput) => {
+      const normNew = normalizeSession(newSessionInput);
+      if (!normNew.sesi || !normNew.tahun) return;
+
+      const updatedList = sortSessionsDesc([...sessionsList, activeSession, normNew]);
+      setActiveSession(normNew);
+      setViewingSession(normNew);
+      setSessionsList(updatedList);
+      localStorage.setItem(
+        'imsr_meta_config',
+        JSON.stringify({ activeSession: normNew, sessionsList: updatedList })
+      );
+
+      const newKey = getSessionKey(normNew);
+      if (navigator.onLine) {
+        try {
+          await setDoc(
+            doc(db, 'msr', 'config_sesi'),
+            {
+              activeSession: normNew,
+              sessionsList: updatedList,
+              updatedAt: new Date().toISOString()
+            },
+            { merge: true }
+          );
+
+          // Pastikan dokumen sesi baharu wujud supaya sedia untuk diurus
+          const targetRef = doc(db, 'msr', `data_utama_${newKey}`);
+          const targetSnap = await getDoc(targetRef);
+          if (!targetSnap.exists()) {
+            await setDoc(
+              targetRef,
+              {
+                sesiKemasukan: normNew,
+                announcements: [],
+                memoText: '',
+                tarikhPenutup: '',
+                lastUpdated: new Date().toISOString()
+              },
+              { merge: true }
+            );
+          }
+        } catch (err) {
+          console.error('Ralat menukar sesi aktif:', err);
+        }
+      }
+    },
+    [activeSession, sessionsList]
+  );
+
+  // --- FUNGSI PENGGUNA / PENGAJAR: LIHAT SESI ARKIB ATAU KEMBALI KE TERKINI ---
+  const handleSelectViewingSession = useCallback((sessionObj) => {
+    const norm = normalizeSession(sessionObj);
+    setViewingSession(norm);
+  }, []);
+
+  const handleReturnToActiveSession = useCallback(() => {
+    setViewingSession(normalizeSession(activeSession));
+  }, [activeSession]);
+
+  // --- 2. MUAT DATA MENGIKUT SESI YANG SEDANG DILIHAT (viewingSession) ---
+  useEffect(() => {
+    let isCancelled = false;
+    const isOriginalLegacySession = currentKey === legacySessionKey || currentKey === '2_2026';
+
+    const applyMainData = (data, cacheKey) => {
+      if (!data || isCancelled) return;
+      try {
+        localStorage.setItem(cacheKey, JSON.stringify(data));
+      } catch (e) {}
+
+      if (data.lastUpdated) setLastUpdated(data.lastUpdated);
+      if (data.latestUpdate) setLatestUpdateInfo(data.latestUpdate);
+      setTarikhPenutup(data.tarikhPenutup !== undefined ? data.tarikhPenutup : '');
+
+      if (data.announcements !== undefined) {
+        setAnnouncements(Array.isArray(data.announcements) ? data.announcements : []);
+      } else if (data.announcement !== undefined) {
+        setAnnouncements(data.announcement ? [{ id: 'legacy_1', text: data.announcement }] : []);
+      } else {
+        setAnnouncements([]);
+      }
+
+      setMemoText(data.memoText !== undefined ? data.memoText : '');
+      setAjkInduk(Array.isArray(data.ajkInduk) ? data.ajkInduk : []);
+      setBiroList(Array.isArray(data.biroList) ? data.biroList : []);
+      setPenutupData(Array.isArray(data.penutupData) ? data.penutupData : []);
+
+      const jadualArr = Array.isArray(data.jadualData) ? data.jadualData : [];
+      setJadualData(jadualArr);
+      setActiveJadualTab(jadualArr.length > 0 ? jadualArr[0].id : '');
+    };
+
+    // Kosongkan paparan sementara sebelum memuatkan cache/Firestore sesi ini
+    setAnnouncements([]);
+    setTarikhPenutup('');
+    setMemoText('');
+    setMemoList([]);
+    setAjkInduk([]);
+    setBiroList([]);
+    setJadualData([]);
+    setPenutupData([]);
+    setLayoutList([]);
+    setActiveJadualTab('');
+    setJadualFile(null);
+    setJadualFileDate(null);
+    setPenutupFile(null);
+    setPenutupFileDate(null);
+    setIkrarFile(null);
+    setIkrarFileDate(null);
+
+    const mainCacheKey = `imsr_cached_data_${currentKey}`;
+    const cachedMain = localStorage.getItem(mainCacheKey);
+    if (cachedMain) {
+      try {
+        applyMainData(JSON.parse(cachedMain), mainCacheKey);
       } catch (e) {}
     }
 
-    const readyFallback = setTimeout(() => setIsAppReady(true), 1200);
+    // Muatkan fail & senarai dokumen dari IndexedDB mengikut sesi
+    (async () => {
+      const [idbJadual, idbPenutup, idbIkrar, idbLayout, idbMemos] = await Promise.all([
+        getSessionFileFromIDB(`jadualFile_${currentKey}`),
+        getSessionFileFromIDB(`penutupFile_${currentKey}`),
+        getSessionFileFromIDB(`ikrarFile_${currentKey}`),
+        getSessionFileFromIDB(`layoutList_${currentKey}`),
+        getSessionFileFromIDB(`memoList_${currentKey}`)
+      ]);
 
-    const unsubscribeUtama = onSnapshot(doc(db, 'msr', 'data_utama'), (docSnap) => {
-      if (docSnap.exists()) {
-        const data = docSnap.data();
-        localStorage.setItem('imsr_cached_data', JSON.stringify(data));
-        if (data.lastUpdated) setLastUpdated(data.lastUpdated);
-        if (data.latestUpdate) setLatestUpdateInfo(data.latestUpdate);
-        if (data.tarikhPenutup !== undefined) setTarikhPenutup(data.tarikhPenutup);
+      if (isCancelled) return;
+      if (idbJadual) {
+        setJadualFile(idbJadual.fileData || null);
+        setJadualFileDate(idbJadual.uploadDate || null);
+      }
+      if (idbPenutup) {
+        setPenutupFile(idbPenutup.fileData || null);
+        setPenutupFileDate(idbPenutup.uploadDate || null);
+      }
+      if (idbIkrar) {
+        setIkrarFile(idbIkrar.fileData || null);
+        setIkrarFileDate(idbIkrar.uploadDate || null);
+      }
+      if (Array.isArray(idbLayout)) setLayoutList(idbLayout);
+      if (Array.isArray(idbMemos)) setMemoList(idbMemos);
+    })();
 
-        if (data.announcements !== undefined) {
-          setAnnouncements(data.announcements);
-        } else if (data.announcement !== undefined) {
-          setAnnouncements([{ id: 'legacy_1', text: data.announcement }]);
+    const safetyTimer = setTimeout(() => {
+      if (!isCancelled) setIsAppReady(true);
+    }, 1500);
+
+    // Listener Data Utama Sesi
+    const unsubMain = onSnapshot(doc(db, 'msr', `data_utama_${currentKey}`), async (snap) => {
+      if (isCancelled) return;
+      if (snap.exists()) {
+        applyMainData(snap.data(), mainCacheKey);
+        setIsAppReady(true);
+        clearTimeout(safetyTimer);
+      } else if (isOriginalLegacySession) {
+        // Tarik data lama asal jika sesi asal belum mempunyai dokumen berasingan
+        const legacySnap = await getDoc(doc(db, 'msr', 'data_utama'));
+        if (!isCancelled && legacySnap.exists()) {
+          const legacyData = legacySnap.data();
+          applyMainData(legacyData, mainCacheKey);
+          if (navigator.onLine) {
+            setDoc(doc(db, 'msr', `data_utama_${currentKey}`), legacyData, { merge: true }).catch(() => {});
+          }
         }
+        if (!isCancelled) {
+          setIsAppReady(true);
+          clearTimeout(safetyTimer);
+        }
+      } else {
+        setIsAppReady(true);
+        clearTimeout(safetyTimer);
+      }
+    });
 
-        if (data.sesiKemasukan) setSesiKemasukan(data.sesiKemasukan);
-        if (data.memoText !== undefined) setMemoText(data.memoText);
-        if (data.ajkInduk) setAjkInduk(data.ajkInduk);
-        if (data.biroList) setBiroList(data.biroList);
-        if (data.penutupData) setPenutupData(data.penutupData);
-        if (data.jadualData) {
-          setJadualData(data.jadualData);
-          setActiveJadualTab((prev) => prev || (data.jadualData.length > 0 ? data.jadualData[0].id : ''));
+    // Listener Memo Sesi
+    const unsubMemos = onSnapshot(doc(db, 'msr', `data_memos_${currentKey}`), async (snap) => {
+      if (isCancelled) return;
+      if (snap.exists() && Array.isArray(snap.data().items)) {
+        const sorted = [...snap.data().items].sort((a, b) => String(a.id).localeCompare(String(b.id)));
+        setMemoList(sorted);
+        saveSessionFileToIDB(`memoList_${currentKey}`, sorted);
+      } else if (isOriginalLegacySession) {
+        const legacyColSnap = await getDoc(doc(db, 'msr', `data_memos_${currentKey}`));
+        if (!legacyColSnap.exists()) {
+          // Baca koleksi asal msr_memos untuk sesi asal
+          const { getDocs } = await import('firebase/firestore');
+          const colSnap = await getDocs(collection(db, 'msr_memos'));
+          const arr = [];
+          colSnap.forEach((d) => arr.push(d.data()));
+          arr.sort((a, b) => String(a.id).localeCompare(String(b.id)));
+          if (!isCancelled && arr.length > 0) {
+            setMemoList(arr);
+            saveSessionFileToIDB(`memoList_${currentKey}`, arr);
+          }
         }
       }
-      setTimeout(() => setIsAppReady(true), 450);
+    });
+
+    // Listener Pelan (Layout) Sesi
+    const unsubLayout = onSnapshot(doc(db, 'msr', `data_layout_${currentKey}`), async (snap) => {
+      if (isCancelled) return;
+      if (snap.exists() && Array.isArray(snap.data().layouts)) {
+        const list = snap.data().layouts;
+        setLayoutList(list);
+        saveSessionFileToIDB(`layoutList_${currentKey}`, list);
+      } else if (isOriginalLegacySession) {
+        const legacyLayoutSnap = await getDoc(doc(db, 'msr', 'data_layout'));
+        if (!isCancelled && legacyLayoutSnap.exists() && Array.isArray(legacyLayoutSnap.data().layouts)) {
+          const list = legacyLayoutSnap.data().layouts;
+          setLayoutList(list);
+          saveSessionFileToIDB(`layoutList_${currentKey}`, list);
+        }
+      }
+    });
+
+    // Listener Fail Jadual Sesi
+    const unsubJadualFile = onSnapshot(doc(db, 'msr', `data_jadual_file_${currentKey}`), async (snap) => {
+      if (isCancelled) return;
+      if (snap.exists() && snap.data().fileData) {
+        const payload = { fileData: snap.data().fileData, uploadDate: snap.data().uploadDate || null };
+        setJadualFile(payload.fileData);
+        setJadualFileDate(payload.uploadDate);
+        saveSessionFileToIDB(`jadualFile_${currentKey}`, payload);
+      } else if (isOriginalLegacySession) {
+        const legacySnap = await getDoc(doc(db, 'msr', 'data_jadual_file'));
+        if (!isCancelled && legacySnap.exists() && legacySnap.data().fileData) {
+          const payload = { fileData: legacySnap.data().fileData, uploadDate: legacySnap.data().uploadDate || null };
+          setJadualFile(payload.fileData);
+          setJadualFileDate(payload.uploadDate);
+          saveSessionFileToIDB(`jadualFile_${currentKey}`, payload);
+        }
+      }
+    });
+
+    // Listener Fail Majlis Penutup Sesi
+    const unsubPenutupFile = onSnapshot(doc(db, 'msr', `data_penutup_file_${currentKey}`), async (snap) => {
+      if (isCancelled) return;
+      if (snap.exists() && snap.data().fileData) {
+        const payload = { fileData: snap.data().fileData, uploadDate: snap.data().uploadDate || null };
+        setPenutupFile(payload.fileData);
+        setPenutupFileDate(payload.uploadDate);
+        saveSessionFileToIDB(`penutupFile_${currentKey}`, payload);
+      } else if (isOriginalLegacySession) {
+        const legacySnap = await getDoc(doc(db, 'msr', 'data_penutup_file'));
+        if (!isCancelled && legacySnap.exists() && legacySnap.data().fileData) {
+          const payload = { fileData: legacySnap.data().fileData, uploadDate: legacySnap.data().uploadDate || null };
+          setPenutupFile(payload.fileData);
+          setPenutupFileDate(payload.uploadDate);
+          saveSessionFileToIDB(`penutupFile_${currentKey}`, payload);
+        }
+      }
+    });
+
+    // Listener Fail Ikrar Pelajar Sesi
+    const unsubIkrarFile = onSnapshot(doc(db, 'msr', `data_ikrar_file_${currentKey}`), async (snap) => {
+      if (isCancelled) return;
+      if (snap.exists() && snap.data().fileData) {
+        const payload = { fileData: snap.data().fileData, uploadDate: snap.data().uploadDate || null };
+        setIkrarFile(payload.fileData);
+        setIkrarFileDate(payload.uploadDate);
+        saveSessionFileToIDB(`ikrarFile_${currentKey}`, payload);
+      } else if (isOriginalLegacySession) {
+        const legacySnap = await getDoc(doc(db, 'msr', 'data_ikrar_file'));
+        if (!isCancelled && legacySnap.exists() && legacySnap.data().fileData) {
+          const payload = { fileData: legacySnap.data().fileData, uploadDate: legacySnap.data().uploadDate || null };
+          setIkrarFile(payload.fileData);
+          setIkrarFileDate(payload.uploadDate);
+          saveSessionFileToIDB(`ikrarFile_${currentKey}`, payload);
+        }
+      }
     });
 
     return () => {
-      clearTimeout(readyFallback);
-      unsubscribeUtama();
+      isCancelled = true;
+      clearTimeout(safetyTimer);
+      unsubMain();
+      unsubMemos();
+      unsubLayout();
+      unsubJadualFile();
+      unsubPenutupFile();
+      unsubIkrarFile();
     };
-  }, []);
-
-  // --- 2. LAZY FIREBASE LISTENERS (TERMASUK DATA_IKRAR_FILE) ---
-  useEffect(() => {
-    let unsub = null;
-
-    if (currentView === 'memo') {
-      unsub = onSnapshot(collection(db, 'msr_memos'), (snapshot) => {
-        const memosArray = [];
-        snapshot.forEach((d) => memosArray.push(d.data()));
-        memosArray.sort((a, b) => a.id.localeCompare(b.id));
-        setMemoList(memosArray);
-      });
-    } else if (currentView === 'layout') {
-      unsub = onSnapshot(doc(db, 'msr', 'data_layout'), (docSnap) => {
-        setLayoutList(docSnap.exists() && docSnap.data().layouts ? docSnap.data().layouts : []);
-      });
-    } else if (currentView === 'jadual') {
-      unsub = onSnapshot(doc(db, 'msr', 'data_jadual_file'), (docSnap) => {
-        if (docSnap.exists() && docSnap.data().fileData) {
-          setJadualFile(docSnap.data().fileData);
-          setJadualFileDate(docSnap.data().uploadDate);
-        } else {
-          setJadualFile(null);
-          setJadualFileDate(null);
-        }
-      });
-    } else if (currentView === 'penutup') {
-      unsub = onSnapshot(doc(db, 'msr', 'data_penutup_file'), (docSnap) => {
-        if (docSnap.exists() && docSnap.data().fileData) {
-          setPenutupFile(docSnap.data().fileData);
-          setPenutupFileDate(docSnap.data().uploadDate);
-        } else {
-          setPenutupFile(null);
-          setPenutupFileDate(null);
-        }
-      });
-    } else if (currentView === 'ikrar') {
-      unsub = onSnapshot(doc(db, 'msr', 'data_ikrar_file'), (docSnap) => {
-        if (docSnap.exists() && docSnap.data().fileData) {
-          setIkrarFile(docSnap.data().fileData);
-          setIkrarFileDate(docSnap.data().uploadDate || null);
-        } else {
-          setIkrarFile(null);
-          setIkrarFileDate(null);
-        }
-      });
-    }
-
-    return () => {
-      if (unsub) unsub();
-    };
-  }, [currentView]);
+  }, [currentKey, legacySessionKey]);
 
   // --- TOAST KEMAS KINI ---
   useEffect(() => {
@@ -309,131 +638,172 @@ export default function App() {
     }
   }, [isAppReady, lastUpdated]);
 
-  const saveToFirebaseWithOffline = useCallback(async (fieldsToUpdate) => {
-    const payload = { ...fieldsToUpdate, lastUpdated: new Date().toISOString() };
-    if (!navigator.onLine) {
-      const pending = JSON.parse(localStorage.getItem('imsr_pending_updates') || '[]');
-      pending.push({ timestamp: Date.now(), payload });
-      localStorage.setItem('imsr_pending_updates', JSON.stringify(pending));
-      setShowOfflineBanner(true);
-      setTimeout(() => setShowOfflineBanner(false), 6000);
-      return;
-    }
-    try {
-      await setDoc(doc(db, 'msr', 'data_utama'), payload, { merge: true });
-    } catch (error) {
-      console.error(error);
-    }
-  }, []);
+  // --- SIMPAN DATA UTAMA MENGIKUT SESI YANG SEDANG DILIHAT ---
+  const saveToFirebaseWithOffline = useCallback(
+    async (fieldsToUpdate) => {
+      const payload = {
+        ...fieldsToUpdate,
+        sesiKemasukan: normalizeSession(viewingSession),
+        lastUpdated: new Date().toISOString()
+      };
 
-  // --- UPLOAD & DELETE HANDLERS ---
+      const cacheKey = `imsr_cached_data_${currentKey}`;
+      try {
+        const existingCache = JSON.parse(localStorage.getItem(cacheKey) || '{}');
+        localStorage.setItem(cacheKey, JSON.stringify({ ...existingCache, ...payload }));
+      } catch (e) {}
+
+      if (!navigator.onLine) {
+        const pending = JSON.parse(localStorage.getItem('imsr_pending_updates') || '[]');
+        pending.push({ timestamp: Date.now(), sessionKey: currentKey, payload });
+        localStorage.setItem('imsr_pending_updates', JSON.stringify(pending));
+        setShowOfflineBanner(true);
+        setTimeout(() => setShowOfflineBanner(false), 6000);
+        return;
+      }
+
+      try {
+        await setDoc(doc(db, 'msr', `data_utama_${currentKey}`), payload, { merge: true });
+        if (currentKey === activeKey) {
+          await setDoc(doc(db, 'msr', 'data_utama'), payload, { merge: true });
+        }
+      } catch (error) {
+        console.error(error);
+      }
+    },
+    [currentKey, activeKey, viewingSession]
+  );
+
+  // --- UPLOAD & DELETE HANDLERS MENGIKUT SESI ---
   const handleDocumentUpload = (e) => {
     const file = e.target.files[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = async (ev) => {
-        const newMemo = {
-          id: 'memo_' + Date.now(),
-          name: file.name,
-          url: ev.target.result,
-          type: file.type.includes('pdf') ? 'pdf' : 'image',
-          uploadDate: new Date().toISOString()
-        };
-        try {
-          await setDoc(doc(db, 'msr_memos', newMemo.id), newMemo);
-          saveToFirebaseWithOffline({ latestUpdate: { view: 'memo', text: 'Dokumen baharu dimuat naik.' } });
-        } catch (error) {
-          alert('RALAT: Gagal muat naik.');
-        }
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = async (ev) => {
+      const newMemo = {
+        id: 'memo_' + Date.now(),
+        name: file.name,
+        url: ev.target.result,
+        type: file.type.includes('pdf') ? 'pdf' : 'image',
+        uploadDate: new Date().toISOString()
       };
-      reader.readAsDataURL(file);
-    }
+      const updatedMemos = [...memoList, newMemo];
+      setMemoList(updatedMemos);
+      saveSessionFileToIDB(`memoList_${currentKey}`, updatedMemos);
+      try {
+        await setDoc(doc(db, 'msr', `data_memos_${currentKey}`), { items: updatedMemos }, { merge: true });
+        if (currentKey === '2_2026' || currentKey === legacySessionKey) {
+          await setDoc(doc(db, 'msr_memos', newMemo.id), newMemo);
+        }
+        saveToFirebaseWithOffline({ latestUpdate: { view: 'memo', text: 'Dokumen baharu dimuat naik.' } });
+      } catch (error) {
+        alert('RALAT: Gagal muat naik.');
+      }
+    };
+    reader.readAsDataURL(file);
   };
 
   const handleLayoutUpload = (e) => {
     const file = e.target.files[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = async (ev) => {
-        const customName = window.prompt('Nama Pelan:', file.name.split('.')[0]);
-        const newLayout = {
-          id: 'layout_' + Date.now(),
-          url: ev.target.result,
-          name: customName || `Pelan_${Date.now()}`,
-          type: file.type.includes('pdf') ? 'pdf' : 'image',
-          uploadDate: new Date().toISOString()
-        };
-        try {
-          await setDoc(doc(db, 'msr', 'data_layout'), { layouts: [...layoutList, newLayout] });
-          saveToFirebaseWithOffline({ latestUpdate: { view: 'layout', text: 'Pelan baharu ditambah.' } });
-        } catch (error) {
-          alert('Gagal muat naik pelan.');
-        }
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = async (ev) => {
+      const customName = window.prompt('Nama Pelan:', file.name.split('.')[0]);
+      const newLayout = {
+        id: 'layout_' + Date.now(),
+        url: ev.target.result,
+        name: customName || `Pelan_${Date.now()}`,
+        type: file.type.includes('pdf') ? 'pdf' : 'image',
+        uploadDate: new Date().toISOString()
       };
-      reader.readAsDataURL(file);
-    }
+      const updatedLayouts = [...layoutList, newLayout];
+      setLayoutList(updatedLayouts);
+      saveSessionFileToIDB(`layoutList_${currentKey}`, updatedLayouts);
+      try {
+        await setDoc(doc(db, 'msr', `data_layout_${currentKey}`), { layouts: updatedLayouts });
+        saveToFirebaseWithOffline({ latestUpdate: { view: 'layout', text: 'Pelan baharu ditambah.' } });
+      } catch (error) {
+        alert('Gagal muat naik pelan.');
+      }
+    };
+    reader.readAsDataURL(file);
   };
 
   const handleDeleteLayout = async (idToDel) => {
     if (window.confirm('Padam pelan ini?')) {
-      await setDoc(doc(db, 'msr', 'data_layout'), { layouts: layoutList.filter((l) => l.id !== idToDel) });
+      const updatedLayouts = layoutList.filter((l) => l.id !== idToDel);
+      setLayoutList(updatedLayouts);
+      saveSessionFileToIDB(`layoutList_${currentKey}`, updatedLayouts);
+      await setDoc(doc(db, 'msr', `data_layout_${currentKey}`), { layouts: updatedLayouts });
     }
   };
 
   const handleJadualFileUpload = (e) => {
     const file = e.target.files[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = async (ev) => {
-        await setDoc(doc(db, 'msr', 'data_jadual_file'), {
-          fileData: ev.target.result,
-          uploadDate: new Date().toISOString()
-        });
-        saveToFirebaseWithOffline({ latestUpdate: { view: 'jadual', text: 'Tentatif Penuh dimuat naik.' } });
-      };
-      reader.readAsDataURL(file);
-    }
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = async (ev) => {
+      const uploadDate = new Date().toISOString();
+      setJadualFile(ev.target.result);
+      setJadualFileDate(uploadDate);
+      saveSessionFileToIDB(`jadualFile_${currentKey}`, { fileData: ev.target.result, uploadDate });
+      await setDoc(doc(db, 'msr', `data_jadual_file_${currentKey}`), {
+        fileData: ev.target.result,
+        uploadDate
+      });
+      saveToFirebaseWithOffline({ latestUpdate: { view: 'jadual', text: 'Tentatif Penuh dimuat naik.' } });
+    };
+    reader.readAsDataURL(file);
   };
 
   const handlePenutupFileUpload = (e) => {
     const file = e.target.files[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = async (ev) => {
-        await setDoc(doc(db, 'msr', 'data_penutup_file'), {
-          fileData: ev.target.result,
-          uploadDate: new Date().toISOString()
-        });
-        saveToFirebaseWithOffline({ latestUpdate: { view: 'penutup', text: 'Majlis Penutup penuh dimuat naik.' } });
-      };
-      reader.readAsDataURL(file);
-    }
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = async (ev) => {
+      const uploadDate = new Date().toISOString();
+      setPenutupFile(ev.target.result);
+      setPenutupFileDate(uploadDate);
+      saveSessionFileToIDB(`penutupFile_${currentKey}`, { fileData: ev.target.result, uploadDate });
+      await setDoc(doc(db, 'msr', `data_penutup_file_${currentKey}`), {
+        fileData: ev.target.result,
+        uploadDate
+      });
+      saveToFirebaseWithOffline({ latestUpdate: { view: 'penutup', text: 'Majlis Penutup penuh dimuat naik.' } });
+    };
+    reader.readAsDataURL(file);
   };
 
   const handleIkrarFileUpload = (e) => {
     const file = e.target.files[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = async (ev) => {
-        try {
-          await setDoc(doc(db, 'msr', 'data_ikrar_file'), {
-            fileData: ev.target.result,
-            uploadDate: new Date().toISOString()
-          });
-          saveToFirebaseWithOffline({
-            latestUpdate: { view: 'ikrar', text: 'Dokumen Lafaz Ikrar Pelajar dikemas kini.' }
-          });
-        } catch (error) {
-          alert('Gagal muat naik dokumen ikrar (pastikan saiz fail bawah 900KB).');
-        }
-      };
-      reader.readAsDataURL(file);
-    }
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = async (ev) => {
+      const uploadDate = new Date().toISOString();
+      try {
+        setIkrarFile(ev.target.result);
+        setIkrarFileDate(uploadDate);
+        saveSessionFileToIDB(`ikrarFile_${currentKey}`, { fileData: ev.target.result, uploadDate });
+        await setDoc(doc(db, 'msr', `data_ikrar_file_${currentKey}`), {
+          fileData: ev.target.result,
+          uploadDate
+        });
+        saveToFirebaseWithOffline({
+          latestUpdate: { view: 'ikrar', text: 'Dokumen Lafaz Ikrar Pelajar dikemas kini.' }
+        });
+      } catch (error) {
+        alert('Gagal muat naik dokumen ikrar (pastikan saiz fail bawah 900KB).');
+      }
+    };
+    reader.readAsDataURL(file);
   };
 
   const handleDeleteIkrarFile = async () => {
     if (window.confirm('Padam dokumen rasmi ikrar ini?')) {
-      await setDoc(doc(db, 'msr', 'data_ikrar_file'), { fileData: null, uploadDate: null });
+      setIkrarFile(null);
+      setIkrarFileDate(null);
+      saveSessionFileToIDB(`ikrarFile_${currentKey}`, null);
+      await setDoc(doc(db, 'msr', `data_ikrar_file_${currentKey}`), { fileData: null, uploadDate: null });
     }
   };
 
@@ -447,8 +817,15 @@ export default function App() {
             announcements={announcements}
             setAnnouncements={setAnnouncements}
             saveToFirebaseWithOffline={saveToFirebaseWithOffline}
-            sesiKemasukan={sesiKemasukan}
-            setSesiKemasukan={setSesiKemasukan}
+            sesiKemasukan={viewingSession}
+            setSesiKemasukan={handleSelectViewingSession}
+            activeSession={activeSession}
+            viewingSession={viewingSession}
+            sessionsList={sessionsList}
+            isViewingArchive={isViewingArchive}
+            onSelectViewingSession={handleSelectViewingSession}
+            onReturnToActiveSession={handleReturnToActiveSession}
+            onSetOfficialSession={handleSetOfficialSession}
             tarikhPenutup={tarikhPenutup}
             setTarikhPenutup={setTarikhPenutup}
             navigateTo={navigateTo}
@@ -547,8 +924,15 @@ export default function App() {
             announcements={announcements}
             setAnnouncements={setAnnouncements}
             saveToFirebaseWithOffline={saveToFirebaseWithOffline}
-            sesiKemasukan={sesiKemasukan}
-            setSesiKemasukan={setSesiKemasukan}
+            sesiKemasukan={viewingSession}
+            setSesiKemasukan={handleSelectViewingSession}
+            activeSession={activeSession}
+            viewingSession={viewingSession}
+            sessionsList={sessionsList}
+            isViewingArchive={isViewingArchive}
+            onSelectViewingSession={handleSelectViewingSession}
+            onReturnToActiveSession={handleReturnToActiveSession}
+            onSetOfficialSession={handleSetOfficialSession}
             tarikhPenutup={tarikhPenutup}
             setTarikhPenutup={setTarikhPenutup}
             navigateTo={navigateTo}
@@ -624,7 +1008,32 @@ export default function App() {
             isScrolled={isScrolled}
           />
 
-          <main className="flex-grow w-full">{renderView()}</main>
+          {/* Banner Mod Arkib Apabila Pengguna / Pengajar Menyemak Sesi Lepas */}
+          {isViewingArchive && (
+            <div className="max-w-6xl w-full mx-auto px-4 lg:px-8 pt-2">
+              <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-2.5 rounded-2xl bg-amber-500/15 border border-amber-500/30 text-amber-800 dark:text-amber-200 text-xs font-semibold backdrop-blur-md">
+                <span>
+                  Sedang menyemak rekod arkib: <strong>Sesi {viewingSession.sesi} / {viewingSession.tahun}</strong>{' '}
+                  (Sesi Terkini: Sesi {activeSession.sesi} / {activeSession.tahun})
+                </span>
+                <button
+                  type="button"
+                  onClick={handleReturnToActiveSession}
+                  className="px-3 py-1 rounded-xl bg-amber-500 text-slate-950 font-bold hover:bg-amber-400 transition"
+                >
+                  Kembali ke Sesi Terkini
+                </button>
+              </div>
+            </div>
+          )}
+
+          <main
+            className={`flex-grow w-full transition-all duration-300 ease-in-out ${
+              isPending ? 'opacity-40 blur-sm scale-[0.98]' : 'opacity-100 blur-0 scale-100'
+            }`}
+          >
+            {renderView()}
+          </main>
 
           <Footer />
         </div>
@@ -665,6 +1074,14 @@ export default function App() {
         show={showPwaBanner}
         onInstall={handleInstallPwaClick}
         onClose={() => setShowPwaBanner(false)}
+      />
+
+      <IosInstallBanner
+        show={showIosBanner}
+        onClose={() => {
+          setShowIosBanner(false);
+          sessionStorage.setItem('imsr_ios_banner_dismissed', 'true');
+        }}
       />
     </div>
   );

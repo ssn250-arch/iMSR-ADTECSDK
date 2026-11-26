@@ -16,7 +16,9 @@ import {
   CheckCircle2,
   Circle,
   Navigation,
-  CalendarDays
+  CalendarDays,
+  Archive,
+  RotateCcw
 } from 'lucide-react';
 import NetworkAnimation from '../ui/NetworkAnimation';
 import LiveClock from '../ui/LiveClock';
@@ -35,7 +37,9 @@ const formatSmartLabel = (val) => {
   return trimmed;
 };
 
-// Skema Warna Liquid Glass 2026 (Kontras ditingkatkan untuk skrin monitor laptop/desktop)
+const getSessionKey = (s) => `${String(s?.sesi || '2').trim()}_${String(s?.tahun || '2026').trim()}`;
+
+// Skema Warna Liquid Glass 2026
 const cardThemes = {
   cyan: {
     iconWrap: 'bg-cyan-500/12 dark:bg-cyan-400/10 text-cyan-600 dark:text-cyan-300 ring-1 ring-cyan-500/25',
@@ -88,7 +92,6 @@ const cardThemes = {
   }
 };
 
-// Komponen Kad Bento 2026 (Mobile/Tablet kekal asal, Desktop diselaraskan garisan tajuk & ketajaman kad)
 function BentoCard({ item, onClick, isAdmin, tarikhPenutup, onTarikhPenutupChange }) {
   const [coords, setCoords] = useState({ x: 0, y: 0, active: false });
   const theme = cardThemes[item.color] || cardThemes.cyan;
@@ -127,7 +130,6 @@ function BentoCard({ item, onClick, isAdmin, tarikhPenutup, onTarikhPenutupChang
         ${item.spanClass || ''}`}
       aria-label={`Buka modul ${item.title}`}
     >
-      {/* Cursor Spotlight Glow */}
       <div
         className="pointer-events-none absolute -inset-px rounded-[2rem] transition-opacity duration-300"
         style={{
@@ -136,14 +138,12 @@ function BentoCard({ item, onClick, isAdmin, tarikhPenutup, onTarikhPenutupChang
         }}
       />
 
-      {/* Ambient Wash Lembut untuk Kad Featured (Span-2) */}
       {item.featured && (
         <div
           className={`pointer-events-none absolute inset-0 bg-gradient-to-br ${theme.accentGlow} opacity-80`}
         />
       )}
 
-      {/* Baris Atas: Ikon, Lencana Status & Anak Panah Serong */}
       <div className="relative z-10 flex items-start justify-between gap-3 w-full">
         <div className="flex items-center gap-3 flex-wrap">
           <div
@@ -171,7 +171,6 @@ function BentoCard({ item, onClick, isAdmin, tarikhPenutup, onTarikhPenutupChang
         </div>
       </div>
 
-      {/* Blok Tajuk & Penerangan: Sejajar Mendatar pada Desktop (`lg:mt-6`) */}
       <div className="relative z-10 mt-6 lg:mt-6 w-full">
         <h3 className="text-lg md:text-xl font-black text-slate-900 dark:text-white tracking-tight">
           {item.title}
@@ -181,7 +180,6 @@ function BentoCard({ item, onClick, isAdmin, tarikhPenutup, onTarikhPenutupChang
         </p>
       </div>
 
-      {/* Micro-Preview Pill / Pilihan Tarikh Penutup ditolak kemas ke dasar kad (`lg:mt-auto`) */}
       {(item.metaPreview || (item.id === 'penutup' && (tarikhPenutup || isAdmin))) && (
         <div className="relative z-10 pt-3 lg:mt-auto lg:pt-4 flex flex-wrap items-center gap-2 w-full">
           {item.metaPreview && (
@@ -217,7 +215,6 @@ function BentoCard({ item, onClick, isAdmin, tarikhPenutup, onTarikhPenutupChang
         </div>
       )}
 
-      {/* Watermark Halus Pada Kad Featured */}
       {item.featured && (
         <div className="pointer-events-none absolute -right-6 -bottom-8 opacity-[0.05] dark:opacity-[0.04] transform -rotate-12 transition-transform duration-500 group-hover:rotate-0 group-hover:scale-105">
           <Icon size={150} strokeWidth={1.2} />
@@ -241,6 +238,13 @@ export default function HomeView({
   saveToFirebaseWithOffline,
   sesiKemasukan = { sesi: '2', tahun: '2026' },
   setSesiKemasukan,
+  activeSession = { sesi: '2', tahun: '2026' },
+  viewingSession = { sesi: '2', tahun: '2026' },
+  sessionsList = [],
+  isViewingArchive = false,
+  onSelectViewingSession,
+  onReturnToActiveSession,
+  onSetOfficialSession,
   tarikhPenutup = '',
   setTarikhPenutup,
   navigateTo,
@@ -249,7 +253,13 @@ export default function HomeView({
   biroList = [],
   penutupData = []
 }) {
-  // Senarai Semak Interaktif Pelajar (Disimpan dalam localStorage peranti)
+  const [showArchiveDrawer, setShowArchiveDrawer] = useState(false);
+  const [showSessionManager, setShowSessionManager] = useState(false);
+  const [draftSession, setDraftSession] = useState({
+    sesi: activeSession?.sesi || '2',
+    tahun: activeSession?.tahun || '2026'
+  });
+
   const [checkedItems, setCheckedItems] = useState(() => {
     try {
       return JSON.parse(localStorage.getItem('imsr_student_checklist') || '{}');
@@ -284,7 +294,6 @@ export default function HomeView({
       ? announcements.map((a) => a.text.trim()).filter(Boolean).join('   •   ')
       : 'Selamat Datang ke Portal iMSR ADTEC JTM Kampus Sandakan. Sila rujuk modul Jadual MSR dan Pelan Daftar untuk panduan penuh.';
 
-  // Kiraan Ringkas Data Live & Format Tarikh Kemas (Contoh: "5 Jul 2026 (Ahad)")
   const totalDays = jadualData?.length || 0;
   const rawFirstDay = jadualData?.[0]?.tarikh || jadualData?.[0]?.hari || null;
   const formattedFirstDay = rawFirstDay ? formatSmartLabel(rawFirstDay) : null;
@@ -371,10 +380,35 @@ export default function HomeView({
   }, [totalDays, formattedFirstDay, totalAjkGroup, biroList?.length, penutupData?.length]);
 
   const completedCount = Object.values(checkedItems).filter(Boolean).length;
+  const displayedSession = viewingSession || sesiKemasukan;
+  const currentKey = getSessionKey(displayedSession);
+  const activeKey = getSessionKey(activeSession);
+
+  const availableArchiveSessions = useMemo(() => {
+    const baseList = Array.isArray(sessionsList) && sessionsList.length > 0
+      ? sessionsList
+      : [activeSession];
+    return baseList.filter((s) => getSessionKey(s) !== currentKey);
+  }, [sessionsList, activeSession, currentKey]);
+
+  const handleChooseArchiveSession = (sessionObj) => {
+    if (onSelectViewingSession) {
+      onSelectViewingSession(sessionObj);
+    } else if (setSesiKemasukan) {
+      setSesiKemasukan(sessionObj);
+    }
+    setShowArchiveDrawer(false);
+  };
+
+  const handleApplyOfficialSession = async (e) => {
+    e.preventDefault();
+    if (!onSetOfficialSession) return;
+    await onSetOfficialSession(draftSession);
+    setShowSessionManager(false);
+  };
 
   return (
     <div className="px-4 lg:px-8 max-w-6xl mx-auto pb-32 pt-4">
-      {/* Animasi Marquee Info Kilat + Edge Fade Mask Lembut */}
       <style>{`
         @keyframes seamlessMarquee {
           0% { transform: translate3d(0, 0, 0); }
@@ -404,7 +438,6 @@ export default function HomeView({
 
         <div className="relative z-20 px-6 py-8 md:px-12 md:py-14 flex flex-col lg:flex-row items-center justify-between gap-8 md:gap-10">
           <div className="w-full lg:w-3/5 space-y-6 text-center lg:text-left">
-            
             {/* BOARD INFO KILAT DENGAN EDGE FADE MASK */}
             <div
               className={`flex ${
@@ -501,49 +534,168 @@ export default function HomeView({
               </div>
             </div>
 
-            {/* TAJUK HERO & LENCANA SESI */}
+            {/* TAJUK HERO, LENCANA SESI & BUTANG ARKIB SESI */}
             <div className="space-y-3.5">
-              <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-cyan-500/15 border border-cyan-400/30 text-cyan-200 text-[11px] font-black tracking-[0.18em] uppercase">
-                <Cpu size={13} className="text-cyan-400" />
-                {isAdmin ? (
-                  <div className="flex items-center gap-2">
-                    <span>Sesi:</span>
-                    <select
-                      value={sesiKemasukan.sesi}
-                      onChange={(e) => {
-                        const updated = { ...sesiKemasukan, sesi: e.target.value };
-                        setSesiKemasukan(updated);
-                        saveToFirebaseWithOffline({ sesiKemasukan: updated });
-                      }}
-                      className="bg-transparent outline-none text-white font-bold border-b border-cyan-400/50"
-                    >
-                      <option value="1" className="text-slate-950">1</option>
-                      <option value="2" className="text-slate-950">2</option>
-                    </select>
-                    <span>/</span>
-                    <select
-                      value={sesiKemasukan.tahun}
-                      onChange={(e) => {
-                        const updated = { ...sesiKemasukan, tahun: e.target.value };
-                        setSesiKemasukan(updated);
-                        saveToFirebaseWithOffline({ sesiKemasukan: updated });
-                      }}
-                      className="bg-transparent outline-none text-white font-bold border-b border-cyan-400/50"
-                    >
-                      {[...Array(10)].map((_, i) => {
-                        const year = (2025 + i).toString();
-                        return (
-                          <option key={year} value={year} className="text-slate-950">
-                            {year}
-                          </option>
-                        );
-                      })}
-                    </select>
-                  </div>
-                ) : (
-                  <span>Kemasukan Sesi {sesiKemasukan.sesi} / {sesiKemasukan.tahun}</span>
+              <div className="flex flex-wrap items-center justify-center lg:justify-start gap-2">
+                <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-cyan-500/15 border border-cyan-400/30 text-cyan-200 text-[11px] font-black tracking-[0.18em] uppercase">
+                  <Cpu size={13} className="text-cyan-400" />
+                  <span>
+                    {isViewingArchive ? 'Arkib Sesi ' : 'Kemasukan Sesi '}
+                    {displayedSession.sesi} / {displayedSession.tahun}
+                  </span>
+                </div>
+
+                {/* Butang Arkib Sesi untuk Pengajar / Pengguna */}
+                <button
+                  type="button"
+                  onClick={() => setShowArchiveDrawer((prev) => !prev)}
+                  className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-white/10 hover:bg-white/15 border border-white/20 text-amber-200 text-[11px] font-extrabold uppercase tracking-wider transition-all"
+                >
+                  <Archive size={13} className="text-amber-300" />
+                  <span>Arkib Sesi</span>
+                </button>
+
+                {/* Butang Kembali ke Sesi Aktif jika sedang melihat arkib */}
+                {isViewingArchive && onReturnToActiveSession && (
+                  <button
+                    type="button"
+                    onClick={onReturnToActiveSession}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-400/40 text-emerald-200 text-[11px] font-extrabold transition-all"
+                  >
+                    <RotateCcw size={12} />
+                    <span>Sesi Terkini ({activeSession.sesi}/{activeSession.tahun})</span>
+                  </button>
+                )}
+
+                {/* Kawalan Tukar / Buka Sesi Rasmi oleh Admin */}
+                {isAdmin && onSetOfficialSession && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDraftSession({
+                        sesi: activeSession?.sesi || '2',
+                        tahun: activeSession?.tahun || '2026'
+                      });
+                      setShowSessionManager((prev) => !prev);
+                    }}
+                    className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-cyan-400 text-slate-950 hover:bg-cyan-300 text-[11px] font-black uppercase tracking-wider transition-all shadow"
+                  >
+                    <span>Urus / Tukar Sesi</span>
+                  </button>
                 )}
               </div>
+
+              {/* Panel Pemilih Arkib Sesi Lepas */}
+              {showArchiveDrawer && (
+                <div className="p-4 rounded-2xl bg-slate-950/85 border border-cyan-500/25 backdrop-blur-xl text-left space-y-2.5 shadow-xl">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-black uppercase tracking-wider text-cyan-300">
+                      Pilih Sesi Lepas Untuk Disemak
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setShowArchiveDrawer(false)}
+                      className="text-slate-400 hover:text-white p-1"
+                      aria-label="Tutup senarai arkib"
+                    >
+                      <X size={14} />
+                    </button>
+                  </div>
+
+                  <div className="flex flex-wrap gap-2">
+                    {availableArchiveSessions.length > 0 ? (
+                      availableArchiveSessions.map((sItem) => {
+                        const sKey = getSessionKey(sItem);
+                        const isOfficial = sKey === activeKey;
+                        return (
+                          <button
+                            key={sKey}
+                            type="button"
+                            onClick={() => handleChooseArchiveSession(sItem)}
+                            className="px-3.5 py-2 rounded-xl bg-white/10 hover:bg-cyan-500/25 border border-white/15 hover:border-cyan-400/50 text-white text-xs font-bold transition-all flex items-center gap-2"
+                          >
+                            <span>Sesi {sItem.sesi} / {sItem.tahun}</span>
+                            {isOfficial && (
+                              <span className="px-2 py-0.5 rounded-full bg-emerald-400/20 text-emerald-300 text-[10px] font-black">
+                                Terkini
+                              </span>
+                            )}
+                          </button>
+                        );
+                      })
+                    ) : (
+                      <p className="text-xs text-slate-400">
+                        Tiada sesi arkib tambahan disenaraikan selain sesi ini.
+                      </p>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Panel Admin: Tetapkan Sesi Aktif Rasmi / Buka Sesi Baharu */}
+              {isAdmin && showSessionManager && onSetOfficialSession && (
+                <form
+                  onSubmit={handleApplyOfficialSession}
+                  className="p-4 rounded-2xl bg-slate-950/90 border border-amber-400/35 backdrop-blur-xl text-left space-y-3 shadow-xl"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-black uppercase tracking-wider text-amber-300">
+                      Tetapkan Sesi Aktif Rasmi (Rekod Sesi Lama Kekal Dalam Arkib)
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setShowSessionManager(false)}
+                      className="text-slate-400 hover:text-white p-1"
+                      aria-label="Tutup pengurus sesi"
+                    >
+                      <X size={14} />
+                    </button>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-3">
+                    <label className="text-xs text-slate-300 font-semibold flex items-center gap-1.5">
+                      <span>Sesi:</span>
+                      <select
+                        value={draftSession.sesi}
+                        onChange={(e) =>
+                          setDraftSession((prev) => ({ ...prev, sesi: e.target.value }))
+                        }
+                        className="bg-slate-900 border border-slate-700 text-white rounded-xl px-3 py-1.5 text-xs font-bold outline-none"
+                      >
+                        <option value="1">1</option>
+                        <option value="2">2</option>
+                      </select>
+                    </label>
+
+                    <label className="text-xs text-slate-300 font-semibold flex items-center gap-1.5">
+                      <span>Tahun:</span>
+                      <select
+                        value={draftSession.tahun}
+                        onChange={(e) =>
+                          setDraftSession((prev) => ({ ...prev, tahun: e.target.value }))
+                        }
+                        className="bg-slate-900 border border-slate-700 text-white rounded-xl px-3 py-1.5 text-xs font-bold outline-none"
+                      >
+                        {[...Array(10)].map((_, i) => {
+                          const year = (2025 + i).toString();
+                          return (
+                            <option key={year} value={year}>
+                              {year}
+                            </option>
+                          );
+                        })}
+                      </select>
+                    </label>
+
+                    <button
+                      type="submit"
+                      className="px-4 py-1.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs transition"
+                    >
+                      Aktifkan Sesi {draftSession.sesi} / {draftSession.tahun}
+                    </button>
+                  </div>
+                </form>
+              )}
 
               <h1 className="text-4xl md:text-5xl lg:text-[3.75rem] font-black text-white tracking-tight leading-[1.08]">
                 Minggu{' '}
@@ -596,7 +748,7 @@ export default function HomeView({
               <div className="relative bg-white/[0.08] backdrop-blur-2xl border border-white/20 ring-1 ring-inset ring-white/10 p-6 md:p-8 rounded-[2.2rem] shadow-2xl text-center">
                 <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-400/15 border border-emerald-400/30 text-emerald-300 text-[10px] font-bold uppercase tracking-widest mb-3">
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
-                  Sistem Aktif
+                  {isViewingArchive ? 'Arkib Aktif' : 'Sistem Aktif'}
                 </div>
                 <LiveClock />
                 <div className="mt-5 pt-4 border-t border-white/10 flex items-center justify-center gap-2 text-xs md:text-sm font-semibold text-slate-100">
