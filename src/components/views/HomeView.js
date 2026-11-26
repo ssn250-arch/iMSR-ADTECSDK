@@ -15,70 +15,81 @@ import {
   Sparkles,
   CheckCircle2,
   Circle,
-  Navigation
+  Navigation,
+  CalendarDays
 } from 'lucide-react';
 import NetworkAnimation from '../ui/NetworkAnimation';
 import LiveClock from '../ui/LiveClock';
 import { formatTarikh } from '../../utils/helpers';
 
-// Tetapkan kepada `true` jika modul ke-7 (Ikrar Pelajar) digunakan, atau `false` untuk 6 modul.
+// Kekalkan `true` untuk Bento Grid 7-Modul penuh (termasuk Ikrar Pelajar)
 const ENABLE_IKRAR_CARD = true;
 
-// Skema Warna Liquid Glass 2026
+// Format pintar: tukar YYYY-MM-DD kepada "5 Jul 2026 (Ahad)", kekalkan teks biasa jika bukan tarikh ISO
+const formatSmartLabel = (val) => {
+  if (!val || typeof val !== 'string') return '';
+  const trimmed = val.trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
+    return formatTarikh(trimmed);
+  }
+  return trimmed;
+};
+
+// Skema Warna Liquid Glass 2026 (Kontras ditingkatkan untuk skrin monitor laptop/desktop)
 const cardThemes = {
   cyan: {
     iconWrap: 'bg-cyan-500/12 dark:bg-cyan-400/10 text-cyan-600 dark:text-cyan-300 ring-1 ring-cyan-500/25',
-    badge: 'bg-cyan-500/10 text-cyan-700 dark:text-cyan-300 border-cyan-500/20',
-    borderHover: 'hover:border-cyan-400/70 dark:hover:border-cyan-400/40',
-    spotlight: 'rgba(6, 182, 212, 0.13)',
-    accentGlow: 'from-cyan-500/20 via-sky-500/5 to-transparent'
+    badge: 'bg-cyan-500/10 text-cyan-700 dark:text-cyan-300 border-cyan-500/25',
+    borderHover: 'hover:border-cyan-400/80 dark:hover:border-cyan-400/45',
+    spotlight: 'rgba(6, 182, 212, 0.14)',
+    accentGlow: 'from-cyan-500/[0.14] via-sky-500/[0.04] to-transparent'
   },
   sky: {
     iconWrap: 'bg-sky-500/12 dark:bg-sky-400/10 text-sky-600 dark:text-sky-300 ring-1 ring-sky-500/25',
-    badge: 'bg-sky-500/10 text-sky-700 dark:text-sky-300 border-sky-500/20',
-    borderHover: 'hover:border-sky-400/70 dark:hover:border-sky-400/40',
-    spotlight: 'rgba(14, 165, 233, 0.13)',
-    accentGlow: 'from-sky-500/15 via-transparent to-transparent'
+    badge: 'bg-sky-500/10 text-sky-700 dark:text-sky-300 border-sky-500/25',
+    borderHover: 'hover:border-sky-400/80 dark:hover:border-sky-400/45',
+    spotlight: 'rgba(14, 165, 233, 0.14)',
+    accentGlow: 'from-sky-500/12 via-transparent to-transparent'
   },
   blue: {
     iconWrap: 'bg-blue-500/12 dark:bg-blue-400/10 text-blue-600 dark:text-blue-300 ring-1 ring-blue-500/25',
-    badge: 'bg-blue-500/10 text-blue-700 dark:text-blue-300 border-blue-500/20',
-    borderHover: 'hover:border-blue-400/70 dark:hover:border-blue-400/40',
-    spotlight: 'rgba(59, 130, 246, 0.13)',
-    accentGlow: 'from-blue-500/15 via-transparent to-transparent'
+    badge: 'bg-blue-500/10 text-blue-700 dark:text-blue-300 border-blue-500/25',
+    borderHover: 'hover:border-blue-400/80 dark:hover:border-blue-400/45',
+    spotlight: 'rgba(59, 130, 246, 0.14)',
+    accentGlow: 'from-blue-500/12 via-transparent to-transparent'
   },
   emerald: {
     iconWrap: 'bg-emerald-500/12 dark:bg-emerald-400/10 text-emerald-600 dark:text-emerald-300 ring-1 ring-emerald-500/25',
-    badge: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/20',
-    borderHover: 'hover:border-emerald-400/70 dark:hover:border-emerald-400/40',
-    spotlight: 'rgba(16, 185, 129, 0.13)',
-    accentGlow: 'from-emerald-500/15 via-transparent to-transparent'
+    badge: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/25',
+    borderHover: 'hover:border-emerald-400/80 dark:hover:border-emerald-400/45',
+    spotlight: 'rgba(16, 185, 129, 0.14)',
+    accentGlow: 'from-emerald-500/12 via-transparent to-transparent'
   },
   indigo: {
     iconWrap: 'bg-indigo-500/12 dark:bg-indigo-400/10 text-indigo-600 dark:text-indigo-300 ring-1 ring-indigo-500/25',
-    badge: 'bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 border-indigo-500/20',
-    borderHover: 'hover:border-indigo-400/70 dark:hover:border-indigo-400/40',
-    spotlight: 'rgba(99, 102, 241, 0.13)',
-    accentGlow: 'from-indigo-500/15 via-transparent to-transparent'
+    badge: 'bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 border-indigo-500/25',
+    borderHover: 'hover:border-indigo-400/80 dark:hover:border-indigo-400/45',
+    spotlight: 'rgba(99, 102, 241, 0.14)',
+    accentGlow: 'from-indigo-500/12 via-transparent to-transparent'
   },
   violet: {
     iconWrap: 'bg-violet-500/12 dark:bg-violet-400/10 text-violet-600 dark:text-violet-300 ring-1 ring-violet-500/25',
-    badge: 'bg-violet-500/10 text-violet-700 dark:text-violet-300 border-violet-500/20',
-    borderHover: 'hover:border-violet-400/70 dark:hover:border-violet-400/40',
-    spotlight: 'rgba(139, 92, 246, 0.13)',
-    accentGlow: 'from-violet-500/15 via-transparent to-transparent'
+    badge: 'bg-violet-500/10 text-violet-700 dark:text-violet-300 border-violet-500/25',
+    borderHover: 'hover:border-violet-400/80 dark:hover:border-violet-400/45',
+    spotlight: 'rgba(139, 92, 246, 0.14)',
+    accentGlow: 'from-violet-500/12 via-transparent to-transparent'
   },
   amber: {
     iconWrap: 'bg-amber-500/12 dark:bg-amber-400/10 text-amber-600 dark:text-amber-300 ring-1 ring-amber-500/25',
-    badge: 'bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/20',
-    borderHover: 'hover:border-amber-400/70 dark:hover:border-amber-400/40',
-    spotlight: 'rgba(245, 158, 11, 0.13)',
-    accentGlow: 'from-amber-500/20 via-orange-500/5 to-transparent'
+    badge: 'bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/25',
+    borderHover: 'hover:border-amber-400/80 dark:hover:border-amber-400/45',
+    spotlight: 'rgba(245, 158, 11, 0.14)',
+    accentGlow: 'from-amber-500/[0.15] via-orange-500/[0.04] to-transparent'
   }
 };
 
-// Komponen Kad Bento 2026 dengan Kesan Cursor Spotlight & Liquid Glass
-function BentoCard({ item, onClick }) {
+// Komponen Kad Bento 2026 (Mobile/Tablet kekal asal, Desktop diselaraskan garisan tajuk & ketajaman kad)
+function BentoCard({ item, onClick, isAdmin, tarikhPenutup, onTarikhPenutupChange }) {
   const [coords, setCoords] = useState({ x: 0, y: 0, active: false });
   const theme = cardThemes[item.color] || cardThemes.cyan;
   const Icon = item.icon;
@@ -93,18 +104,26 @@ function BentoCard({ item, onClick }) {
   };
 
   return (
-    <button
-      type="button"
+    <div
+      role="button"
+      tabIndex={0}
       onClick={() => onClick(item.id)}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          onClick(item.id);
+        }
+      }}
       onMouseMove={handleMouseMove}
       onMouseLeave={() => setCoords((prev) => ({ ...prev, active: false }))}
-      className={`group relative overflow-hidden text-left rounded-[2rem] p-6 md:p-7 transition-all duration-300
-        bg-white/75 dark:bg-slate-900/60 backdrop-blur-2xl
-        border border-slate-200/80 dark:border-slate-800/90
-        ring-1 ring-inset ring-white/80 dark:ring-white/[0.06]
-        shadow-[0_8px_30px_rgb(15,23,42,0.04)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.25)]
-        hover:-translate-y-1 hover:shadow-xl ${theme.borderHover}
-        flex flex-col justify-between min-h-[190px] focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500
+      className={`group relative cursor-pointer overflow-hidden text-left rounded-[2rem] p-6 md:p-7 transition-all duration-300
+        bg-white/85 lg:bg-white/90 dark:bg-slate-900/60 backdrop-blur-2xl
+        border border-slate-200/90 lg:border-slate-300/75 dark:border-slate-800/90
+        ring-1 ring-inset ring-white/90 dark:ring-white/[0.06]
+        shadow-[0_6px_24px_-6px_rgba(15,23,42,0.08)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.28)]
+        hover:-translate-y-1 hover:shadow-[0_18px_38px_-10px_rgba(15,23,42,0.13)] dark:hover:shadow-2xl ${theme.borderHover}
+        flex flex-col justify-between lg:justify-start min-h-[190px] lg:min-h-[218px]
+        focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500
         ${item.spanClass || ''}`}
       aria-label={`Buka modul ${item.title}`}
     >
@@ -117,16 +136,16 @@ function BentoCard({ item, onClick }) {
         }}
       />
 
-      {/* Subtle Ambient Corner Wash untuk Kad Featured (Span-2) */}
+      {/* Ambient Wash Lembut untuk Kad Featured (Span-2) */}
       {item.featured && (
         <div
-          className={`pointer-events-none absolute inset-0 bg-gradient-to-br ${theme.accentGlow} opacity-70`}
+          className={`pointer-events-none absolute inset-0 bg-gradient-to-br ${theme.accentGlow} opacity-80`}
         />
       )}
 
-      {/* Bahagian Atas: Ikon, Lencana Status & Anak Panah Serong */}
+      {/* Baris Atas: Ikon, Lencana Status & Anak Panah Serong */}
       <div className="relative z-10 flex items-start justify-between gap-3 w-full">
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 flex-wrap">
           <div
             className={`p-3.5 rounded-2xl ${theme.iconWrap} shadow-sm transition-transform duration-300 group-hover:scale-105`}
           >
@@ -144,7 +163,7 @@ function BentoCard({ item, onClick }) {
           )}
         </div>
 
-        <div className="p-2.5 rounded-xl bg-slate-100/80 dark:bg-slate-800/70 border border-slate-200/60 dark:border-slate-700/60 text-slate-500 dark:text-slate-400 group-hover:text-slate-900 dark:group-hover:text-white group-hover:bg-white dark:group-hover:bg-slate-800 transition-all duration-300">
+        <div className="p-2.5 rounded-xl bg-slate-100/90 dark:bg-slate-800/70 border border-slate-200/80 dark:border-slate-700/60 text-slate-500 dark:text-slate-400 group-hover:text-slate-900 dark:group-hover:text-white group-hover:bg-white dark:group-hover:bg-slate-800 transition-all duration-300 shrink-0">
           <ArrowUpRight
             size={16}
             className="transition-transform duration-300 group-hover:translate-x-0.5 group-hover:-translate-y-0.5"
@@ -152,35 +171,59 @@ function BentoCard({ item, onClick }) {
         </div>
       </div>
 
-      {/* Bahagian Tengah/Bawah: Tajuk, Penerangan & Micro-Widget */}
-      <div className="relative z-10 mt-6 space-y-2.5 w-full">
-        <div>
-          <h3 className="text-lg md:text-xl font-black text-slate-900 dark:text-white tracking-tight">
-            {item.title}
-          </h3>
-          <p className="text-xs md:text-sm text-slate-500 dark:text-slate-400 font-medium mt-1 leading-relaxed">
-            {item.desc}
-          </p>
-        </div>
+      {/* Blok Tajuk & Penerangan: Sejajar Mendatar pada Desktop (`lg:mt-6`) */}
+      <div className="relative z-10 mt-6 lg:mt-6 w-full">
+        <h3 className="text-lg md:text-xl font-black text-slate-900 dark:text-white tracking-tight">
+          {item.title}
+        </h3>
+        <p className="text-xs md:text-sm text-slate-500 dark:text-slate-400 font-medium mt-1 leading-relaxed">
+          {item.desc}
+        </p>
+      </div>
 
-        {/* Micro-Preview Pill untuk kad utama */}
-        {item.metaPreview && (
-          <div className="pt-2 flex flex-wrap items-center gap-2">
-            <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-slate-600 dark:text-slate-300 bg-slate-100/90 dark:bg-slate-800/80 px-3 py-1.5 rounded-xl border border-slate-200/70 dark:border-slate-700/60">
+      {/* Micro-Preview Pill / Pilihan Tarikh Penutup ditolak kemas ke dasar kad (`lg:mt-auto`) */}
+      {(item.metaPreview || (item.id === 'penutup' && (tarikhPenutup || isAdmin))) && (
+        <div className="relative z-10 pt-3 lg:mt-auto lg:pt-4 flex flex-wrap items-center gap-2 w-full">
+          {item.metaPreview && (
+            <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-slate-600 dark:text-slate-300 bg-slate-100/95 dark:bg-slate-800/80 px-3 py-1.5 rounded-xl border border-slate-200/85 dark:border-slate-700/60">
               <Sparkles size={12} className="text-cyan-500 shrink-0" />
               <span className="truncate max-w-[260px] sm:max-w-md">{item.metaPreview}</span>
             </span>
-          </div>
-        )}
-      </div>
+          )}
 
-      {/* Watermark Halus Hanya Pada Kad Featured Supaya Tidak Serabut */}
+          {item.id === 'penutup' && isAdmin && onTarikhPenutupChange && (
+            <div
+              onClick={(e) => e.stopPropagation()}
+              onKeyDown={(e) => e.stopPropagation()}
+              className="inline-flex items-center gap-1.5 text-[11px] font-bold text-indigo-700 dark:text-indigo-300 bg-indigo-500/10 px-2.5 py-1 rounded-xl border border-indigo-500/25"
+            >
+              <CalendarDays size={12} className="shrink-0" />
+              <input
+                type="date"
+                value={tarikhPenutup || ''}
+                onChange={(e) => onTarikhPenutupChange(e.target.value)}
+                className="bg-transparent outline-none text-[11px] font-bold cursor-pointer"
+                aria-label="Pilih tarikh majlis penutup"
+              />
+            </div>
+          )}
+
+          {item.id === 'penutup' && !isAdmin && tarikhPenutup && (
+            <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-indigo-700 dark:text-indigo-300 bg-indigo-500/10 px-3 py-1.5 rounded-xl border border-indigo-500/20">
+              <CalendarDays size={12} className="shrink-0" />
+              <span>{formatTarikh(tarikhPenutup)}</span>
+            </span>
+          )}
+        </div>
+      )}
+
+      {/* Watermark Halus Pada Kad Featured */}
       {item.featured && (
-        <div className="pointer-events-none absolute -right-6 -bottom-8 opacity-[0.045] dark:opacity-[0.04] transform -rotate-12 transition-transform duration-500 group-hover:rotate-0 group-hover:scale-105">
+        <div className="pointer-events-none absolute -right-6 -bottom-8 opacity-[0.05] dark:opacity-[0.04] transform -rotate-12 transition-transform duration-500 group-hover:rotate-0 group-hover:scale-105">
           <Icon size={150} strokeWidth={1.2} />
         </div>
       )}
-    </button>
+    </div>
   );
 }
 
@@ -198,6 +241,8 @@ export default function HomeView({
   saveToFirebaseWithOffline,
   sesiKemasukan = { sesi: '2', tahun: '2026' },
   setSesiKemasukan,
+  tarikhPenutup = '',
+  setTarikhPenutup,
   navigateTo,
   jadualData = [],
   ajkInduk = [],
@@ -221,17 +266,30 @@ export default function HomeView({
     });
   };
 
+  const handleTarikhPenutupUpdate = (newDate) => {
+    if (setTarikhPenutup) setTarikhPenutup(newDate);
+    if (saveToFirebaseWithOffline) {
+      saveToFirebaseWithOffline({
+        tarikhPenutup: newDate,
+        latestUpdate: {
+          view: 'penutup',
+          text: 'Tarikh Majlis Penutup telah dikemas kini.'
+        }
+      });
+    }
+  };
+
   const compiledText =
     announcements && announcements.length > 0
       ? announcements.map((a) => a.text.trim()).filter(Boolean).join('   •   ')
       : 'Selamat Datang ke Portal iMSR ADTEC JTM Kampus Sandakan. Sila rujuk modul Jadual MSR dan Pelan Daftar untuk panduan penuh.';
 
-  // Kiraan Ringkas Data Live untuk Micro-Badges pada Kad
+  // Kiraan Ringkas Data Live & Format Tarikh Kemas (Contoh: "5 Jul 2026 (Ahad)")
   const totalDays = jadualData?.length || 0;
-  const firstDayTitle = jadualData?.[0]?.hari || jadualData?.[0]?.tarikh || null;
+  const rawFirstDay = jadualData?.[0]?.tarikh || jadualData?.[0]?.hari || null;
+  const formattedFirstDay = rawFirstDay ? formatSmartLabel(rawFirstDay) : null;
   const totalAjkGroup = (ajkInduk?.length ? 1 : 0) + (biroList?.length || 0);
 
-  // Susunan Bento Grid 2026 (Tiada Kad Yatim pada Desktop 3-Lajur mahupun Tablet 2-Lajur)
   const moduleCards = useMemo(() => {
     const baseCards = [
       {
@@ -243,12 +301,10 @@ export default function HomeView({
         featured: true,
         pulse: true,
         badge: totalDays > 0 ? `${totalDays} Hari Program` : 'Tentatif Utama',
-        metaPreview: firstDayTitle
-          ? `Slot tersedia bermula: ${firstDayTitle}`
+        metaPreview: formattedFirstDay
+          ? `Slot tersedia bermula: ${formattedFirstDay}`
           : 'Klik untuk semak susunan aktiviti harian pelajar',
-        spanClass: ENABLE_IKRAR_CARD
-          ? 'sm:col-span-2 lg:col-span-2'
-          : 'sm:col-span-2 lg:col-span-2'
+        spanClass: 'sm:col-span-2 lg:col-span-2'
       },
       {
         id: 'layout',
@@ -312,13 +368,13 @@ export default function HomeView({
     }
 
     return baseCards;
-  }, [totalDays, firstDayTitle, totalAjkGroup, biroList?.length, penutupData?.length]);
+  }, [totalDays, formattedFirstDay, totalAjkGroup, biroList?.length, penutupData?.length]);
 
   const completedCount = Object.values(checkedItems).filter(Boolean).length;
 
   return (
     <div className="px-4 lg:px-8 max-w-6xl mx-auto pb-32 pt-4">
-      {/* Animasi Marquee Info Kilat */}
+      {/* Animasi Marquee Info Kilat + Edge Fade Mask Lembut */}
       <style>{`
         @keyframes seamlessMarquee {
           0% { transform: translate3d(0, 0, 0); }
@@ -327,14 +383,20 @@ export default function HomeView({
         .tech-marquee-track {
           display: flex;
           width: max-content;
-          animation: seamlessMarquee 16s linear infinite;
+          animation: seamlessMarquee 14s linear infinite;
           will-change: transform;
         }
-        @media (min-width: 768px) { .tech-marquee-track { animation-duration: 22s; } }
+        @media (min-width: 640px) { .tech-marquee-track { animation-duration: 20s; } }
+        @media (min-width: 1024px) { .tech-marquee-track { animation-duration: 25s; } }
         .tech-marquee-track:hover { animation-play-state: paused; }
+
+        .marquee-fade-mask {
+          -webkit-mask-image: linear-gradient(to right, transparent 0%, #000 22px, #000 calc(100% - 22px), transparent 100%);
+          mask-image: linear-gradient(to right, transparent 0%, #000 22px, #000 calc(100% - 22px), transparent 100%);
+        }
       `}</style>
 
-      {/* HERO SECTION 2026 (TIADA LANDING PAGE BERASINGAN — TERUS KE TINDAKAN UTAMA) */}
+      {/* HERO SECTION 2026 */}
       <section className="relative rounded-[2.5rem] bg-gradient-to-br from-slate-950 via-[#08172e] to-[#030b18] overflow-hidden shadow-[0_20px_60px_-15px_rgba(2,8,23,0.7)] border border-cyan-500/20 ring-1 ring-inset ring-white/10 mb-8">
         <NetworkAnimation />
         <div className="absolute top-[-25%] left-[-10%] w-[55%] h-[55%] bg-cyan-500/20 rounded-full blur-[130px] animate-float pointer-events-none" />
@@ -343,7 +405,7 @@ export default function HomeView({
         <div className="relative z-20 px-6 py-8 md:px-12 md:py-14 flex flex-col lg:flex-row items-center justify-between gap-8 md:gap-10">
           <div className="w-full lg:w-3/5 space-y-6 text-center lg:text-left">
             
-            {/* BOARD INFO KILAT */}
+            {/* BOARD INFO KILAT DENGAN EDGE FADE MASK */}
             <div
               className={`flex ${
                 isAdmin ? 'flex-col items-start gap-4' : 'items-center gap-3'
@@ -354,7 +416,11 @@ export default function HomeView({
                 INFO KILAT {isAdmin && `(${announcements.length})`}
               </span>
 
-              <div className="flex-1 overflow-hidden relative w-full flex items-center">
+              <div
+                className={`flex-1 overflow-hidden relative w-full flex items-center ${
+                  !isAdmin ? 'marquee-fade-mask' : ''
+                }`}
+              >
                 {isAdmin ? (
                   <div className="w-full flex flex-col gap-2">
                     {announcements.map((item, index) => (
@@ -418,7 +484,7 @@ export default function HomeView({
                     </button>
                   </div>
                 ) : (
-                  <div className="tech-marquee-track font-semibold text-amber-200/95 tracking-wide gap-12 whitespace-nowrap">
+                  <div className="tech-marquee-track font-semibold text-amber-200/95 tracking-wide gap-12 whitespace-nowrap pl-2">
                     <div className="flex items-center gap-3 shrink-0 whitespace-nowrap">
                       <span>{compiledText}</span>
                       <span className="text-amber-400/60 font-black shrink-0 ml-4">•</span>
@@ -491,7 +557,7 @@ export default function HomeView({
               </p>
             </div>
 
-            {/* QUICK ACTION BUTTONS (Pengganti fungsi Landing Page) */}
+            {/* QUICK ACTION BUTTONS */}
             <div className="flex flex-wrap items-center justify-center lg:justify-start gap-3 pt-1">
               <button
                 type="button"
@@ -553,30 +619,37 @@ export default function HomeView({
             Pilih modul di bawah untuk akses pantas dokumen dan maklumat MSR
           </p>
         </div>
-        <span className="hidden sm:inline-flex items-center px-3 py-1 rounded-full text-[11px] font-bold bg-slate-200/70 dark:bg-slate-800/80 text-slate-600 dark:text-slate-300">
+        <span className="hidden sm:inline-flex items-center px-3 py-1 rounded-full text-[11px] font-bold bg-slate-200/80 dark:bg-slate-800/80 text-slate-700 dark:text-slate-300 border border-slate-300/60 dark:border-slate-700/60">
           {moduleCards.length} Modul Tersedia
         </span>
       </div>
 
-      {/* BENTO GRID 2026 (SEIMBANG PENUH UNTUK 7 ATAU 6 KAD) */}
+      {/* BENTO GRID 2026 */}
       <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-5 mb-8">
         {moduleCards.map((item) => (
-          <BentoCard key={item.id} item={item} onClick={navigateTo} />
+          <BentoCard
+            key={item.id}
+            item={item}
+            onClick={navigateTo}
+            isAdmin={isAdmin}
+            tarikhPenutup={tarikhPenutup}
+            onTarikhPenutupChange={handleTarikhPenutupUpdate}
+          />
         ))}
       </section>
 
-      {/* WIDGET PERSEDIAAN PANTAS PELAJAR BAHARU (LOCALSTORAGE INTERAKTIF) */}
-      <section className="rounded-[2rem] bg-white/75 dark:bg-slate-900/60 backdrop-blur-2xl border border-slate-200/80 dark:border-slate-800/90 ring-1 ring-inset ring-white/80 dark:ring-white/[0.06] p-6 md:p-7 shadow-sm">
+      {/* WIDGET PERSEDIAAN PANTAS PELAJAR BAHARU */}
+      <section className="rounded-[2rem] bg-white/85 lg:bg-white/90 dark:bg-slate-900/60 backdrop-blur-2xl border border-slate-200/90 lg:border-slate-300/75 dark:border-slate-800/90 ring-1 ring-inset ring-white/90 dark:ring-white/[0.06] p-6 md:p-7 shadow-[0_6px_24px_-6px_rgba(15,23,42,0.06)]">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
           <div>
             <h3 className="text-sm md:text-base font-black text-slate-900 dark:text-white">
               Senarai Semak Pantas Hari Pendaftaran
             </h3>
             <p className="text-xs text-slate-500 dark:text-slate-400">
-              Tandakan persediaan anda (disimpan secara automatik pada telefon ini)
+              Tandakan persediaan anda (disimpan secara automatik pada peranti ini)
             </p>
           </div>
-          <span className="self-start sm:self-auto px-3 py-1 rounded-full text-xs font-extrabold bg-cyan-500/10 text-cyan-700 dark:text-cyan-300 border border-cyan-500/20">
+          <span className="self-start sm:self-auto px-3 py-1 rounded-full text-xs font-extrabold bg-cyan-500/10 text-cyan-700 dark:text-cyan-300 border border-cyan-500/25">
             {completedCount} / {DEFAULT_CHECKLIST.length} Selesai
           </span>
         </div>
@@ -592,7 +665,7 @@ export default function HomeView({
                 className={`flex items-center gap-3 p-3.5 rounded-2xl border text-left transition-all duration-200 ${
                   done
                     ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-800 dark:text-emerald-200'
-                    : 'bg-slate-50/80 dark:bg-slate-800/40 border-slate-200/70 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:border-cyan-400/50'
+                    : 'bg-slate-50/90 dark:bg-slate-800/40 border-slate-200/85 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:border-cyan-400/60'
                 }`}
               >
                 {done ? (
