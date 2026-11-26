@@ -1,5 +1,5 @@
 // --- NAIKKAN VERSI INI SEBELUM DEPLOY (Cth: v11) ---
-const CACHE_NAME = 'imsr-cache-v12'; 
+const CACHE_NAME = 'imsr-cache-v13'; 
 
 const urlsToCache = [
   '/',
