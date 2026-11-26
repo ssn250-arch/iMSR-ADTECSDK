@@ -1,315 +1,613 @@
-import React, { useState } from 'react';
-import { Bell, ChevronRight, FileSignature, UserCog, CalendarClock, GraduationCap, MapPinned, AudioLines, Cpu, Plus, X, HandHeart, History, CheckCircle2, Sparkles } from 'lucide-react';
+import React, { useState, useMemo } from 'react';
+import {
+  Bell,
+  ArrowUpRight,
+  FileSignature,
+  UserCog,
+  CalendarClock,
+  GraduationCap,
+  MapPinned,
+  AudioLines,
+  ShieldCheck,
+  Cpu,
+  Plus,
+  X,
+  Sparkles,
+  CheckCircle2,
+  Circle,
+  Navigation
+} from 'lucide-react';
 import NetworkAnimation from '../ui/NetworkAnimation';
 import LiveClock from '../ui/LiveClock';
 import { formatTarikh } from '../../utils/helpers';
 
-const cardStyles = {
-  blue: { iconBg: 'bg-blue-50 dark:bg-blue-950/40', iconText: 'text-blue-600 dark:text-blue-400', iconBorder: 'border-blue-200/60 dark:border-blue-500/30', glow: 'hover:border-blue-400 dark:hover:border-blue-500/50 hover:shadow-[0_12px_40px_rgba(59,130,246,0.15)]', watermark: 'text-blue-500/[0.08] dark:text-blue-400/[0.06]' },
-  emerald: { iconBg: 'bg-emerald-50 dark:bg-emerald-950/40', iconText: 'text-emerald-600 dark:text-emerald-400', iconBorder: 'border-emerald-200/60 dark:border-emerald-500/30', glow: 'hover:border-emerald-400 dark:hover:border-emerald-500/50 hover:shadow-[0_12px_40px_rgba(16,185,129,0.15)]', watermark: 'text-emerald-500/[0.08] dark:text-emerald-400/[0.06]' },
-  cyan: { iconBg: 'bg-cyan-50 dark:bg-cyan-950/40', iconText: 'text-cyan-600 dark:text-cyan-400', iconBorder: 'border-cyan-200/60 dark:border-cyan-500/30', glow: 'hover:border-cyan-400 dark:hover:border-cyan-500/50 hover:shadow-[0_12px_40px_rgba(6,182,212,0.15)]', watermark: 'text-cyan-500/[0.08] dark:text-cyan-400/[0.06]' },
-  indigo: { iconBg: 'bg-indigo-50 dark:bg-indigo-950/40', iconText: 'text-indigo-600 dark:text-indigo-400', iconBorder: 'border-indigo-200/60 dark:border-indigo-500/30', glow: 'hover:border-indigo-400 dark:hover:border-indigo-500/50 hover:shadow-[0_12px_40px_rgba(99,102,241,0.15)]', watermark: 'text-indigo-500/[0.08] dark:text-indigo-400/[0.06]' },
-  sky: { iconBg: 'bg-sky-50 dark:bg-sky-950/40', iconText: 'text-sky-600 dark:text-sky-400', iconBorder: 'border-sky-200/60 dark:border-sky-500/30', glow: 'hover:border-sky-400 dark:hover:border-sky-500/50 hover:shadow-[0_12px_40px_rgba(14,165,233,0.15)]', watermark: 'text-sky-500/[0.08] dark:text-sky-400/[0.06]' },
-  violet: { iconBg: 'bg-violet-50 dark:bg-violet-950/40', iconText: 'text-violet-600 dark:text-violet-400', iconBorder: 'border-violet-200/60 dark:border-violet-500/30', glow: 'hover:border-violet-400 dark:hover:border-violet-500/50 hover:shadow-[0_12px_40px_rgba(139,92,246,0.15)]', watermark: 'text-violet-500/[0.08] dark:text-violet-400/[0.06]' },
-  rose: { iconBg: 'bg-rose-50 dark:bg-rose-950/40', iconText: 'text-rose-600 dark:text-rose-400', iconBorder: 'border-rose-200/60 dark:border-rose-500/30', glow: 'hover:border-rose-400 dark:hover:border-rose-500/50 hover:shadow-[0_12px_40px_rgba(225,29,72,0.15)]', watermark: 'text-rose-500/[0.08] dark:text-rose-400/[0.06]' }
+// Tetapkan kepada `true` jika modul ke-7 (Ikrar Pelajar) digunakan, atau `false` untuk 6 modul.
+const ENABLE_IKRAR_CARD = true;
+
+// Skema Warna Liquid Glass 2026
+const cardThemes = {
+  cyan: {
+    iconWrap: 'bg-cyan-500/12 dark:bg-cyan-400/10 text-cyan-600 dark:text-cyan-300 ring-1 ring-cyan-500/25',
+    badge: 'bg-cyan-500/10 text-cyan-700 dark:text-cyan-300 border-cyan-500/20',
+    borderHover: 'hover:border-cyan-400/70 dark:hover:border-cyan-400/40',
+    spotlight: 'rgba(6, 182, 212, 0.13)',
+    accentGlow: 'from-cyan-500/20 via-sky-500/5 to-transparent'
+  },
+  sky: {
+    iconWrap: 'bg-sky-500/12 dark:bg-sky-400/10 text-sky-600 dark:text-sky-300 ring-1 ring-sky-500/25',
+    badge: 'bg-sky-500/10 text-sky-700 dark:text-sky-300 border-sky-500/20',
+    borderHover: 'hover:border-sky-400/70 dark:hover:border-sky-400/40',
+    spotlight: 'rgba(14, 165, 233, 0.13)',
+    accentGlow: 'from-sky-500/15 via-transparent to-transparent'
+  },
+  blue: {
+    iconWrap: 'bg-blue-500/12 dark:bg-blue-400/10 text-blue-600 dark:text-blue-300 ring-1 ring-blue-500/25',
+    badge: 'bg-blue-500/10 text-blue-700 dark:text-blue-300 border-blue-500/20',
+    borderHover: 'hover:border-blue-400/70 dark:hover:border-blue-400/40',
+    spotlight: 'rgba(59, 130, 246, 0.13)',
+    accentGlow: 'from-blue-500/15 via-transparent to-transparent'
+  },
+  emerald: {
+    iconWrap: 'bg-emerald-500/12 dark:bg-emerald-400/10 text-emerald-600 dark:text-emerald-300 ring-1 ring-emerald-500/25',
+    badge: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/20',
+    borderHover: 'hover:border-emerald-400/70 dark:hover:border-emerald-400/40',
+    spotlight: 'rgba(16, 185, 129, 0.13)',
+    accentGlow: 'from-emerald-500/15 via-transparent to-transparent'
+  },
+  indigo: {
+    iconWrap: 'bg-indigo-500/12 dark:bg-indigo-400/10 text-indigo-600 dark:text-indigo-300 ring-1 ring-indigo-500/25',
+    badge: 'bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 border-indigo-500/20',
+    borderHover: 'hover:border-indigo-400/70 dark:hover:border-indigo-400/40',
+    spotlight: 'rgba(99, 102, 241, 0.13)',
+    accentGlow: 'from-indigo-500/15 via-transparent to-transparent'
+  },
+  violet: {
+    iconWrap: 'bg-violet-500/12 dark:bg-violet-400/10 text-violet-600 dark:text-violet-300 ring-1 ring-violet-500/25',
+    badge: 'bg-violet-500/10 text-violet-700 dark:text-violet-300 border-violet-500/20',
+    borderHover: 'hover:border-violet-400/70 dark:hover:border-violet-400/40',
+    spotlight: 'rgba(139, 92, 246, 0.13)',
+    accentGlow: 'from-violet-500/15 via-transparent to-transparent'
+  },
+  amber: {
+    iconWrap: 'bg-amber-500/12 dark:bg-amber-400/10 text-amber-600 dark:text-amber-300 ring-1 ring-amber-500/25',
+    badge: 'bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/20',
+    borderHover: 'hover:border-amber-400/70 dark:hover:border-amber-400/40',
+    spotlight: 'rgba(245, 158, 11, 0.13)',
+    accentGlow: 'from-amber-500/20 via-orange-500/5 to-transparent'
+  }
 };
 
-export default function HomeView({ 
-  isAdmin, 
-  announcements, 
-  setAnnouncements, 
-  saveToFirebaseWithOffline, 
-  sesiKemasukan = { sesi: '2', tahun: '2026' }, 
-  activeSession = { sesi: '2', tahun: '2026' },
-  availableSessions = [],
-  isViewingArchive = false,
-  onSwitchViewSession,
-  onSetOfficialSession,
-  tarikhPenutup, 
-  setTarikhPenutup, 
-  navigateTo 
-}) {
-  const [showArchiveModal, setShowArchiveModal] = useState(false);
-  const [newSesiDraft, setNewSesiDraft] = useState({ sesi: activeSession.sesi, tahun: activeSession.tahun });
+// Komponen Kad Bento 2026 dengan Kesan Cursor Spotlight & Liquid Glass
+function BentoCard({ item, onClick }) {
+  const [coords, setCoords] = useState({ x: 0, y: 0, active: false });
+  const theme = cardThemes[item.color] || cardThemes.cyan;
+  const Icon = item.icon;
 
-  const compiledText = announcements && announcements.length > 0 
-    ? announcements.map(a => a.text.trim()).filter(Boolean).join("   •   ") 
-    : `Selamat Datang ke Portal iMSR ADTEC JTM Kampus Sandakan bagi Sesi ${sesiKemasukan.sesi}/${sesiKemasukan.tahun}. Sila rujuk dokumen jadual dan pelan pendaftaran.`;
+  const handleMouseMove = (e) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    setCoords({
+      x: e.clientX - rect.left,
+      y: e.clientY - rect.top,
+      active: true
+    });
+  };
+
+  return (
+    <button
+      type="button"
+      onClick={() => onClick(item.id)}
+      onMouseMove={handleMouseMove}
+      onMouseLeave={() => setCoords((prev) => ({ ...prev, active: false }))}
+      className={`group relative overflow-hidden text-left rounded-[2rem] p-6 md:p-7 transition-all duration-300
+        bg-white/75 dark:bg-slate-900/60 backdrop-blur-2xl
+        border border-slate-200/80 dark:border-slate-800/90
+        ring-1 ring-inset ring-white/80 dark:ring-white/[0.06]
+        shadow-[0_8px_30px_rgb(15,23,42,0.04)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.25)]
+        hover:-translate-y-1 hover:shadow-xl ${theme.borderHover}
+        flex flex-col justify-between min-h-[190px] focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500
+        ${item.spanClass || ''}`}
+      aria-label={`Buka modul ${item.title}`}
+    >
+      {/* Cursor Spotlight Glow */}
+      <div
+        className="pointer-events-none absolute -inset-px rounded-[2rem] transition-opacity duration-300"
+        style={{
+          opacity: coords.active ? 1 : 0,
+          background: `radial-gradient(380px circle at ${coords.x}px ${coords.y}px, ${theme.spotlight}, transparent 70%)`
+        }}
+      />
+
+      {/* Subtle Ambient Corner Wash untuk Kad Featured (Span-2) */}
+      {item.featured && (
+        <div
+          className={`pointer-events-none absolute inset-0 bg-gradient-to-br ${theme.accentGlow} opacity-70`}
+        />
+      )}
+
+      {/* Bahagian Atas: Ikon, Lencana Status & Anak Panah Serong */}
+      <div className="relative z-10 flex items-start justify-between gap-3 w-full">
+        <div className="flex items-center gap-3">
+          <div
+            className={`p-3.5 rounded-2xl ${theme.iconWrap} shadow-sm transition-transform duration-300 group-hover:scale-105`}
+          >
+            <Icon size={22} strokeWidth={2} />
+          </div>
+          {item.badge && (
+            <span
+              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold border ${theme.badge}`}
+            >
+              {item.pulse && (
+                <span className="w-1.5 h-1.5 rounded-full bg-current animate-ping" />
+              )}
+              {item.badge}
+            </span>
+          )}
+        </div>
+
+        <div className="p-2.5 rounded-xl bg-slate-100/80 dark:bg-slate-800/70 border border-slate-200/60 dark:border-slate-700/60 text-slate-500 dark:text-slate-400 group-hover:text-slate-900 dark:group-hover:text-white group-hover:bg-white dark:group-hover:bg-slate-800 transition-all duration-300">
+          <ArrowUpRight
+            size={16}
+            className="transition-transform duration-300 group-hover:translate-x-0.5 group-hover:-translate-y-0.5"
+          />
+        </div>
+      </div>
+
+      {/* Bahagian Tengah/Bawah: Tajuk, Penerangan & Micro-Widget */}
+      <div className="relative z-10 mt-6 space-y-2.5 w-full">
+        <div>
+          <h3 className="text-lg md:text-xl font-black text-slate-900 dark:text-white tracking-tight">
+            {item.title}
+          </h3>
+          <p className="text-xs md:text-sm text-slate-500 dark:text-slate-400 font-medium mt-1 leading-relaxed">
+            {item.desc}
+          </p>
+        </div>
+
+        {/* Micro-Preview Pill untuk kad utama */}
+        {item.metaPreview && (
+          <div className="pt-2 flex flex-wrap items-center gap-2">
+            <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-slate-600 dark:text-slate-300 bg-slate-100/90 dark:bg-slate-800/80 px-3 py-1.5 rounded-xl border border-slate-200/70 dark:border-slate-700/60">
+              <Sparkles size={12} className="text-cyan-500 shrink-0" />
+              <span className="truncate max-w-[260px] sm:max-w-md">{item.metaPreview}</span>
+            </span>
+          </div>
+        )}
+      </div>
+
+      {/* Watermark Halus Hanya Pada Kad Featured Supaya Tidak Serabut */}
+      {item.featured && (
+        <div className="pointer-events-none absolute -right-6 -bottom-8 opacity-[0.045] dark:opacity-[0.04] transform -rotate-12 transition-transform duration-500 group-hover:rotate-0 group-hover:scale-105">
+          <Icon size={150} strokeWidth={1.2} />
+        </div>
+      )}
+    </button>
+  );
+}
+
+const DEFAULT_CHECKLIST = [
+  { id: 'ic', label: 'Salinan Kad Pengenalan & Surat Tawaran' },
+  { id: 'sijil', label: 'Sijil Akademik / SPM Asal & Salinan' },
+  { id: 'borang', label: 'Borang Pendaftaran & Pemeriksaan Kesihatan' },
+  { id: 'pakaian', label: 'Pakaian Kemas Mengikut Etika MSR' }
+];
+
+export default function HomeView({
+  isAdmin,
+  announcements = [],
+  setAnnouncements,
+  saveToFirebaseWithOffline,
+  sesiKemasukan = { sesi: '2', tahun: '2026' },
+  setSesiKemasukan,
+  navigateTo,
+  jadualData = [],
+  ajkInduk = [],
+  biroList = [],
+  penutupData = []
+}) {
+  // Senarai Semak Interaktif Pelajar (Disimpan dalam localStorage peranti)
+  const [checkedItems, setCheckedItems] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem('imsr_student_checklist') || '{}');
+    } catch {
+      return {};
+    }
+  });
+
+  const toggleCheck = (id) => {
+    setCheckedItems((prev) => {
+      const next = { ...prev, [id]: !prev[id] };
+      localStorage.setItem('imsr_student_checklist', JSON.stringify(next));
+      return next;
+    });
+  };
+
+  const compiledText =
+    announcements && announcements.length > 0
+      ? announcements.map((a) => a.text.trim()).filter(Boolean).join('   •   ')
+      : 'Selamat Datang ke Portal iMSR ADTEC JTM Kampus Sandakan. Sila rujuk modul Jadual MSR dan Pelan Daftar untuk panduan penuh.';
+
+  // Kiraan Ringkas Data Live untuk Micro-Badges pada Kad
+  const totalDays = jadualData?.length || 0;
+  const firstDayTitle = jadualData?.[0]?.hari || jadualData?.[0]?.tarikh || null;
+  const totalAjkGroup = (ajkInduk?.length ? 1 : 0) + (biroList?.length || 0);
+
+  // Susunan Bento Grid 2026 (Tiada Kad Yatim pada Desktop 3-Lajur mahupun Tablet 2-Lajur)
+  const moduleCards = useMemo(() => {
+    const baseCards = [
+      {
+        id: 'jadual',
+        icon: CalendarClock,
+        title: 'Jadual MSR',
+        desc: 'Tentatif penuh aktiviti harian, masa berkumpul, lokasi slot & muat turun jadual rasmi.',
+        color: 'cyan',
+        featured: true,
+        pulse: true,
+        badge: totalDays > 0 ? `${totalDays} Hari Program` : 'Tentatif Utama',
+        metaPreview: firstDayTitle
+          ? `Slot tersedia bermula: ${firstDayTitle}`
+          : 'Klik untuk semak susunan aktiviti harian pelajar',
+        spanClass: ENABLE_IKRAR_CARD
+          ? 'sm:col-span-2 lg:col-span-2'
+          : 'sm:col-span-2 lg:col-span-2'
+      },
+      {
+        id: 'layout',
+        icon: MapPinned,
+        title: 'Pelan Daftar',
+        desc: 'Panduan aliran kaunter pendaftaran, dewan & lokasi kemasukan.',
+        color: 'sky',
+        badge: 'Peta & Aliran',
+        spanClass: 'col-span-1'
+      },
+      {
+        id: 'memo',
+        icon: FileSignature,
+        title: 'Memo Lantikan',
+        desc: 'Rujukan surat pelantikan rasmi & dokumen edaran dalaman.',
+        color: 'blue',
+        badge: 'Rasmi',
+        spanClass: 'col-span-1'
+      },
+      {
+        id: 'ajk',
+        icon: UserCog,
+        title: 'Senarai AJK',
+        desc: 'Struktur jawatankuasa induk & pembahagian tugas biro pelaksana.',
+        color: 'emerald',
+        badge: totalAjkGroup > 0 ? `${biroList.length} Biro Aktif` : 'Jawatankuasa',
+        spanClass: 'col-span-1'
+      },
+      {
+        id: 'penutup',
+        icon: GraduationCap,
+        title: 'Majlis Penutup',
+        desc: 'Atur cara protokol & tentatif perasmian penutupan MSR.',
+        color: 'indigo',
+        badge: penutupData?.length ? `${penutupData.length} Atur Cara` : 'Protokol',
+        spanClass: 'col-span-1'
+      },
+      {
+        id: 'lagu',
+        icon: AudioLines,
+        title: 'Lirik Nyanyian',
+        desc: 'Senarai lirik lagu rasmi Negaraku, Sabah Tanah Airku & korporat JTM.',
+        color: 'violet',
+        badge: 'Audio & Lirik',
+        spanClass: ENABLE_IKRAR_CARD ? 'col-span-1' : 'sm:col-span-2 lg:col-span-2'
+      }
+    ];
+
+    if (ENABLE_IKRAR_CARD) {
+      baseCards.push({
+        id: 'ikrar',
+        icon: ShieldCheck,
+        title: 'Ikrar Pelajar',
+        desc: 'Lafaz ikrar rasmi pelajar baharu ADTEC JTM Kampus Sandakan sempena Minggu Silaturahim.',
+        color: 'amber',
+        featured: true,
+        badge: 'Wajib Lafaz',
+        metaPreview: 'Bacaan ikrar beramai-ramai semasa sesi taklimat & majlis rasmi',
+        spanClass: 'sm:col-span-1 lg:col-span-2'
+      });
+    }
+
+    return baseCards;
+  }, [totalDays, firstDayTitle, totalAjkGroup, biroList?.length, penutupData?.length]);
+
+  const completedCount = Object.values(checkedItems).filter(Boolean).length;
 
   return (
     <div className="px-4 lg:px-8 max-w-6xl mx-auto pb-32 pt-4">
+      {/* Animasi Marquee Info Kilat */}
       <style>{`
-        @keyframes seamlessMarquee { 0% { transform: translate3d(0, 0, 0); } 100% { transform: translate3d(-50%, 0, 0); } }
-        .tech-marquee-track { display: flex; width: max-content; animation: seamlessMarquee 14s linear infinite; will-change: transform; }
-        @media (min-width: 768px) { .tech-marquee-track { animation-duration: 20s; } }
-        @media (min-width: 1024px) { .tech-marquee-track { animation-duration: 25s; } }
+        @keyframes seamlessMarquee {
+          0% { transform: translate3d(0, 0, 0); }
+          100% { transform: translate3d(-50%, 0, 0); }
+        }
+        .tech-marquee-track {
+          display: flex;
+          width: max-content;
+          animation: seamlessMarquee 16s linear infinite;
+          will-change: transform;
+        }
+        @media (min-width: 768px) { .tech-marquee-track { animation-duration: 22s; } }
         .tech-marquee-track:hover { animation-play-state: paused; }
-        
-        @keyframes gradient-x {
-          0%, 100% { background-position: 0% 50%; }
-          50% { background-position: 100% 50%; }
-        }
-        .animate-gradient-x {
-          background-size: 200% 200%;
-          animation: gradient-x 4s ease infinite;
-        }
-
-        @keyframes shimmer {
-          100% { transform: translateX(100%); }
-        }
       `}</style>
 
-      {/* HERO SECTION TECH THEME */}
-      <div className="relative rounded-[2.5rem] bg-gradient-to-br from-slate-900 via-[#0a192f] to-[#020c1b] overflow-hidden shadow-2xl border border-cyan-900/30 mb-8 py-2 md:py-6 animate-in slide-in-from-bottom-6 duration-1000 fade-in">
+      {/* HERO SECTION 2026 (TIADA LANDING PAGE BERASINGAN — TERUS KE TINDAKAN UTAMA) */}
+      <section className="relative rounded-[2.5rem] bg-gradient-to-br from-slate-950 via-[#08172e] to-[#030b18] overflow-hidden shadow-[0_20px_60px_-15px_rgba(2,8,23,0.7)] border border-cyan-500/20 ring-1 ring-inset ring-white/10 mb-8">
         <NetworkAnimation />
-        <div className="absolute top-[-20%] left-[-10%] w-[50%] h-[50%] bg-cyan-600/20 rounded-full blur-[120px] pointer-events-none animate-float"></div>
-        <div className="absolute bottom-[-20%] right-[-10%] w-[50%] h-[50%] bg-blue-600/20 rounded-full blur-[120px] pointer-events-none animate-float-delayed"></div>
+        <div className="absolute top-[-25%] left-[-10%] w-[55%] h-[55%] bg-cyan-500/20 rounded-full blur-[130px] animate-float pointer-events-none" />
+        <div className="absolute bottom-[-25%] right-[-10%] w-[50%] h-[50%] bg-blue-600/20 rounded-full blur-[130px] animate-float-delayed pointer-events-none" />
 
-        <div className="relative z-20 px-6 py-8 md:px-12 md:py-16 flex flex-col lg:flex-row items-center justify-between gap-8 md:gap-10">
-          <div className="w-full lg:w-3/5 space-y-5 text-center lg:text-left">
+        <div className="relative z-20 px-6 py-8 md:px-12 md:py-14 flex flex-col lg:flex-row items-center justify-between gap-8 md:gap-10">
+          <div className="w-full lg:w-3/5 space-y-6 text-center lg:text-left">
             
-            {/* BOARD INFO KILAT (Hanya memaparkan makluman sesi yang sedang dilihat / terkini) */}
-            <div className={`flex ${isAdmin ? 'flex-col items-start gap-4' : 'items-center gap-3'} px-4 py-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 backdrop-blur-md text-amber-400 text-xs md:text-sm font-semibold w-full overflow-hidden shadow-inner`}>
-              <span className="flex items-center gap-1.5 bg-amber-500 text-slate-950 px-2 py-0.5 rounded-md text-[10px] font-black tracking-wider shrink-0 uppercase relative z-10">
-                <Bell size={12} className="shrink-0 animate-bounce" /> INFO KILAT {isAdmin && `(${announcements.length})`}
+            {/* BOARD INFO KILAT */}
+            <div
+              className={`flex ${
+                isAdmin ? 'flex-col items-start gap-4' : 'items-center gap-3'
+              } px-3.5 py-2.5 rounded-2xl bg-amber-500/10 border border-amber-400/25 backdrop-blur-md text-amber-300 text-xs md:text-sm font-semibold w-full overflow-hidden`}
+            >
+              <span className="flex items-center gap-1.5 bg-amber-400 text-slate-950 px-2.5 py-1 rounded-lg text-[10px] font-black tracking-wider shrink-0 uppercase shadow-sm">
+                <Bell size={12} className="shrink-0 animate-bounce" />
+                INFO KILAT {isAdmin && `(${announcements.length})`}
               </span>
+
               <div className="flex-1 overflow-hidden relative w-full flex items-center">
                 {isAdmin ? (
-                  <div className="w-full flex flex-col gap-2 animate-in fade-in duration-200">
+                  <div className="w-full flex flex-col gap-2">
                     {announcements.map((item, index) => (
-                      <div key={item.id || index} className="flex items-center gap-2 bg-slate-950/40 border border-slate-800 p-1.5 rounded-lg w-full">
-                        <span className="text-[10px] font-mono text-slate-500 px-1.5">{index + 1}</span>
-                        <input type="text" value={item.text} onChange={e => { const updated = [...announcements]; updated[index].text = e.target.value; setAnnouncements(updated); }} onBlur={() => saveToFirebaseWithOffline({ announcements, latestUpdate: { view: 'home', text: 'Hebahan dikemas kini.' } })} className="flex-1 bg-transparent border-none outline-none text-white text-xs md:text-sm" placeholder="Tulis pengumuman kilat sesi ini..." />
-                        <button onClick={() => { const updated = announcements.filter((_, i) => i !== index); setAnnouncements(updated); saveToFirebaseWithOffline({ announcements: updated }); }} className="text-red-400 hover:text-red-500 p-1 bg-red-500/10 hover:bg-red-500/20 rounded"><X size={13} /></button>
+                      <div
+                        key={item.id || index}
+                        className="flex items-center gap-2 bg-slate-950/60 border border-slate-800 p-1.5 rounded-xl w-full"
+                      >
+                        <span className="text-[10px] font-mono text-slate-400 px-1.5">
+                          {index + 1}
+                        </span>
+                        <input
+                          type="text"
+                          value={item.text}
+                          onChange={(e) => {
+                            const updated = [...announcements];
+                            updated[index].text = e.target.value;
+                            setAnnouncements(updated);
+                          }}
+                          onBlur={() =>
+                            saveToFirebaseWithOffline({
+                              announcements,
+                              latestUpdate: {
+                                view: 'home',
+                                text: 'Senarai maklumat hebahan utama telah dikemas kini.'
+                              }
+                            })
+                          }
+                          className="flex-1 bg-transparent border-none outline-none text-white text-xs md:text-sm"
+                          placeholder="Tulis pengumuman kilat di sini..."
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const updated = announcements.filter((_, i) => i !== index);
+                            setAnnouncements(updated);
+                            saveToFirebaseWithOffline({
+                              announcements: updated,
+                              latestUpdate: {
+                                view: 'home',
+                                text: 'Satu rekod maklumat hebahan telah dipadam.'
+                              }
+                            });
+                          }}
+                          className="text-red-400 hover:text-red-300 p-1.5 bg-red-500/10 hover:bg-red-500/20 rounded-lg"
+                        >
+                          <X size={13} />
+                        </button>
                       </div>
                     ))}
-                    <button onClick={() => setAnnouncements([...announcements, { id: 'ann_' + Date.now(), text: '' }])} className="text-[11px] bg-amber-500 hover:bg-amber-600 text-slate-950 px-3 py-1.5 rounded-lg font-black tracking-wide mt-1 self-start flex items-center gap-1 shadow"><Plus size={12} /> Tambah Hebahan</button>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setAnnouncements([
+                          ...announcements,
+                          { id: 'ann_' + Date.now(), text: '' }
+                        ])
+                      }
+                      className="text-[11px] bg-amber-400 hover:bg-amber-300 text-slate-950 px-3 py-1.5 rounded-xl font-black tracking-wide mt-1 self-start flex items-center gap-1 shadow"
+                    >
+                      <Plus size={12} /> Tambah Hebahan Baru
+                    </button>
                   </div>
                 ) : (
-                  <div className="tech-marquee-track font-bold text-amber-300/90 tracking-wide gap-12 whitespace-nowrap">
-                    <div className="flex items-center gap-3 shrink-0 whitespace-nowrap"><span>{compiledText}</span><span className="text-amber-500/60 font-black shrink-0 ml-4">•</span></div>
-                    <div className="flex items-center gap-3 shrink-0 whitespace-nowrap" aria-hidden="true"><span>{compiledText}</span><span className="text-amber-500/60 font-black shrink-0 ml-4">•</span></div>
+                  <div className="tech-marquee-track font-semibold text-amber-200/95 tracking-wide gap-12 whitespace-nowrap">
+                    <div className="flex items-center gap-3 shrink-0 whitespace-nowrap">
+                      <span>{compiledText}</span>
+                      <span className="text-amber-400/60 font-black shrink-0 ml-4">•</span>
+                    </div>
+                    <div
+                      className="flex items-center gap-3 shrink-0 whitespace-nowrap"
+                      aria-hidden="true"
+                    >
+                      <span>{compiledText}</span>
+                      <span className="text-amber-400/60 font-black shrink-0 ml-4">•</span>
+                    </div>
                   </div>
                 )}
               </div>
             </div>
 
-            <div className="space-y-3">
-              {/* BARIS LENCANA SESI & BUTANG ARKIB SESI */}
-              <div className="flex flex-wrap items-center justify-center lg:justify-start gap-2.5">
-                <div className={`inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full border text-[10px] md:text-xs font-black tracking-[0.18em] uppercase shadow-inner ${isViewingArchive ? 'bg-amber-500/20 border-amber-400/40 text-amber-200' : 'bg-cyan-500/20 border-cyan-400/30 text-cyan-200'}`}>
-                  <Cpu size={13} className={isViewingArchive ? 'text-amber-400' : 'text-cyan-400'}/>
-                  <span>Kemasukan {sesiKemasukan.sesi} / {sesiKemasukan.tahun}</span>
-                  {!isViewingArchive && (
-                    <span className="bg-emerald-500 text-slate-950 px-1.5 py-0.5 rounded text-[9px] font-black tracking-normal ml-1">TERKINI</span>
-                  )}
-                </div>
-
-                {/* Butang Buka Senarai Sesi / Arkib untuk User & Admin */}
-                <button 
-                  onClick={() => {
-                    setNewSesiDraft({ sesi: activeSession.sesi, tahun: activeSession.tahun });
-                    setShowArchiveModal(true);
-                  }}
-                  className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-white/10 hover:bg-white/20 border border-white/20 text-white text-[10px] md:text-xs font-bold tracking-wider uppercase transition-all active:scale-95 backdrop-blur-md shadow-sm"
-                >
-                  <History size={13} className="text-cyan-400" />
-                  <span>{isAdmin ? 'Urus / Tukar Sesi' : `Arkib Sesi (${availableSessions.length})`}</span>
-                </button>
+            {/* TAJUK HERO & LENCANA SESI */}
+            <div className="space-y-3.5">
+              <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-cyan-500/15 border border-cyan-400/30 text-cyan-200 text-[11px] font-black tracking-[0.18em] uppercase">
+                <Cpu size={13} className="text-cyan-400" />
+                {isAdmin ? (
+                  <div className="flex items-center gap-2">
+                    <span>Sesi:</span>
+                    <select
+                      value={sesiKemasukan.sesi}
+                      onChange={(e) => {
+                        const updated = { ...sesiKemasukan, sesi: e.target.value };
+                        setSesiKemasukan(updated);
+                        saveToFirebaseWithOffline({ sesiKemasukan: updated });
+                      }}
+                      className="bg-transparent outline-none text-white font-bold border-b border-cyan-400/50"
+                    >
+                      <option value="1" className="text-slate-950">1</option>
+                      <option value="2" className="text-slate-950">2</option>
+                    </select>
+                    <span>/</span>
+                    <select
+                      value={sesiKemasukan.tahun}
+                      onChange={(e) => {
+                        const updated = { ...sesiKemasukan, tahun: e.target.value };
+                        setSesiKemasukan(updated);
+                        saveToFirebaseWithOffline({ sesiKemasukan: updated });
+                      }}
+                      className="bg-transparent outline-none text-white font-bold border-b border-cyan-400/50"
+                    >
+                      {[...Array(10)].map((_, i) => {
+                        const year = (2025 + i).toString();
+                        return (
+                          <option key={year} value={year} className="text-slate-950">
+                            {year}
+                          </option>
+                        );
+                      })}
+                    </select>
+                  </div>
+                ) : (
+                  <span>Kemasukan Sesi {sesiKemasukan.sesi} / {sesiKemasukan.tahun}</span>
+                )}
               </div>
-              
-              <h1 className="text-4xl md:text-5xl lg:text-[4rem] font-black text-white tracking-tight leading-[1.1] drop-shadow-lg">
-                Minggu<br/>
-                <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-blue-500 to-cyan-400 animate-gradient-x inline-block">
+
+              <h1 className="text-4xl md:text-5xl lg:text-[3.75rem] font-black text-white tracking-tight leading-[1.08]">
+                Minggu{' '}
+                <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-300 via-sky-400 to-blue-500">
                   Silaturahim
                 </span>
               </h1>
-              <p className="text-sm md:text-base text-slate-300/90 font-medium max-w-lg mx-auto lg:mx-0 leading-relaxed">
-                Portal rasmi Pendaftaran dan Minggu Silaturahim Pelajar (MSR) baharu ADTEC JTM Kampus Sandakan.
+
+              <p className="text-sm md:text-base text-slate-300/90 font-medium max-w-xl mx-auto lg:mx-0 leading-relaxed">
+                Hab digital sehenti pendaftaran, jadual orientasi, dan maklumat operasi pelajar baharu ADTEC JTM Kampus Sandakan.
               </p>
             </div>
+
+            {/* QUICK ACTION BUTTONS (Pengganti fungsi Landing Page) */}
+            <div className="flex flex-wrap items-center justify-center lg:justify-start gap-3 pt-1">
+              <button
+                type="button"
+                onClick={() => navigateTo('jadual')}
+                className="inline-flex items-center gap-2 px-5 py-3 rounded-2xl bg-gradient-to-r from-cyan-400 to-blue-500 hover:from-cyan-300 hover:to-blue-400 text-slate-950 font-black text-xs md:text-sm shadow-lg shadow-cyan-500/25 transition-all duration-200 hover:-translate-y-0.5"
+              >
+                <CalendarClock size={16} />
+                <span>Semak Jadual Hari Ini</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => navigateTo('layout')}
+                className="inline-flex items-center gap-2 px-5 py-3 rounded-2xl bg-white/10 hover:bg-white/15 border border-white/20 text-white font-bold text-xs md:text-sm backdrop-blur-md transition-all duration-200"
+              >
+                <MapPinned size={16} className="text-cyan-300" />
+                <span>Pelan Kaunter Daftar</span>
+              </button>
+
+              <a
+                href="https://maps.google.com/?q=ADTEC+Sandakan"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 px-4 py-3 rounded-2xl bg-slate-900/60 hover:bg-slate-900 border border-slate-700/80 text-slate-200 font-semibold text-xs md:text-sm transition-all duration-200"
+              >
+                <Navigation size={14} className="text-emerald-400" />
+                <span>Lokasi Kampus</span>
+              </a>
+            </div>
           </div>
 
+          {/* WIDGET JAM MASA NYATA GLASS 2026 */}
           <div className="w-full lg:w-2/5 flex justify-center lg:justify-end">
-            <div className="relative w-full max-w-[18rem]">
-              <div className="absolute inset-0 bg-gradient-to-r from-cyan-600 to-blue-600 rounded-[2rem] blur-2xl opacity-40 animate-pulse"></div>
-              <div className="relative bg-white/10 backdrop-blur-2xl border border-white/20 p-6 md:p-8 rounded-[2rem] shadow-xl text-center transform hover:scale-[1.02] transition-transform duration-500">
-                 <p className="text-cyan-200/80 text-[10px] font-bold uppercase tracking-[0.3em] mb-2">Waktu Semasa</p>
-                 <LiveClock />
-                 <div className="mt-6 pt-4 border-t border-white/10 flex items-center justify-center gap-1.5 text-xs md:text-sm font-semibold text-white tracking-wide"><CalendarClock size={14} className="text-cyan-400" /><span>{formatTarikh(new Date().toISOString().split('T')[0])}</span></div>
+            <div className="relative w-full max-w-[19rem]">
+              <div className="absolute inset-0 bg-gradient-to-tr from-cyan-500/30 to-blue-600/30 rounded-[2.2rem] blur-2xl pointer-events-none" />
+              <div className="relative bg-white/[0.08] backdrop-blur-2xl border border-white/20 ring-1 ring-inset ring-white/10 p-6 md:p-8 rounded-[2.2rem] shadow-2xl text-center">
+                <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-400/15 border border-emerald-400/30 text-emerald-300 text-[10px] font-bold uppercase tracking-widest mb-3">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
+                  Sistem Aktif
+                </div>
+                <LiveClock />
+                <div className="mt-5 pt-4 border-t border-white/10 flex items-center justify-center gap-2 text-xs md:text-sm font-semibold text-slate-100">
+                  <CalendarClock size={14} className="text-cyan-400" />
+                  <span>{formatTarikh(new Date().toISOString().split('T')[0])}</span>
+                </div>
               </div>
             </div>
           </div>
         </div>
+      </section>
+
+      {/* HEADER SEKSYEN MODUL */}
+      <div className="flex items-center justify-between mb-4 px-1">
+        <div>
+          <h2 className="text-base md:text-lg font-black text-slate-800 dark:text-slate-100 tracking-tight">
+            Modul Utama Portal
+          </h2>
+          <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">
+            Pilih modul di bawah untuk akses pantas dokumen dan maklumat MSR
+          </p>
+        </div>
+        <span className="hidden sm:inline-flex items-center px-3 py-1 rounded-full text-[11px] font-bold bg-slate-200/70 dark:bg-slate-800/80 text-slate-600 dark:text-slate-300">
+          {moduleCards.length} Modul Tersedia
+        </span>
       </div>
 
-      {/* MODAL PEMILIH ARKIB SESI & KAWALAN SESI BARU ADMIN */}
-      {showArchiveModal && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-md animate-in fade-in duration-200" onClick={() => setShowArchiveModal(false)}>
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl max-w-md w-full p-6 shadow-2xl relative animate-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
-            <button onClick={() => setShowArchiveModal(false)} className="absolute top-5 right-5 p-2 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-slate-800 dark:hover:text-white transition-colors">
-              <X size={16} />
-            </button>
+      {/* BENTO GRID 2026 (SEIMBANG PENUH UNTUK 7 ATAU 6 KAD) */}
+      <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-5 mb-8">
+        {moduleCards.map((item) => (
+          <BentoCard key={item.id} item={item} onClick={navigateTo} />
+        ))}
+      </section>
 
-            <div className="flex items-center gap-3 mb-5">
-              <div className="p-3 rounded-2xl bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border border-cyan-500/20">
-                <History size={22} />
-              </div>
-              <div>
-                <h3 className="text-lg font-black text-slate-800 dark:text-white">Senarai Sesi Kemasukan</h3>
-                <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">Pilih sesi untuk melihat maklumat & dokumen</p>
-              </div>
-            </div>
-
-            {/* Senarai Sesi Sedia Ada (Terkini & Arkib) */}
-            <div className="space-y-2.5 max-h-60 overflow-y-auto custom-scrollbar pr-1 mb-5">
-              {availableSessions.map((item, idx) => {
-                const isCurrentActive = item.sesi === activeSession.sesi && item.tahun === activeSession.tahun;
-                const isCurrentlyViewing = item.sesi === sesiKemasukan.sesi && item.tahun === sesiKemasukan.tahun;
-
-                return (
-                  <button
-                    key={`${item.sesi}_${item.tahun}_${idx}`}
-                    onClick={() => {
-                      if (onSwitchViewSession) onSwitchViewSession(item);
-                      setShowArchiveModal(false);
-                    }}
-                    className={`w-full flex items-center justify-between p-3.5 rounded-2xl border text-left transition-all ${
-                      isCurrentlyViewing 
-                        ? 'bg-cyan-50 dark:bg-cyan-950/40 border-cyan-400 dark:border-cyan-500/60 shadow-sm' 
-                        : 'bg-slate-50 dark:bg-slate-800/50 border-slate-200/70 dark:border-slate-700/60 hover:border-cyan-300'
-                    }`}
-                  >
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="font-black text-sm text-slate-800 dark:text-white">
-                          Sesi {item.sesi} / {item.tahun}
-                        </span>
-                        {isCurrentActive ? (
-                          <span className="bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 px-2 py-0.5 rounded-full text-[10px] font-black uppercase">
-                            Sesi Terkini
-                          </span>
-                        ) : (
-                          <span className="bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase">
-                            Arkib
-                          </span>
-                        )}
-                      </div>
-                      <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
-                        {isCurrentActive ? 'Paparan utama semasa pelajar baharu' : 'Klik untuk semak rekod sesi terdahulu'}
-                      </p>
-                    </div>
-                    {isCurrentlyViewing && <CheckCircle2 size={18} className="text-cyan-600 dark:text-cyan-400 shrink-0" />}
-                  </button>
-                );
-              })}
-            </div>
-
-            {/* PANEL KHAS ADMIN: AKTIFKAN SESI BAHARU */}
-            {isAdmin && (
-              <div className="pt-4 border-t border-slate-200 dark:border-slate-800">
-                <div className="flex items-center gap-1.5 text-xs font-black text-cyan-600 dark:text-cyan-400 uppercase tracking-wider mb-3">
-                  <Sparkles size={14} /> Tetapkan Sesi Terkini Rasmi (Admin)
-                </div>
-                <p className="text-[11px] text-slate-500 dark:text-slate-400 mb-3 leading-relaxed">
-                  Menukar sesi terkini akan memulakan ruang baharu yang bersih untuk sesi tersebut. Semua maklumat sesi terdahulu <strong>kekal tersimpan di dalam Arkib</strong>.
-                </p>
-                <div className="flex items-center gap-2 mb-3">
-                  <select 
-                    value={newSesiDraft.sesi} 
-                    onChange={e => setNewSesiDraft({ ...newSesiDraft, sesi: e.target.value })}
-                    className="flex-1 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 dark:text-white outline-none"
-                  >
-                    <option value="1">Sesi 1</option>
-                    <option value="2">Sesi 2</option>
-                  </select>
-                  <select 
-                    value={newSesiDraft.tahun} 
-                    onChange={e => setNewSesiDraft({ ...newSesiDraft, tahun: e.target.value })}
-                    className="flex-1 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 dark:text-white outline-none"
-                  >
-                    {[...Array(10)].map((_, i) => (
-                      <option key={i} value={(2025 + i).toString()}>{2025 + i}</option>
-                    ))}
-                  </select>
-                </div>
-                <button
-                  onClick={() => {
-                    if (onSetOfficialSession) onSetOfficialSession(newSesiDraft);
-                    setShowArchiveModal(false);
-                  }}
-                  className="w-full bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 text-white font-black text-xs py-2.5 rounded-xl shadow-md transition-transform active:scale-95"
-                >
-                  Jadikan Sesi {newSesiDraft.sesi}/{newSesiDraft.tahun} Sebagai Sesi Terkini
-                </button>
-              </div>
-            )}
+      {/* WIDGET PERSEDIAAN PANTAS PELAJAR BAHARU (LOCALSTORAGE INTERAKTIF) */}
+      <section className="rounded-[2rem] bg-white/75 dark:bg-slate-900/60 backdrop-blur-2xl border border-slate-200/80 dark:border-slate-800/90 ring-1 ring-inset ring-white/80 dark:ring-white/[0.06] p-6 md:p-7 shadow-sm">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
+          <div>
+            <h3 className="text-sm md:text-base font-black text-slate-900 dark:text-white">
+              Senarai Semak Pantas Hari Pendaftaran
+            </h3>
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              Tandakan persediaan anda (disimpan secara automatik pada telefon ini)
+            </p>
           </div>
+          <span className="self-start sm:self-auto px-3 py-1 rounded-full text-xs font-extrabold bg-cyan-500/10 text-cyan-700 dark:text-cyan-300 border border-cyan-500/20">
+            {completedCount} / {DEFAULT_CHECKLIST.length} Selesai
+          </span>
         </div>
-      )}
 
-      {/* GRID KAD MENU */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-        {[
-          { id: 'memo', icon: FileSignature, title: 'Memo Lantikan', desc: 'Rujukan surat pelantikan rasmi', color: 'blue' },
-          { id: 'ajk', icon: UserCog, title: 'Senarai AJK', desc: 'Struktur jawatankuasa & biro pelaksana', color: 'emerald' },
-          { id: 'jadual', icon: CalendarClock, title: 'Jadual MSR', desc: 'Tentatif program & aktiviti harian terperinci', color: 'cyan' },
-          { id: 'penutup', icon: GraduationCap, title: 'Majlis Penutup', desc: 'Atur cara & protokol majlis penutupan rasmi', color: 'indigo' },
-          { id: 'layout', icon: MapPinned, title: 'Pelan Daftar', desc: 'Panduan susun atur kaunter & pelan dewan', color: 'sky' },
-          { id: 'lagu', icon: AudioLines, title: 'Lirik Nyanyian', desc: 'Nyanyian lagu korporat & aspirasi JTM', color: 'violet' },
-          { id: 'ikrar', icon: HandHeart, title: 'Ikrar Pelajar', desc: 'Lafaz ikrar rasmi pelajar baharu', color: 'rose' } 
-        ].map((item, index) => {
-          const style = cardStyles[item.color];
-          return (
-            <button 
-              key={item.id} 
-              onClick={() => navigateTo(item.id)} 
-              style={{ animationFillMode: 'both', animationDelay: `${index * 120}ms` }}
-              className={`relative group overflow-hidden bg-white/90 dark:bg-slate-900/80 backdrop-blur-md p-6 rounded-[2rem] border border-slate-200/70 dark:border-slate-800/80 shadow-[0_4px_20px_rgba(0,0,0,0.02)] hover:-translate-y-2 ${style.glow} transition-all duration-500 text-left flex flex-col justify-between min-h-[175px] focus:outline-none animate-in fade-in slide-in-from-bottom-8`} 
-              aria-label={`Buka bahagian ${item.title}`}
-            >
-              <div className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/40 dark:via-white/10 to-transparent group-hover:animate-[shimmer_1.2s_ease-in-out_infinite] pointer-events-none z-20"></div>
-
-              <div className={`absolute -right-6 -bottom-10 pointer-events-none transform rotate-12 transition-all duration-700 ease-out group-hover:rotate-6 group-hover:scale-110 ${style.watermark}`}>
-                <item.icon size={150} strokeWidth={1} />
-              </div>
-
-              <div className="flex justify-between items-center relative z-10 w-full">
-                <div className={`p-3.5 rounded-2xl border ${style.iconBg} ${style.iconBorder} shadow-sm group-hover:scale-110 group-hover:rotate-3 transition-transform duration-500`}><item.icon size={22} strokeWidth={2} className={style.iconText} /></div>
-                <div className={`p-2 rounded-xl bg-slate-50 dark:bg-slate-800/80 border border-slate-100 dark:border-slate-700/50 shadow-sm opacity-60 group-hover:opacity-100 group-hover:translate-x-1 group-hover:bg-white dark:group-hover:bg-slate-700 transition-all duration-300`}><ChevronRight size={14} className={style.iconText} /></div>
-              </div>
-
-              <div className="relative z-10 mt-6 w-full transform transition-transform duration-500 group-hover:translate-x-1">
-                <h3 className="text-base md:text-lg font-black text-slate-800 dark:text-slate-100 tracking-tight transition-colors duration-300">{item.title}</h3>
-                
-                {item.id === 'penutup' && (isAdmin || tarikhPenutup) ? (
-                  <div className="mt-3 w-full" onClick={(e) => { if(isAdmin) { e.preventDefault(); e.stopPropagation(); } }}>
-                    {isAdmin ? (
-                      <div className="flex flex-col gap-1 w-full bg-indigo-50/50 dark:bg-indigo-900/20 p-2 rounded-xl border border-indigo-200 dark:border-indigo-500/30">
-                        <label className="text-[10px] text-indigo-600 dark:text-indigo-400 font-bold uppercase tracking-widest pl-1">Pilih Tarikh:</label>
-                        <input 
-                          type="date" 
-                          value={tarikhPenutup || ''} 
-                          onChange={e => setTarikhPenutup(e.target.value)} 
-                          onBlur={() => saveToFirebaseWithOffline({ tarikhPenutup, latestUpdate: { view: 'home', text: 'Tarikh Majlis Penutup dikemas kini.' } })} 
-                          className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-white text-xs font-bold px-3 py-2 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 w-full cursor-pointer shadow-sm" 
-                        />
-                      </div>
-                    ) : (
-                      <div className="inline-flex items-center gap-1.5 bg-gradient-to-r from-indigo-500 to-purple-600 text-white px-3 py-1.5 rounded-full shadow-[0_0_15px_rgba(99,102,241,0.4)] border border-indigo-400/50 hover:scale-105 transition-transform duration-300 mt-1">
-                        <CalendarClock size={14} className="animate-pulse" />
-                        <span className="text-[11px] font-bold tracking-wide">{formatTarikh(tarikhPenutup)}</span>
-                      </div>
-                    )}
-                  </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          {DEFAULT_CHECKLIST.map((item) => {
+            const done = !!checkedItems[item.id];
+            return (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => toggleCheck(item.id)}
+                className={`flex items-center gap-3 p-3.5 rounded-2xl border text-left transition-all duration-200 ${
+                  done
+                    ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-800 dark:text-emerald-200'
+                    : 'bg-slate-50/80 dark:bg-slate-800/40 border-slate-200/70 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:border-cyan-400/50'
+                }`}
+              >
+                {done ? (
+                  <CheckCircle2 size={18} className="text-emerald-500 shrink-0" />
                 ) : (
-                  <p className="text-xs text-slate-400 dark:text-slate-500 font-bold mt-1 line-clamp-1 leading-relaxed">{item.desc}</p>
+                  <Circle size={18} className="text-slate-400 shrink-0" />
                 )}
-              </div>
-            </button>
-          );
-        })}
-      </div>
+                <span className={`text-xs md:text-sm font-semibold ${done ? 'line-through opacity-80' : ''}`}>
+                  {item.label}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </section>
     </div>
   );
 }
