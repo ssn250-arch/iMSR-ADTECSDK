@@ -24,8 +24,7 @@ import JadualView from './components/views/JadualView';
 import PenutupView from './components/views/PenutupView';
 import LayoutView from './components/views/LayoutView';
 import LaguView from './components/views/LaguView';
-// Nyah-komen baris di bawah jika IkrarView.js sudah ada dalam projek anda:
-// import IkrarView from './components/views/IkrarView';
+import IkrarView from './components/views/IkrarView';
 
 const GlobalStyles = React.memo(() => (
   <style>
@@ -92,6 +91,7 @@ export default function App() {
   const [lastUpdated, setLastUpdated] = useState(null);
   const [announcements, setAnnouncements] = useState([]);
   const [sesiKemasukan, setSesiKemasukan] = useState({ sesi: '2', tahun: '2026' });
+  const [tarikhPenutup, setTarikhPenutup] = useState('');
   const [memoText, setMemoText] = useState('');
   const [memoList, setMemoList] = useState([]);
   const [ajkInduk, setAjkInduk] = useState([]);
@@ -104,11 +104,13 @@ export default function App() {
   const [jadualFileDate, setJadualFileDate] = useState(null);
   const [penutupFile, setPenutupFile] = useState(null);
   const [penutupFileDate, setPenutupFileDate] = useState(null);
+  const [ikrarFile, setIkrarFile] = useState(null);
+  const [ikrarFileDate, setIkrarFileDate] = useState(null);
 
   const hasCheckedUpdates = useRef(false);
   const [showOfflineBanner, setShowOfflineBanner] = useState(false);
 
-  // --- LOGIK DETECT & PROMPT INSTALASI PWA (ANDROID TARGET) ---
+  // --- PWA ANDROID PROMPT ---
   useEffect(() => {
     const handleBeforeInstallPrompt = (e) => {
       e.preventDefault();
@@ -185,7 +187,7 @@ export default function App() {
     }
   };
 
-  // --- 1. FAST CORE DATA SYNC (Hanya muat turun teks utama semasa mula dibuka) ---
+  // --- 1. FAST CORE DATA SYNC ---
   useEffect(() => {
     const cachedData = localStorage.getItem('imsr_cached_data');
     if (cachedData) {
@@ -194,6 +196,7 @@ export default function App() {
         if (data.lastUpdated) setLastUpdated(data.lastUpdated);
         if (data.announcements) setAnnouncements(data.announcements);
         if (data.sesiKemasukan) setSesiKemasukan(data.sesiKemasukan);
+        if (data.tarikhPenutup !== undefined) setTarikhPenutup(data.tarikhPenutup);
         if (data.memoText !== undefined) setMemoText(data.memoText);
         if (data.ajkInduk) setAjkInduk(data.ajkInduk);
         if (data.biroList) setBiroList(data.biroList);
@@ -202,12 +205,10 @@ export default function App() {
           setJadualData(data.jadualData);
           setActiveJadualTab((prev) => prev || (data.jadualData.length > 0 ? data.jadualData[0].id : ''));
         }
-        // Buka terus dari cache dengan pantas
         setTimeout(() => setIsAppReady(true), 350);
       } catch (e) {}
     }
 
-    // Fallback keselamatan jika tiada internet / cache kosong
     const readyFallback = setTimeout(() => setIsAppReady(true), 1200);
 
     const unsubscribeUtama = onSnapshot(doc(db, 'msr', 'data_utama'), (docSnap) => {
@@ -216,6 +217,7 @@ export default function App() {
         localStorage.setItem('imsr_cached_data', JSON.stringify(data));
         if (data.lastUpdated) setLastUpdated(data.lastUpdated);
         if (data.latestUpdate) setLatestUpdateInfo(data.latestUpdate);
+        if (data.tarikhPenutup !== undefined) setTarikhPenutup(data.tarikhPenutup);
 
         if (data.announcements !== undefined) {
           setAnnouncements(data.announcements);
@@ -242,7 +244,7 @@ export default function App() {
     };
   }, []);
 
-  // --- 2. LAZY FIREBASE LISTENERS (Muat turun fail Base64 berat HANYA bila modul dibuka) ---
+  // --- 2. LAZY FIREBASE LISTENERS (TERMASUK DATA_IKRAR_FILE) ---
   useEffect(() => {
     let unsub = null;
 
@@ -277,6 +279,16 @@ export default function App() {
           setPenutupFileDate(null);
         }
       });
+    } else if (currentView === 'ikrar') {
+      unsub = onSnapshot(doc(db, 'msr', 'data_ikrar_file'), (docSnap) => {
+        if (docSnap.exists() && docSnap.data().fileData) {
+          setIkrarFile(docSnap.data().fileData);
+          setIkrarFileDate(docSnap.data().uploadDate || null);
+        } else {
+          setIkrarFile(null);
+          setIkrarFileDate(null);
+        }
+      });
     }
 
     return () => {
@@ -284,7 +296,7 @@ export default function App() {
     };
   }, [currentView]);
 
-  // --- SEMAK KEMAS KINI BAHARU UNTUK TOAST ---
+  // --- TOAST KEMAS KINI ---
   useEffect(() => {
     if (isAppReady && lastUpdated && !hasCheckedUpdates.current) {
       const lastVisit = localStorage.getItem('imsr_last_visit');
@@ -314,7 +326,7 @@ export default function App() {
     }
   }, []);
 
-  // --- UPLOAD HANDLERS ---
+  // --- UPLOAD & DELETE HANDLERS ---
   const handleDocumentUpload = (e) => {
     const file = e.target.files[0];
     if (file) {
@@ -398,6 +410,33 @@ export default function App() {
     }
   };
 
+  const handleIkrarFileUpload = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = async (ev) => {
+        try {
+          await setDoc(doc(db, 'msr', 'data_ikrar_file'), {
+            fileData: ev.target.result,
+            uploadDate: new Date().toISOString()
+          });
+          saveToFirebaseWithOffline({
+            latestUpdate: { view: 'ikrar', text: 'Dokumen Lafaz Ikrar Pelajar dikemas kini.' }
+          });
+        } catch (error) {
+          alert('Gagal muat naik dokumen ikrar (pastikan saiz fail bawah 900KB).');
+        }
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleDeleteIkrarFile = async () => {
+    if (window.confirm('Padam dokumen rasmi ikrar ini?')) {
+      await setDoc(doc(db, 'msr', 'data_ikrar_file'), { fileData: null, uploadDate: null });
+    }
+  };
+
   // --- RENDERING ROUTER ---
   const renderView = () => {
     switch (currentView) {
@@ -410,6 +449,8 @@ export default function App() {
             saveToFirebaseWithOffline={saveToFirebaseWithOffline}
             sesiKemasukan={sesiKemasukan}
             setSesiKemasukan={setSesiKemasukan}
+            tarikhPenutup={tarikhPenutup}
+            setTarikhPenutup={setTarikhPenutup}
             navigateTo={navigateTo}
             jadualData={jadualData}
             ajkInduk={ajkInduk}
@@ -486,11 +527,37 @@ export default function App() {
         );
       case 'lagu':
         return <LaguView />;
-      // Nyah-komen jika IkrarView.js sudah wujud:
-      // case 'ikrar':
-      //   return <IkrarView />;
+      case 'ikrar':
+        return (
+          <IkrarView
+            isAdmin={isAdmin}
+            ikrarFile={ikrarFile}
+            ikrarFileDate={ikrarFileDate}
+            handleIkrarFileUpload={handleIkrarFileUpload}
+            handleDeleteIkrarFile={handleDeleteIkrarFile}
+            setViewingMemo={setViewingMemo}
+            handleDownloadBlob={handleDownloadBlob}
+            navigateTo={navigateTo}
+          />
+        );
       default:
-        return <HomeView navigateTo={navigateTo} />;
+        return (
+          <HomeView
+            isAdmin={isAdmin}
+            announcements={announcements}
+            setAnnouncements={setAnnouncements}
+            saveToFirebaseWithOffline={saveToFirebaseWithOffline}
+            sesiKemasukan={sesiKemasukan}
+            setSesiKemasukan={setSesiKemasukan}
+            tarikhPenutup={tarikhPenutup}
+            setTarikhPenutup={setTarikhPenutup}
+            navigateTo={navigateTo}
+            jadualData={jadualData}
+            ajkInduk={ajkInduk}
+            biroList={biroList}
+            penutupData={penutupData}
+          />
+        );
     }
   };
 
@@ -532,10 +599,8 @@ export default function App() {
         navigateTo={navigateTo}
       />
 
-      {/* MAIN CONTAINER DENGAN AMBIENT AURORA + TECH-GRID 2026 */}
       <div className="min-h-screen bg-[#f4f7fb] dark:bg-[#020617] font-sans text-slate-900 dark:text-slate-100 flex flex-col relative selection:bg-cyan-200 dark:selection:bg-cyan-900 overflow-x-hidden transition-colors duration-500">
-        
-        {/* Lapisan Latar Belakang 2026 (Fixed Ambient Mesh + Masked Tech Grid) */}
+        {/* Lapisan Latar Belakang 2026 */}
         <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden" aria-hidden="true">
           <div className="absolute inset-0 tech-grid-2026"></div>
           <div className="absolute -top-32 left-1/4 w-[36rem] h-[36rem] bg-cyan-400/15 dark:bg-cyan-500/10 rounded-full blur-[130px] animate-float"></div>
@@ -543,7 +608,6 @@ export default function App() {
           <div className="absolute -bottom-32 left-10 w-[28rem] h-[28rem] bg-emerald-400/10 dark:bg-teal-500/5 rounded-full blur-[130px]"></div>
         </div>
 
-        {/* Banner Simpanan Offline */}
         {showOfflineBanner && (
           <div className="relative z-50 bg-amber-500 text-slate-950 text-xs font-bold text-center py-2 px-4 shadow-md">
             Mod Luar Talian: Perubahan disimpan secara tempatan dan akan disegerakkan apabila internet kembali.
