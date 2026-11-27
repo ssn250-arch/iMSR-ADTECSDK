@@ -21,7 +21,7 @@ export default function MemoView({ isAdmin, memoList, handleDocumentUpload, setV
               <UploadCloud size={32} className="text-blue-500 mb-2 animate-pulse" />
               <span className="text-sm font-bold text-slate-700 dark:text-slate-200">Muat Naik Fail Memo Baharu</span>
               <span className="text-[10px] font-medium text-slate-500 mt-1.5 bg-white dark:bg-slate-800 px-2 py-0.5 rounded-full border border-slate-200 dark:border-slate-700 shadow-sm">Sokongan: PDF / Imej</span>
-              <input type="file" accept="application/pdf, image/*" className="hidden" onChange={handleDocumentUpload} aria-label="Muat naik fail memo" />
+              <input type="file" multiple accept="application/pdf, image/*" className="hidden" onChange={handleDocumentUpload} aria-label="Muat naik fail memo" />
             </label>
           </div>
         )}

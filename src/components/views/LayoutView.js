@@ -18,7 +18,7 @@ export default function LayoutView({ isAdmin, layoutList, handleLayoutUpload, ha
               <UploadCloud size={32} className="text-sky-500 mb-2 animate-pulse" />
               <span className="text-sm font-bold text-slate-700 dark:text-slate-200">Muat Naik Fail Pelan Baharu</span>
               <span className="text-[10px] font-medium text-slate-500 mt-1 bg-white dark:bg-slate-800 px-2 py-0.5 rounded-md shadow-sm">Sokongan: PDF / Imej</span>
-              <input type="file" accept="application/pdf, image/*" className="hidden" onChange={handleLayoutUpload} aria-label="Muat naik pelan" />
+              <input type="file" multiple accept="application/pdf, image/*" className="hidden" onChange={handleLayoutUpload} aria-label="Muat naik pelan" />
             </label>
           </div>
         )}

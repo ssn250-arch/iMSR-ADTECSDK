@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback, useTransition } from 'react';
-import { doc, onSnapshot, setDoc, collection, getDoc } from 'firebase/firestore';
+import { doc, onSnapshot, setDoc, collection, getDoc, getDocs } from 'firebase/firestore';
 import { db } from './firebase';
 
 // --- IMPORT DARI UTILS ---
@@ -90,6 +90,23 @@ const getSessionFileFromIDB = async (key) => {
   } catch (e) {
     return null;
   }
+};
+
+// --- HELPER BACA FAIL & JENIS DOKUMEN ---
+const readFileAsDataURL = (file) =>
+  new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (ev) => resolve(ev.target.result);
+    reader.onerror = (err) => reject(err);
+    reader.readAsDataURL(file);
+  });
+
+const detectFileType = (file) => {
+  const mime = (file?.type || '').toLowerCase();
+  const name = (file?.name || '').toLowerCase();
+  if (mime.includes('pdf') || name.endsWith('.pdf')) return 'pdf';
+  if (mime.startsWith('image/') || /\.(png|jpe?g|webp|gif)$/i.test(name)) return 'image';
+  return 'document';
 };
 
 const GlobalStyles = React.memo(() => (
@@ -310,12 +327,12 @@ export default function App() {
         setViewingSession((prev) => (!isConfigLoaded ? normActive : prev));
         setIsConfigLoaded(true);
       } else {
-        // Fallback kepada data_utama sedia ada jika config_sesi belum wujud
         try {
           const legacySnap = await getDoc(doc(db, 'msr', 'data_utama'));
-          const baseSession = legacySnap.exists() && legacySnap.data()?.sesiKemasukan
-            ? normalizeSession(legacySnap.data().sesiKemasukan)
-            : { sesi: '2', tahun: '2026' };
+          const baseSession =
+            legacySnap.exists() && legacySnap.data()?.sesiKemasukan
+              ? normalizeSession(legacySnap.data().sesiKemasukan)
+              : { sesi: '2', tahun: '2026' };
           const baseKey = getSessionKey(baseSession);
           setLegacySessionKey(baseKey);
           setActiveSession(baseSession);
@@ -324,7 +341,10 @@ export default function App() {
           if (navigator.onLine) {
             await setDoc(
               doc(db, 'msr', 'config_sesi'),
-              { activeSession: baseSession, sessionsList: sortSessionsDesc([baseSession, { sesi: '2', tahun: '2026' }]) },
+              {
+                activeSession: baseSession,
+                sessionsList: sortSessionsDesc([baseSession, { sesi: '2', tahun: '2026' }])
+              },
               { merge: true }
             );
           }
@@ -364,7 +384,6 @@ export default function App() {
             { merge: true }
           );
 
-          // Pastikan dokumen sesi baharu wujud supaya sedia untuk diurus
           const targetRef = doc(db, 'msr', `data_utama_${newKey}`);
           const targetSnap = await getDoc(targetRef);
           if (!targetSnap.exists()) {
@@ -431,7 +450,6 @@ export default function App() {
       setActiveJadualTab(jadualArr.length > 0 ? jadualArr[0].id : '');
     };
 
-    // Kosongkan paparan sementara sebelum memuatkan cache/Firestore sesi ini
     setAnnouncements([]);
     setTarikhPenutup('');
     setMemoText('');
@@ -457,7 +475,6 @@ export default function App() {
       } catch (e) {}
     }
 
-    // Muatkan fail & senarai dokumen dari IndexedDB mengikut sesi
     (async () => {
       const [idbJadual, idbPenutup, idbIkrar, idbLayout, idbMemos] = await Promise.all([
         getSessionFileFromIDB(`jadualFile_${currentKey}`),
@@ -488,7 +505,6 @@ export default function App() {
       if (!isCancelled) setIsAppReady(true);
     }, 1500);
 
-    // Listener Data Utama Sesi
     const unsubMain = onSnapshot(doc(db, 'msr', `data_utama_${currentKey}`), async (snap) => {
       if (isCancelled) return;
       if (snap.exists()) {
@@ -496,7 +512,6 @@ export default function App() {
         setIsAppReady(true);
         clearTimeout(safetyTimer);
       } else if (isOriginalLegacySession) {
-        // Tarik data lama asal jika sesi asal belum mempunyai dokumen berasingan
         const legacySnap = await getDoc(doc(db, 'msr', 'data_utama'));
         if (!isCancelled && legacySnap.exists()) {
           const legacyData = legacySnap.data();
@@ -515,7 +530,6 @@ export default function App() {
       }
     });
 
-    // Listener Memo Sesi
     const unsubMemos = onSnapshot(doc(db, 'msr', `data_memos_${currentKey}`), async (snap) => {
       if (isCancelled) return;
       if (snap.exists() && Array.isArray(snap.data().items)) {
@@ -525,8 +539,6 @@ export default function App() {
       } else if (isOriginalLegacySession) {
         const legacyColSnap = await getDoc(doc(db, 'msr', `data_memos_${currentKey}`));
         if (!legacyColSnap.exists()) {
-          // Baca koleksi asal msr_memos untuk sesi asal
-          const { getDocs } = await import('firebase/firestore');
           const colSnap = await getDocs(collection(db, 'msr_memos'));
           const arr = [];
           colSnap.forEach((d) => arr.push(d.data()));
@@ -539,7 +551,6 @@ export default function App() {
       }
     });
 
-    // Listener Pelan (Layout) Sesi
     const unsubLayout = onSnapshot(doc(db, 'msr', `data_layout_${currentKey}`), async (snap) => {
       if (isCancelled) return;
       if (snap.exists() && Array.isArray(snap.data().layouts)) {
@@ -556,7 +567,6 @@ export default function App() {
       }
     });
 
-    // Listener Fail Jadual Sesi
     const unsubJadualFile = onSnapshot(doc(db, 'msr', `data_jadual_file_${currentKey}`), async (snap) => {
       if (isCancelled) return;
       if (snap.exists() && snap.data().fileData) {
@@ -575,7 +585,6 @@ export default function App() {
       }
     });
 
-    // Listener Fail Majlis Penutup Sesi
     const unsubPenutupFile = onSnapshot(doc(db, 'msr', `data_penutup_file_${currentKey}`), async (snap) => {
       if (isCancelled) return;
       if (snap.exists() && snap.data().fileData) {
@@ -594,7 +603,6 @@ export default function App() {
       }
     });
 
-    // Listener Fail Ikrar Pelajar Sesi
     const unsubIkrarFile = onSnapshot(doc(db, 'msr', `data_ikrar_file_${currentKey}`), async (snap) => {
       if (isCancelled) return;
       if (snap.exists() && snap.data().fileData) {
@@ -674,59 +682,118 @@ export default function App() {
     [currentKey, activeKey, viewingSession]
   );
 
-  // --- UPLOAD & DELETE HANDLERS MENGIKUT SESI ---
-  const handleDocumentUpload = (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = async (ev) => {
-      const newMemo = {
-        id: 'memo_' + Date.now(),
-        name: file.name,
-        url: ev.target.result,
-        type: file.type.includes('pdf') ? 'pdf' : 'image',
-        uploadDate: new Date().toISOString()
-      };
-      const updatedMemos = [...memoList, newMemo];
+  // --- MULTI-FILE UPLOAD: DOKUMEN & SURAT (MEMO) ---
+  const handleDocumentUpload = async (e) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
+
+    const addedMemos = [];
+    const failedFiles = [];
+
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      if (file.size > 900 * 1024) {
+        failedFiles.push(`${file.name} (>900KB)`);
+        continue;
+      }
+      try {
+        const dataUrl = await readFileAsDataURL(file);
+        addedMemos.push({
+          id: `memo_${Date.now()}_${i}_${Math.random().toString(36).slice(2, 6)}`,
+          name: file.name,
+          url: dataUrl,
+          type: detectFileType(file),
+          uploadDate: new Date().toISOString()
+        });
+      } catch (err) {
+        failedFiles.push(file.name);
+      }
+    }
+
+    e.target.value = '';
+
+    if (addedMemos.length > 0) {
+      const updatedMemos = [...memoList, ...addedMemos];
       setMemoList(updatedMemos);
       saveSessionFileToIDB(`memoList_${currentKey}`, updatedMemos);
       try {
         await setDoc(doc(db, 'msr', `data_memos_${currentKey}`), { items: updatedMemos }, { merge: true });
         if (currentKey === '2_2026' || currentKey === legacySessionKey) {
-          await setDoc(doc(db, 'msr_memos', newMemo.id), newMemo);
+          await Promise.all(addedMemos.map((m) => setDoc(doc(db, 'msr_memos', m.id), m)));
         }
-        saveToFirebaseWithOffline({ latestUpdate: { view: 'memo', text: 'Dokumen baharu dimuat naik.' } });
+        saveToFirebaseWithOffline({
+          latestUpdate: {
+            view: 'memo',
+            text:
+              addedMemos.length === 1
+                ? '1 dokumen baharu dimuat naik.'
+                : `${addedMemos.length} dokumen baharu dimuat naik.`
+          }
+        });
       } catch (error) {
-        alert('RALAT: Gagal muat naik.');
+        alert('RALAT: Gagal menyimpan senarai dokumen (kemungkinan jumlah saiz melebihi had Firestore ~1MB).');
       }
-    };
-    reader.readAsDataURL(file);
+    }
+
+    if (failedFiles.length > 0) {
+      alert(`Beberapa fail tidak dimuat naik: ${failedFiles.join(', ')}`);
+    }
   };
 
-  const handleLayoutUpload = (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = async (ev) => {
-      const customName = window.prompt('Nama Pelan:', file.name.split('.')[0]);
-      const newLayout = {
-        id: 'layout_' + Date.now(),
-        url: ev.target.result,
-        name: customName || `Pelan_${Date.now()}`,
-        type: file.type.includes('pdf') ? 'pdf' : 'image',
-        uploadDate: new Date().toISOString()
-      };
-      const updatedLayouts = [...layoutList, newLayout];
+  // --- MULTI-FILE UPLOAD: PELAN PENDAFTARAN (LAYOUT) ---
+  const handleLayoutUpload = async (e) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
+
+    const addedLayouts = [];
+    const failedFiles = [];
+
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      if (file.size > 900 * 1024) {
+        failedFiles.push(`${file.name} (>900KB)`);
+        continue;
+      }
+      try {
+        const dataUrl = await readFileAsDataURL(file);
+        const baseName = file.name.replace(/\.[^/.]+$/, '').replace(/[_-]+/g, ' ').trim();
+        addedLayouts.push({
+          id: `layout_${Date.now()}_${i}_${Math.random().toString(36).slice(2, 6)}`,
+          url: dataUrl,
+          name: baseName || `Pelan_${i + 1}`,
+          type: detectFileType(file),
+          uploadDate: new Date().toISOString()
+        });
+      } catch (err) {
+        failedFiles.push(file.name);
+      }
+    }
+
+    e.target.value = '';
+
+    if (addedLayouts.length > 0) {
+      const updatedLayouts = [...layoutList, ...addedLayouts];
       setLayoutList(updatedLayouts);
       saveSessionFileToIDB(`layoutList_${currentKey}`, updatedLayouts);
       try {
         await setDoc(doc(db, 'msr', `data_layout_${currentKey}`), { layouts: updatedLayouts });
-        saveToFirebaseWithOffline({ latestUpdate: { view: 'layout', text: 'Pelan baharu ditambah.' } });
+        saveToFirebaseWithOffline({
+          latestUpdate: {
+            view: 'layout',
+            text:
+              addedLayouts.length === 1
+                ? '1 pelan baharu ditambah.'
+                : `${addedLayouts.length} pelan baharu ditambah.`
+          }
+        });
       } catch (error) {
-        alert('Gagal muat naik pelan.');
+        alert('Gagal menyimpan pelan (kemungkinan jumlah saiz melebihi had Firestore ~1MB).');
       }
-    };
-    reader.readAsDataURL(file);
+    }
+
+    if (failedFiles.length > 0) {
+      alert(`Beberapa fail pelan tidak dimuat naik: ${failedFiles.join(', ')}`);
+    }
   };
 
   const handleDeleteLayout = async (idToDel) => {
@@ -752,6 +819,7 @@ export default function App() {
         uploadDate
       });
       saveToFirebaseWithOffline({ latestUpdate: { view: 'jadual', text: 'Tentatif Penuh dimuat naik.' } });
+      e.target.value = '';
     };
     reader.readAsDataURL(file);
   };
@@ -770,6 +838,7 @@ export default function App() {
         uploadDate
       });
       saveToFirebaseWithOffline({ latestUpdate: { view: 'penutup', text: 'Majlis Penutup penuh dimuat naik.' } });
+      e.target.value = '';
     };
     reader.readAsDataURL(file);
   };
@@ -793,6 +862,8 @@ export default function App() {
         });
       } catch (error) {
         alert('Gagal muat naik dokumen ikrar (pastikan saiz fail bawah 900KB).');
+      } finally {
+        e.target.value = '';
       }
     };
     reader.readAsDataURL(file);
@@ -984,7 +1055,6 @@ export default function App() {
       />
 
       <div className="min-h-screen bg-[#f4f7fb] dark:bg-[#020617] font-sans text-slate-900 dark:text-slate-100 flex flex-col relative selection:bg-cyan-200 dark:selection:bg-cyan-900 overflow-x-hidden transition-colors duration-500">
-        {/* Lapisan Latar Belakang 2026 */}
         <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden" aria-hidden="true">
           <div className="absolute inset-0 tech-grid-2026"></div>
           <div className="absolute -top-32 left-1/4 w-[36rem] h-[36rem] bg-cyan-400/15 dark:bg-cyan-500/10 rounded-full blur-[130px] animate-float"></div>
@@ -1008,7 +1078,6 @@ export default function App() {
             isScrolled={isScrolled}
           />
 
-          {/* Banner Mod Arkib Apabila Pengguna / Pengajar Menyemak Sesi Lepas */}
           {isViewingArchive && (
             <div className="max-w-6xl w-full mx-auto px-4 lg:px-8 pt-2">
               <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-2.5 rounded-2xl bg-amber-500/15 border border-amber-500/30 text-amber-800 dark:text-amber-200 text-xs font-semibold backdrop-blur-md">
