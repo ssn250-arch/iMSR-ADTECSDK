@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback, useTransition } from 'react';
-import { doc, onSnapshot, setDoc, collection, getDoc, getDocs } from 'firebase/firestore';
+import { doc, onSnapshot, setDoc, deleteDoc, collection, getDoc } from 'firebase/firestore';
 import { db } from './firebase';
 
 // --- IMPORT DARI UTILS ---
@@ -92,7 +92,7 @@ const getSessionFileFromIDB = async (key) => {
   }
 };
 
-// --- HELPER BACA FAIL & JENIS DOKUMEN ---
+// --- HELPER BACA FAIL, KESAN JENIS & MAMPATAN IMEJ AUTOMATIK ---
 const readFileAsDataURL = (file) =>
   new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -107,6 +107,41 @@ const detectFileType = (file) => {
   if (mime.includes('pdf') || name.endsWith('.pdf')) return 'pdf';
   if (mime.startsWith('image/') || /\.(png|jpe?g|webp|gif)$/i.test(name)) return 'image';
   return 'document';
+};
+
+const prepareFileDataUrl = async (file) => {
+  const type = detectFileType(file);
+  const rawDataUrl = await readFileAsDataURL(file);
+
+  // Mampatkan imej besar secara automatik supaya tidak melebihi had 1MB Firestore
+  if (type === 'image' && rawDataUrl.length > 850000) {
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.onload = () => {
+        const maxDim = 1600;
+        let { width, height } = img;
+        if (width > maxDim || height > maxDim) {
+          if (width > height) {
+            height = Math.round((height * maxDim) / width);
+            width = maxDim;
+          } else {
+            width = Math.round((width * maxDim) / height);
+            height = maxDim;
+          }
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL('image/jpeg', 0.78));
+      };
+      img.onerror = () => resolve(rawDataUrl);
+      img.src = rawDataUrl;
+    });
+  }
+
+  return rawDataUrl;
 };
 
 const GlobalStyles = React.memo(() => (
@@ -407,10 +442,9 @@ export default function App() {
     [activeSession, sessionsList]
   );
 
-  // --- FUNGSI PENGGUNA / PENGAJAR: LIHAT SESI ARKIB ATAU KEMBALI KE TERKINI ---
+  // --- FUNGSI PENGGUNA: LIHAT SESI ARKIB ATAU KEMBALI KE TERKINI ---
   const handleSelectViewingSession = useCallback((sessionObj) => {
-    const norm = normalizeSession(sessionObj);
-    setViewingSession(norm);
+    setViewingSession(normalizeSession(sessionObj));
   }, []);
 
   const handleReturnToActiveSession = useCallback(() => {
@@ -450,6 +484,7 @@ export default function App() {
       setActiveJadualTab(jadualArr.length > 0 ? jadualArr[0].id : '');
     };
 
+    // Reset paparan sementara bertukar sesi
     setAnnouncements([]);
     setTarikhPenutup('');
     setMemoText('');
@@ -475,6 +510,7 @@ export default function App() {
       } catch (e) {}
     }
 
+    // Baca fail berat dari IndexedDB dengan pantas
     (async () => {
       const [idbJadual, idbPenutup, idbIkrar, idbLayout, idbMemos] = await Promise.all([
         getSessionFileFromIDB(`jadualFile_${currentKey}`),
@@ -505,6 +541,7 @@ export default function App() {
       if (!isCancelled) setIsAppReady(true);
     }, 1500);
 
+    // Listener Data Utama
     const unsubMain = onSnapshot(doc(db, 'msr', `data_utama_${currentKey}`), async (snap) => {
       if (isCancelled) return;
       if (snap.exists()) {
@@ -530,43 +567,75 @@ export default function App() {
       }
     });
 
-    const unsubMemos = onSnapshot(doc(db, 'msr', `data_memos_${currentKey}`), async (snap) => {
+    // Listener Memo: 1 Dokumen Firestore Per Fail dalam koleksi 'msr_memos' (tiada lagi had gabungan 1MB)
+    const unsubMemos = onSnapshot(collection(db, 'msr_memos'), async (snapshot) => {
       if (isCancelled) return;
-      if (snap.exists() && Array.isArray(snap.data().items)) {
-        const sorted = [...snap.data().items].sort((a, b) => String(a.id).localeCompare(String(b.id)));
-        setMemoList(sorted);
-        saveSessionFileToIDB(`memoList_${currentKey}`, sorted);
+      const map = new Map();
+
+      snapshot.forEach((docSnap) => {
+        const item = docSnap.data();
+        if (!item || !item.id) return;
+        if (item.sessionKey === currentKey || (!item.sessionKey && isOriginalLegacySession)) {
+          map.set(item.id, item);
+        }
+      });
+
+      // Sokong juga sebarang dokumen yang pernah tersimpan dalam data_memos_${currentKey} sebelum ini
+      try {
+        const oldArrayDoc = await getDoc(doc(db, 'msr', `data_memos_${currentKey}`));
+        if (oldArrayDoc.exists() && Array.isArray(oldArrayDoc.data().items)) {
+          oldArrayDoc.data().items.forEach((m) => {
+            if (m && m.id && !map.has(m.id)) {
+              map.set(m.id, m);
+            }
+          });
+        }
+      } catch (e) {}
+
+      if (isCancelled) return;
+      const sorted = Array.from(map.values()).sort((a, b) => String(a.id).localeCompare(String(b.id)));
+      setMemoList(sorted);
+      saveSessionFileToIDB(`memoList_${currentKey}`, sorted);
+    });
+
+    // Listener Layout: Metadata ringan di data_layout_${currentKey}, fail berat berasingan di msr/layout_file_${id}
+    const resolveLayouts = async (rawLayouts) => {
+      const resolved = await Promise.all(
+        rawLayouts.map(async (item) => {
+          if (item.url) return item;
+          try {
+            const fileSnap = await getDoc(doc(db, 'msr', `layout_file_${item.id}`));
+            if (fileSnap.exists() && fileSnap.data()?.url) {
+              return { ...item, url: fileSnap.data().url };
+            }
+          } catch (e) {}
+          return null;
+        })
+      );
+      return resolved.filter(Boolean);
+    };
+
+    const unsubLayout = onSnapshot(doc(db, 'msr', `data_layout_${currentKey}`), async (snap) => {
+      if (isCancelled) return;
+      if (snap.exists() && Array.isArray(snap.data().layouts)) {
+        const fullList = await resolveLayouts(snap.data().layouts);
+        if (!isCancelled) {
+          setLayoutList(fullList);
+          saveSessionFileToIDB(`layoutList_${currentKey}`, fullList);
+        }
       } else if (isOriginalLegacySession) {
-        const legacyColSnap = await getDoc(doc(db, 'msr', `data_memos_${currentKey}`));
-        if (!legacyColSnap.exists()) {
-          const colSnap = await getDocs(collection(db, 'msr_memos'));
-          const arr = [];
-          colSnap.forEach((d) => arr.push(d.data()));
-          arr.sort((a, b) => String(a.id).localeCompare(String(b.id)));
-          if (!isCancelled && arr.length > 0) {
-            setMemoList(arr);
-            saveSessionFileToIDB(`memoList_${currentKey}`, arr);
+        const legacyLayoutSnap = await getDoc(doc(db, 'msr', 'data_layout'));
+        if (!isCancelled && legacyLayoutSnap.exists() && Array.isArray(legacyLayoutSnap.data().layouts)) {
+          const fullList = await resolveLayouts(legacyLayoutSnap.data().layouts);
+          if (!isCancelled) {
+            setLayoutList(fullList);
+            saveSessionFileToIDB(`layoutList_${currentKey}`, fullList);
           }
         }
       }
     });
 
-    const unsubLayout = onSnapshot(doc(db, 'msr', `data_layout_${currentKey}`), async (snap) => {
-      if (isCancelled) return;
-      if (snap.exists() && Array.isArray(snap.data().layouts)) {
-        const list = snap.data().layouts;
-        setLayoutList(list);
-        saveSessionFileToIDB(`layoutList_${currentKey}`, list);
-      } else if (isOriginalLegacySession) {
-        const legacyLayoutSnap = await getDoc(doc(db, 'msr', 'data_layout'));
-        if (!isCancelled && legacyLayoutSnap.exists() && Array.isArray(legacyLayoutSnap.data().layouts)) {
-          const list = legacyLayoutSnap.data().layouts;
-          setLayoutList(list);
-          saveSessionFileToIDB(`layoutList_${currentKey}`, list);
-        }
-      }
-    });
-
+    // Listener Fail Jadual
     const unsubJadualFile = onSnapshot(doc(db, 'msr', `data_jadual_file_${currentKey}`), async (snap) => {
       if (isCancelled) return;
       if (snap.exists() && snap.data().fileData) {
@@ -585,6 +654,7 @@ export default function App() {
       }
     });
 
+    // Listener Fail Majlis Penutup
     const unsubPenutupFile = onSnapshot(doc(db, 'msr', `data_penutup_file_${currentKey}`), async (snap) => {
       if (isCancelled) return;
       if (snap.exists() && snap.data().fileData) {
@@ -603,6 +673,7 @@ export default function App() {
       }
     });
 
+    // Listener Fail Ikrar
     const unsubIkrarFile = onSnapshot(doc(db, 'msr', `data_ikrar_file_${currentKey}`), async (snap) => {
       if (isCancelled) return;
       if (snap.exists() && snap.data().fileData) {
@@ -682,7 +753,7 @@ export default function App() {
     [currentKey, activeKey, viewingSession]
   );
 
-  // --- MULTI-FILE UPLOAD: DOKUMEN & SURAT (MEMO) ---
+  // --- MULTI-FILE UPLOAD: DOKUMEN & SURAT (MEMO - 1 DOKUMEN PER FAIL DI msr_memos) ---
   const handleDocumentUpload = async (e) => {
     const files = Array.from(e.target.files || []);
     if (files.length === 0) return;
@@ -692,55 +763,86 @@ export default function App() {
 
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
-      if (file.size > 900 * 1024) {
-        failedFiles.push(`${file.name} (>900KB)`);
-        continue;
-      }
       try {
-        const dataUrl = await readFileAsDataURL(file);
-        addedMemos.push({
-          id: `memo_${Date.now()}_${i}_${Math.random().toString(36).slice(2, 6)}`,
+        const dataUrl = await prepareFileDataUrl(file);
+
+        // Semak saiz Base64 sebenar (had 1 dokumen Firestore = 1,048,576 bait)
+        if (dataUrl.length > 1030000) {
+          failedFiles.push(`${file.name} (saiz PDF melebihi ~750KB selepas pengekodan Base64)`);
+          continue;
+        }
+
+        const memoId = `memo_${Date.now()}_${i}_${Math.random().toString(36).slice(2, 6)}`;
+        const newMemo = {
+          id: memoId,
+          sessionKey: currentKey,
           name: file.name,
           url: dataUrl,
           type: detectFileType(file),
           uploadDate: new Date().toISOString()
-        });
+        };
+
+        await setDoc(doc(db, 'msr_memos', memoId), newMemo);
+        addedMemos.push(newMemo);
       } catch (err) {
-        failedFiles.push(file.name);
+        failedFiles.push(`${file.name} (${err?.code || err?.message || 'gagal disimpan'})`);
       }
     }
 
     e.target.value = '';
 
     if (addedMemos.length > 0) {
-      const updatedMemos = [...memoList, ...addedMemos];
-      setMemoList(updatedMemos);
-      saveSessionFileToIDB(`memoList_${currentKey}`, updatedMemos);
-      try {
-        await setDoc(doc(db, 'msr', `data_memos_${currentKey}`), { items: updatedMemos }, { merge: true });
-        if (currentKey === '2_2026' || currentKey === legacySessionKey) {
-          await Promise.all(addedMemos.map((m) => setDoc(doc(db, 'msr_memos', m.id), m)));
+      const map = new Map();
+      [...memoList, ...addedMemos].forEach((m) => map.set(m.id, m));
+      const updated = Array.from(map.values()).sort((a, b) => String(a.id).localeCompare(String(b.id)));
+      setMemoList(updated);
+      saveSessionFileToIDB(`memoList_${currentKey}`, updated);
+
+      saveToFirebaseWithOffline({
+        latestUpdate: {
+          view: 'memo',
+          text:
+            addedMemos.length === 1
+              ? '1 dokumen baharu dimuat naik.'
+              : `${addedMemos.length} dokumen baharu dimuat naik.`
         }
-        saveToFirebaseWithOffline({
-          latestUpdate: {
-            view: 'memo',
-            text:
-              addedMemos.length === 1
-                ? '1 dokumen baharu dimuat naik.'
-                : `${addedMemos.length} dokumen baharu dimuat naik.`
-          }
-        });
-      } catch (error) {
-        alert('RALAT: Gagal menyimpan senarai dokumen (kemungkinan jumlah saiz melebihi had Firestore ~1MB).');
-      }
+      });
     }
 
     if (failedFiles.length > 0) {
-      alert(`Beberapa fail tidak dimuat naik: ${failedFiles.join(', ')}`);
+      alert(`Beberapa fail tidak dapat dimuat naik:\n- ${failedFiles.join('\n- ')}`);
     }
   };
 
-  // --- MULTI-FILE UPLOAD: PELAN PENDAFTARAN (LAYOUT) ---
+  // --- PADAM DOKUMEN MEMO (SERASI DENGAN msr_memos & data_memos_${currentKey}) ---
+  const handleDeleteMemo = async (memoItem) => {
+    if (!memoItem?.id) return;
+    if (!window.confirm(`Padam dokumen "${memoItem.name}"?`)) return;
+
+    try {
+      await deleteDoc(doc(db, 'msr_memos', memoItem.id)).catch(() => {});
+
+      // Bersihkan juga jika rekod wujud dalam dokumen lama data_memos_${currentKey}
+      const oldDocRef = doc(db, 'msr', `data_memos_${currentKey}`);
+      const oldDocSnap = await getDoc(oldDocRef);
+      if (oldDocSnap.exists() && Array.isArray(oldDocSnap.data().items)) {
+        const filteredOld = oldDocSnap.data().items.filter((m) => m.id !== memoItem.id);
+        await setDoc(oldDocRef, { items: filteredOld }, { merge: true });
+      }
+
+      const updated = memoList.filter((m) => m.id !== memoItem.id);
+      setMemoList(updated);
+      saveSessionFileToIDB(`memoList_${currentKey}`, updated);
+
+      saveToFirebaseWithOffline({
+        latestUpdate: { view: 'memo', text: 'Satu dokumen telah dipadam.' }
+      });
+    } catch (err) {
+      alert(`Gagal memadam dokumen: ${err?.code || err?.message || 'ralat'}`);
+    }
+  };
+
+  // --- MULTI-FILE UPLOAD: PELAN PENDAFTARAN (1 DOKUMEN PER FAIL DI msr/layout_file_*) ---
   const handleLayoutUpload = async (e) => {
     const files = Array.from(e.target.files || []);
     if (files.length === 0) return;
@@ -750,123 +852,167 @@ export default function App() {
 
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
-      if (file.size > 900 * 1024) {
-        failedFiles.push(`${file.name} (>900KB)`);
-        continue;
-      }
       try {
-        const dataUrl = await readFileAsDataURL(file);
+        const dataUrl = await prepareFileDataUrl(file);
+        if (dataUrl.length > 1030000) {
+          failedFiles.push(`${file.name} (saiz PDF melebihi ~750KB selepas pengekodan Base64)`);
+          continue;
+        }
+
+        const layoutId = `layout_${Date.now()}_${i}_${Math.random().toString(36).slice(2, 6)}`;
         const baseName = file.name.replace(/\.[^/.]+$/, '').replace(/[_-]+/g, ' ').trim();
+        const uploadDate = new Date().toISOString();
+        const fileType = detectFileType(file);
+
+        // Simpan kandungan Base64 dalam dokumen sendiri supaya senarai pelan tidak melebihi 1MB
+        await setDoc(doc(db, 'msr', `layout_file_${layoutId}`), {
+          id: layoutId,
+          sessionKey: currentKey,
+          url: dataUrl,
+          uploadDate
+        });
+
         addedLayouts.push({
-          id: `layout_${Date.now()}_${i}_${Math.random().toString(36).slice(2, 6)}`,
+          id: layoutId,
           url: dataUrl,
           name: baseName || `Pelan_${i + 1}`,
-          type: detectFileType(file),
-          uploadDate: new Date().toISOString()
+          type: fileType,
+          uploadDate
         });
       } catch (err) {
-        failedFiles.push(file.name);
+        failedFiles.push(`${file.name} (${err?.code || err?.message || 'gagal disimpan'})`);
       }
     }
 
     e.target.value = '';
 
     if (addedLayouts.length > 0) {
-      const updatedLayouts = [...layoutList, ...addedLayouts];
-      setLayoutList(updatedLayouts);
-      saveSessionFileToIDB(`layoutList_${currentKey}`, updatedLayouts);
-      try {
-        await setDoc(doc(db, 'msr', `data_layout_${currentKey}`), { layouts: updatedLayouts });
-        saveToFirebaseWithOffline({
-          latestUpdate: {
-            view: 'layout',
-            text:
-              addedLayouts.length === 1
-                ? '1 pelan baharu ditambah.'
-                : `${addedLayouts.length} pelan baharu ditambah.`
-          }
-        });
-      } catch (error) {
-        alert('Gagal menyimpan pelan (kemungkinan jumlah saiz melebihi had Firestore ~1MB).');
-      }
+      const updatedFullLayouts = [...layoutList, ...addedLayouts];
+      setLayoutList(updatedFullLayouts);
+      saveSessionFileToIDB(`layoutList_${currentKey}`, updatedFullLayouts);
+
+      // Simpan hanya metadata ringan dalam indeks sesi (kecuali item lama yang belum dipisahkan)
+      const lightweightIndex = updatedFullLayouts.map((item) => ({
+        id: item.id,
+        name: item.name,
+        type: item.type,
+        uploadDate: item.uploadDate || new Date().toISOString()
+      }));
+
+      // Pastikan item lama yang tiada layout_file_* turut dipindahkan secara selamat
+      await Promise.all(
+        layoutList.map((existing) =>
+          existing.url
+            ? setDoc(
+                doc(db, 'msr', `layout_file_${existing.id}`),
+                { id: existing.id, sessionKey: currentKey, url: existing.url, uploadDate: existing.uploadDate || null },
+                { merge: true }
+              ).catch(() => {})
+            : Promise.resolve()
+        )
+      );
+
+      await setDoc(doc(db, 'msr', `data_layout_${currentKey}`), { layouts: lightweightIndex });
+
+      saveToFirebaseWithOffline({
+        latestUpdate: {
+          view: 'layout',
+          text:
+            addedLayouts.length === 1
+              ? '1 pelan baharu ditambah.'
+              : `${addedLayouts.length} pelan baharu ditambah.`
+        }
+      });
     }
 
     if (failedFiles.length > 0) {
-      alert(`Beberapa fail pelan tidak dimuat naik: ${failedFiles.join(', ')}`);
+      alert(`Beberapa fail pelan tidak dapat dimuat naik:\n- ${failedFiles.join('\n- ')}`);
     }
   };
 
   const handleDeleteLayout = async (idToDel) => {
-    if (window.confirm('Padam pelan ini?')) {
-      const updatedLayouts = layoutList.filter((l) => l.id !== idToDel);
-      setLayoutList(updatedLayouts);
-      saveSessionFileToIDB(`layoutList_${currentKey}`, updatedLayouts);
-      await setDoc(doc(db, 'msr', `data_layout_${currentKey}`), { layouts: updatedLayouts });
+    if (!window.confirm('Padam pelan ini?')) return;
+    const updatedLayouts = layoutList.filter((l) => l.id !== idToDel);
+    setLayoutList(updatedLayouts);
+    saveSessionFileToIDB(`layoutList_${currentKey}`, updatedLayouts);
+
+    const lightweightIndex = updatedLayouts.map((item) => ({
+      id: item.id,
+      name: item.name,
+      type: item.type,
+      uploadDate: item.uploadDate || null
+    }));
+
+    await setDoc(doc(db, 'msr', `data_layout_${currentKey}`), { layouts: lightweightIndex });
+    await deleteDoc(doc(db, 'msr', `layout_file_${idToDel}`)).catch(() => {});
+  };
+
+  const handleJadualFileUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      const dataUrl = await prepareFileDataUrl(file);
+      if (dataUrl.length > 1030000) {
+        alert('Saiz fail melebihi had ~750KB Firestore. Sila kecilkan saiz PDF terlebih dahulu.');
+        return;
+      }
+      const uploadDate = new Date().toISOString();
+      setJadualFile(dataUrl);
+      setJadualFileDate(uploadDate);
+      saveSessionFileToIDB(`jadualFile_${currentKey}`, { fileData: dataUrl, uploadDate });
+      await setDoc(doc(db, 'msr', `data_jadual_file_${currentKey}`), { fileData: dataUrl, uploadDate });
+      saveToFirebaseWithOffline({ latestUpdate: { view: 'jadual', text: 'Tentatif Penuh dimuat naik.' } });
+    } catch (err) {
+      alert(`Gagal muat naik fail jadual: ${err?.code || err?.message}`);
+    } finally {
+      e.target.value = '';
     }
   };
 
-  const handleJadualFileUpload = (e) => {
-    const file = e.target.files[0];
+  const handlePenutupFileUpload = async (e) => {
+    const file = e.target.files?.[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = async (ev) => {
-      const uploadDate = new Date().toISOString();
-      setJadualFile(ev.target.result);
-      setJadualFileDate(uploadDate);
-      saveSessionFileToIDB(`jadualFile_${currentKey}`, { fileData: ev.target.result, uploadDate });
-      await setDoc(doc(db, 'msr', `data_jadual_file_${currentKey}`), {
-        fileData: ev.target.result,
-        uploadDate
-      });
-      saveToFirebaseWithOffline({ latestUpdate: { view: 'jadual', text: 'Tentatif Penuh dimuat naik.' } });
-      e.target.value = '';
-    };
-    reader.readAsDataURL(file);
-  };
-
-  const handlePenutupFileUpload = (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = async (ev) => {
-      const uploadDate = new Date().toISOString();
-      setPenutupFile(ev.target.result);
-      setPenutupFileDate(uploadDate);
-      saveSessionFileToIDB(`penutupFile_${currentKey}`, { fileData: ev.target.result, uploadDate });
-      await setDoc(doc(db, 'msr', `data_penutup_file_${currentKey}`), {
-        fileData: ev.target.result,
-        uploadDate
-      });
-      saveToFirebaseWithOffline({ latestUpdate: { view: 'penutup', text: 'Majlis Penutup penuh dimuat naik.' } });
-      e.target.value = '';
-    };
-    reader.readAsDataURL(file);
-  };
-
-  const handleIkrarFileUpload = (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = async (ev) => {
-      const uploadDate = new Date().toISOString();
-      try {
-        setIkrarFile(ev.target.result);
-        setIkrarFileDate(uploadDate);
-        saveSessionFileToIDB(`ikrarFile_${currentKey}`, { fileData: ev.target.result, uploadDate });
-        await setDoc(doc(db, 'msr', `data_ikrar_file_${currentKey}`), {
-          fileData: ev.target.result,
-          uploadDate
-        });
-        saveToFirebaseWithOffline({
-          latestUpdate: { view: 'ikrar', text: 'Dokumen Lafaz Ikrar Pelajar dikemas kini.' }
-        });
-      } catch (error) {
-        alert('Gagal muat naik dokumen ikrar (pastikan saiz fail bawah 900KB).');
-      } finally {
-        e.target.value = '';
+    try {
+      const dataUrl = await prepareFileDataUrl(file);
+      if (dataUrl.length > 1030000) {
+        alert('Saiz fail melebihi had ~750KB Firestore. Sila kecilkan saiz PDF terlebih dahulu.');
+        return;
       }
-    };
-    reader.readAsDataURL(file);
+      const uploadDate = new Date().toISOString();
+      setPenutupFile(dataUrl);
+      setPenutupFileDate(uploadDate);
+      saveSessionFileToIDB(`penutupFile_${currentKey}`, { fileData: dataUrl, uploadDate });
+      await setDoc(doc(db, 'msr', `data_penutup_file_${currentKey}`), { fileData: dataUrl, uploadDate });
+      saveToFirebaseWithOffline({ latestUpdate: { view: 'penutup', text: 'Majlis Penutup penuh dimuat naik.' } });
+    } catch (err) {
+      alert(`Gagal muat naik fail penutup: ${err?.code || err?.message}`);
+    } finally {
+      e.target.value = '';
+    }
+  };
+
+  const handleIkrarFileUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      const dataUrl = await prepareFileDataUrl(file);
+      if (dataUrl.length > 1030000) {
+        alert('Saiz fail melebihi had ~750KB Firestore. Sila kecilkan saiz PDF terlebih dahulu.');
+        return;
+      }
+      const uploadDate = new Date().toISOString();
+      setIkrarFile(dataUrl);
+      setIkrarFileDate(uploadDate);
+      saveSessionFileToIDB(`ikrarFile_${currentKey}`, { fileData: dataUrl, uploadDate });
+      await setDoc(doc(db, 'msr', `data_ikrar_file_${currentKey}`), { fileData: dataUrl, uploadDate });
+      saveToFirebaseWithOffline({
+        latestUpdate: { view: 'ikrar', text: 'Dokumen Lafaz Ikrar Pelajar dikemas kini.' }
+      });
+    } catch (err) {
+      alert(`Gagal muat naik dokumen ikrar: ${err?.code || err?.message}`);
+    } finally {
+      e.target.value = '';
+    }
   };
 
   const handleDeleteIkrarFile = async () => {
@@ -912,6 +1058,7 @@ export default function App() {
             isAdmin={isAdmin}
             memoList={memoList}
             handleDocumentUpload={handleDocumentUpload}
+            handleDeleteMemo={handleDeleteMemo}
             setViewingMemo={setViewingMemo}
             handleDownloadBlob={handleDownloadBlob}
             memoText={memoText}

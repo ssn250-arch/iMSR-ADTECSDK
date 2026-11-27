@@ -1,53 +1,128 @@
 import React from 'react';
-import { MapPinned, UploadCloud, FileText, Image as ImageIcon, Eye, Clock, ExternalLink, Download, Trash2 } from 'lucide-react';
-import { formatDateTime } from '../../utils/helpers';
+import { Map, UploadCloud, ExternalLink, Download, Trash2, FileText } from 'lucide-react';
 
-export default function LayoutView({ isAdmin, layoutList, handleLayoutUpload, handleDeleteLayout, setViewingMemo, handleDownloadBlob }) {
+export default function LayoutView({
+  isAdmin,
+  layoutList = [],
+  handleLayoutUpload,
+  handleDeleteLayout,
+  setViewingMemo,
+  handleDownloadBlob
+}) {
   return (
-    <div className="p-4 max-w-4xl mx-auto pb-32 text-center">
-      <div className="bg-white dark:bg-slate-800 rounded-[2rem] border border-slate-200 dark:border-slate-700 p-6 md:p-10 shadow-xl text-center">
-        <div className="bg-sky-100 dark:bg-sky-900/50 w-16 h-16 md:w-20 md:h-20 mx-auto rounded-[1.5rem] flex items-center justify-center mb-5 transform rotate-3 shadow-inner border border-sky-200 dark:border-sky-800/50">
-          <MapPinned size={36} className="text-sky-600 dark:text-sky-400 -rotate-3" />
+    <div className="max-w-5xl mx-auto px-4 py-6 pb-28">
+      <div className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl rounded-3xl p-5 sm:p-7 border border-slate-200/80 dark:border-slate-800 shadow-xl">
+        <div className="flex items-center gap-3 mb-5">
+          <div className="p-2.5 rounded-2xl bg-cyan-50 dark:bg-cyan-900/30 text-cyan-600 dark:text-cyan-400">
+          </div>
+          <div>
+            <h2 className="text-xl font-extrabold text-slate-900 dark:text-white tracking-tight">
+              Pelan &amp; Susun Atur Pendaftaran
+            </h2>
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              Rujukan aliran pergerakan, lokasi kaunter pendaftaran dan pelan dewan/asrama
+            </p>
+          </div>
         </div>
-        <h3 className="text-2xl md:text-3xl font-black text-slate-800 dark:text-white mb-2 tracking-tight">Pelan Pendaftaran</h3>
-        <p className="text-slate-500 dark:text-slate-400 mb-8 text-sm md:text-base font-medium">Panduan susun atur dewan bagi melancarkan pergerakan.</p>
-        
+
         {isAdmin && (
-          <div className="mb-6 p-6 border-2 border-dashed border-sky-200 dark:border-sky-800/50 rounded-2xl bg-sky-50/50 dark:bg-sky-900/10 hover:bg-sky-50 dark:hover:bg-sky-900/20 transition-colors">
+          <div className="mb-6 border-2 border-dashed border-cyan-200 dark:border-cyan-800/60 bg-cyan-50/40 dark:bg-slate-800/40 hover:bg-cyan-50 dark:hover:bg-slate-800/70 transition-colors rounded-2xl p-6 text-center">
             <label className="cursor-pointer flex flex-col items-center">
-              <UploadCloud size={32} className="text-sky-500 mb-2 animate-pulse" />
-              <span className="text-sm font-bold text-slate-700 dark:text-slate-200">Muat Naik Fail Pelan Baharu</span>
-              <span className="text-[10px] font-medium text-slate-500 mt-1 bg-white dark:bg-slate-800 px-2 py-0.5 rounded-md shadow-sm">Sokongan: PDF / Imej</span>
-              <input type="file" multiple accept="application/pdf, image/*" className="hidden" onChange={handleLayoutUpload} aria-label="Muat naik pelan" />
+              <UploadCloud size={32} className="text-cyan-500 mb-2" />
+              <span className="text-sm font-bold text-slate-800 dark:text-slate-100">
+                Muat Naik Pelan / Gambar Baharu (Boleh Pilih Banyak)
+              </span>
+              <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400 mt-1.5 bg-white dark:bg-slate-800 px-3 py-0.5 rounded-full border border-slate-200 dark:border-slate-700 shadow-sm">
+                Sokongan: Imej (Auto-Mampat) / PDF (~750KB/fail)
+              </span>
+              <input
+                type="file"
+                multiple
+                accept="application/pdf,image/*"
+                className="hidden"
+                onChange={handleLayoutUpload}
+                aria-label="Muat naik fail pelan"
+              />
             </label>
           </div>
         )}
 
         {layoutList.length === 0 ? (
-          <div className="border-2 border-dashed border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 rounded-[1.5rem] min-h-[200px] flex flex-col items-center justify-center p-4">
-            <ImageIcon size={48} className="text-slate-300 dark:text-slate-600 mb-3" />
-            <p className="text-sm font-bold text-slate-500">Tiada fail pelan dimuat naik.</p>
+          <div className="text-center py-12 text-slate-400 dark:text-slate-500 text-sm font-medium">
+            Tiada pelan pendaftaran dimuat naik bagi sesi ini.
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 md:gap-5 mt-6 w-full text-left">
-            {layoutList.map(layout => (
-              <div key={layout.id} className="bg-slate-50 dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm flex flex-col group hover:shadow-md transition-all">
-                 <div className="w-full relative cursor-pointer overflow-hidden rounded-xl h-48 mb-4 border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-800 flex items-center justify-center" onClick={() => setViewingMemo({ url: layout.url, name: layout.name, type: layout.type, uploadDate: layout.uploadDate })}>
-                    {layout.type === 'pdf' ? <FileText size={64} className="text-sky-500 opacity-80 group-hover:scale-110 transition-transform duration-300" /> : <img src={layout.url} alt={layout.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />}
-                    <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300"><span className="text-white text-sm font-bold flex items-center gap-2"><Eye size={18}/> Lihat Penuh</span></div>
-                 </div>
-                 <div className="flex-1 px-1">
-                    <p className="text-sm font-bold text-slate-800 dark:text-slate-200 line-clamp-1" title={layout.name}>{layout.name}</p>
-                    <div className="flex items-center gap-2 mt-1.5">
-                      <span className="text-[9px] font-black text-sky-600 bg-sky-100 dark:text-sky-300 dark:bg-sky-900/40 px-1.5 py-0.5 rounded uppercase">{layout.type === 'pdf' ? 'PDF' : 'IMEJ'}</span>
-                      {layout.uploadDate && <span className="text-[9px] font-bold text-slate-500"><Clock size={10} className="inline mr-1"/>{formatDateTime(layout.uploadDate)}</span>}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+            {layoutList.map((layout, idx) => (
+              <div
+                key={layout.id || idx}
+                className="group rounded-2xl overflow-hidden bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/70 shadow-sm hover:shadow-md transition-all flex flex-col"
+              >
+                <div
+                  onClick={() => setViewingMemo(layout)}
+                  className="cursor-pointer relative h-52 bg-slate-200/70 dark:bg-slate-900 flex items-center justify-center overflow-hidden"
+                >
+                  {layout.type === 'pdf' ? (
+                    <div className="flex flex-col items-center gap-2 text-red-500">
+                      <FileText size={44} />
+                      <span className="text-xs font-extrabold uppercase tracking-wider px-2.5 py-1 rounded-full bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-300">
+                        Dokumen PDF
+                      </span>
                     </div>
-                 </div>
-                 <div className="flex w-full gap-2 mt-4 pt-3 border-t border-slate-200 dark:border-slate-700/50">
-                    <button onClick={() => setViewingMemo({ url: layout.url, name: layout.name, type: layout.type, uploadDate: layout.uploadDate })} className="flex-1 inline-flex items-center justify-center gap-1.5 text-[11px] font-bold text-sky-700 bg-sky-100 hover:bg-sky-200 dark:bg-sky-900/40 dark:text-sky-300 dark:hover:bg-sky-800/60 px-2 py-2.5 rounded-xl transition-all active:scale-95"><ExternalLink size={14}/> Lihat</button>
-                    <button onClick={() => handleDownloadBlob(layout.url, layout.name)} className="flex-[1.5] inline-flex items-center justify-center gap-1.5 text-[11px] font-bold text-white bg-emerald-600 hover:bg-emerald-700 px-2 py-2.5 rounded-xl shadow-sm transition-all active:scale-95"><Download size={14}/> Muat Turun</button>
-                    {isAdmin && <button onClick={() => handleDeleteLayout(layout.id)} className="bg-red-50 text-red-600 hover:bg-red-100 dark:bg-red-900/20 p-2.5 rounded-xl transition-colors active:scale-90" aria-label="Padam pelan"><Trash2 size={16}/></button>}
-                 </div>
+                  ) : (
+                    <img
+                      src={layout.url}
+                      alt={layout.name}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                    />
+                  )}
+                </div>
+
+                <div className="p-4 flex items-center justify-between gap-2 mt-auto">
+                  <div className="min-w-0">
+                    <p className="text-sm font-bold text-slate-900 dark:text-slate-100 truncate">
+                      {layout.name}
+                    </p>
+                    <span className="text-[10px] font-bold uppercase text-cyan-600 dark:text-cyan-400">
+                      {layout.type === 'pdf' ? 'Fail PDF' : 'Imej Pelan'}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => setViewingMemo(layout)}
+                      className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-bold bg-cyan-50 text-cyan-700 hover:bg-cyan-100 dark:bg-cyan-900/30 dark:text-cyan-300 border border-cyan-200/60 dark:border-cyan-800 transition"
+                    >
+                      <ExternalLink size={13} />
+                      Lihat
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() =>
+                        handleDownloadBlob(
+                          layout.url,
+                          `${layout.name}.${layout.type === 'pdf' ? 'pdf' : 'jpg'}`
+                        )
+                      }
+                      className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-bold bg-emerald-600 text-white hover:bg-emerald-500 transition"
+                    >
+                      <Download size={13} />
+                    </button>
+
+                    {isAdmin && (
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteLayout(layout.id)}
+                        className="p-1.5 rounded-xl text-red-500 bg-red-50 hover:bg-red-100 dark:bg-red-900/20 dark:hover:bg-red-900/40 transition"
+                        aria-label="Padam pelan"
+                      >
+                        <Trash2 size={15} />
+                      </button>
+                    )}
+                  </div>
+                </div>
               </div>
             ))}
           </div>
